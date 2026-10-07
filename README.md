@@ -186,6 +186,21 @@ dotnet build src\Hikan.Dynamo -c Release
 
 配布時は `Hikan.AutoCAD.dll` / `Hikan.Dynamo.dll` と `Hikan.Core.dll` を同じフォルダに置く(AutoCAD 本体 DLL は含めない)。
 
+### ビルド時に出る `warning MSB3277` について(無害)
+
+`Hikan.AutoCAD` のビルドで `Microsoft.VisualBasic` / `System.Drawing` / `WindowsBase` の 3 件の
+`MSB3277`(異なるバージョン間で解決できない競合)が出るが、**対処不要**。
+
+発生源は AutoCAD 側で、`AcMgd.dll` などがこれらの新しいバージョンに依存しているのに対し、
+net8.0 の参照パックが公開しているのは互換ファサード側、という食い違いによる。
+C# コンパイラは実際に型を使ったアセンブリしか参照に残さないため、**生成される
+`Hikan.AutoCAD.dll` の参照は `System.Runtime` / `System.Collections` / `accoremgd` / `Acdbmgd` のみ**で、
+競合している 3 つは 1 つも含まれない(メタデータの AssemblyRef を読んで確認済み)。
+`<Private>False</Private>` により配布物にも同梱されず、実行時は AutoCAD が自身のコピーを読む。
+
+`<MSBuildWarningsAsMessages>MSB3277</MSBuildWarningsAsMessages>` で抑制できるが、将来 `System.Drawing`
+などを実際に使う参照を追加したときに本物の競合を見逃すため、既定では抑制していない。
+
 ## 8. 規約・制約
 
 - `using` ディレクティブ不使用(完全修飾名)、mm 不使用(メートル統一)、Z は上向き、AutoCAD 系 DLL は Private=False。
