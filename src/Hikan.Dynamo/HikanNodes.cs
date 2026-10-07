@@ -19,7 +19,12 @@ namespace Hikan.Dynamo
             "外形幅_m",
             "外形高_m",
             "敷高_m",
-            "コンクリート計_m3",
+            "コンクリート総計_m3",
+            "函体_m3",
+            "上流胸壁_m3",
+            "下流胸壁_m3",
+            "しゃ水壁_m3",
+            "浸透路長_m",
             "頂版_m3",
             "底版_m3",
             "側壁_m3",
@@ -27,6 +32,8 @@ namespace Hikan.Dynamo
             "型枠_外側面_m2",
             "型枠_頂版上面_m2",
             "型枠_端面_m2",
+            "型枠_胸壁_m2",
+            "型枠_しゃ水壁_m2",
             "水平投影長_m",
             "落差_m",
             "ブロック長_m",
@@ -47,7 +54,16 @@ namespace Hikan.Dynamo
             int blockCount = 4,
             double excavationMargin = 0.5,
             double excavationSlope = 0.5,
-            double foundationThickness = 0.1)
+            double foundationThickness = 0.1,
+            double upstreamBreastThickness = 0.0,
+            double upstreamBreastWidth = 4.0,
+            double upstreamBreastHeight = 4.0,
+            double downstreamBreastThickness = 0.0,
+            double downstreamBreastWidth = 4.0,
+            double downstreamBreastHeight = 4.0,
+            int cutoffCount = 0,
+            double cutoffThickness = 0.5,
+            double cutoffProjection = 0.5)
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
             p.InnerWidth = (decimal)innerWidth;
@@ -62,6 +78,15 @@ namespace Hikan.Dynamo
             p.ExcavationMargin = (decimal)excavationMargin;
             p.ExcavationSlope = (decimal)excavationSlope;
             p.FoundationThickness = (decimal)foundationThickness;
+            p.UpstreamBreastThickness = (decimal)upstreamBreastThickness;
+            p.UpstreamBreastWidth = (decimal)upstreamBreastWidth;
+            p.UpstreamBreastHeight = (decimal)upstreamBreastHeight;
+            p.DownstreamBreastThickness = (decimal)downstreamBreastThickness;
+            p.DownstreamBreastWidth = (decimal)downstreamBreastWidth;
+            p.DownstreamBreastHeight = (decimal)downstreamBreastHeight;
+            p.CutoffCount = cutoffCount;
+            p.CutoffThickness = (decimal)cutoffThickness;
+            p.CutoffProjection = (decimal)cutoffProjection;
 
             Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
 
@@ -70,7 +95,12 @@ namespace Hikan.Dynamo
             r["外形幅_m"] = (double)e.OuterWidth;
             r["外形高_m"] = (double)e.OuterHeight;
             r["敷高_m"] = (double)e.InvertLevel;
-            r["コンクリート計_m3"] = (double)e.ConcreteVolume;
+            r["コンクリート総計_m3"] = (double)e.ConcreteVolume;
+            r["函体_m3"] = (double)e.BarrelConcreteVolume;
+            r["上流胸壁_m3"] = (double)e.UpstreamBreastVolume;
+            r["下流胸壁_m3"] = (double)e.DownstreamBreastVolume;
+            r["しゃ水壁_m3"] = (double)e.CutoffTotalVolume;
+            r["浸透路長_m"] = (double)e.SeepagePathLength;
             r["頂版_m3"] = (double)e.TopSlabVolume;
             r["底版_m3"] = (double)e.BottomSlabVolume;
             r["側壁_m3"] = (double)e.WallVolume;
@@ -78,6 +108,8 @@ namespace Hikan.Dynamo
             r["型枠_外側面_m2"] = (double)e.FormworkOuterSide;
             r["型枠_頂版上面_m2"] = (double)e.FormworkTop;
             r["型枠_端面_m2"] = (double)e.FormworkEnd;
+            r["型枠_胸壁_m2"] = (double)e.FormworkBreast;
+            r["型枠_しゃ水壁_m2"] = (double)e.FormworkCutoff;
             r["水平投影長_m"] = (double)e.HorizontalProjection;
             r["落差_m"] = (double)e.DropHeight;
             r["ブロック長_m"] = (double)e.BlockLength;

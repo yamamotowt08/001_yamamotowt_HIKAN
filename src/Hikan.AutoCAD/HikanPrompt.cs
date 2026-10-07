@@ -84,6 +84,37 @@ namespace Hikan.AutoCAD
             p.ExcavationSlope = d;
             if (!GetDecimal(ed, "基礎材厚 (均しコン等) [m]", p.FoundationThickness, out d)) { return false; }
             p.FoundationThickness = d;
+
+            // 胸壁。厚 0 なら設置しないので幅・高は聞かない。
+            if (!GetDecimal(ed, "上流胸壁 厚 [m] (0 で設置しない)", p.UpstreamBreastThickness, out d)) { return false; }
+            p.UpstreamBreastThickness = d;
+            if (p.UpstreamBreastThickness > 0m)
+            {
+                if (!GetDecimal(ed, "上流胸壁 幅 [m] (外形幅以上)", p.UpstreamBreastWidth, out d)) { return false; }
+                p.UpstreamBreastWidth = d;
+                if (!GetDecimal(ed, "上流胸壁 高 [m] (底版下面から、外形高以上)", p.UpstreamBreastHeight, out d)) { return false; }
+                p.UpstreamBreastHeight = d;
+            }
+            if (!GetDecimal(ed, "下流胸壁 厚 [m] (0 で設置しない)", p.DownstreamBreastThickness, out d)) { return false; }
+            p.DownstreamBreastThickness = d;
+            if (p.DownstreamBreastThickness > 0m)
+            {
+                if (!GetDecimal(ed, "下流胸壁 幅 [m] (外形幅以上)", p.DownstreamBreastWidth, out d)) { return false; }
+                p.DownstreamBreastWidth = d;
+                if (!GetDecimal(ed, "下流胸壁 高 [m] (底版下面から、外形高以上)", p.DownstreamBreastHeight, out d)) { return false; }
+                p.DownstreamBreastHeight = d;
+            }
+
+            // しゃ水壁。枚数 0 なら設置しないので厚・張出しは聞かない。
+            if (!GetInt(ed, "しゃ水壁 枚数 (0 で設置しない。等間隔配置)", p.CutoffCount, out n)) { return false; }
+            p.CutoffCount = n;
+            if (p.CutoffCount > 0)
+            {
+                if (!GetDecimal(ed, "しゃ水壁 厚 [m]", p.CutoffThickness, out d)) { return false; }
+                p.CutoffThickness = d;
+                if (!GetDecimal(ed, "しゃ水壁 張出し量 [m] (全周一律、下方にも)", p.CutoffProjection, out d)) { return false; }
+                p.CutoffProjection = d;
+            }
             if (!GetInt(ed, "ソリッド色 (ACI 0〜256)", p.ColorIndex, out n)) { return false; }
             p.ColorIndex = n;
 

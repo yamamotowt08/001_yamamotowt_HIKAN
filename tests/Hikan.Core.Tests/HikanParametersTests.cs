@@ -96,6 +96,45 @@ namespace Hikan.Core.Tests
             }
         }
 
+        // テスト8: 第1段階で生成したソリッドとの後方互換。
+        // 胸壁・しゃ水壁のキーが無い XData でも読め、函体だけのモデルになること。
+        [Xunit.Fact]
+        public void FromDictionary_StageOneXData_ReadsAsBarrelOnly()
+        {
+            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            System.Collections.Generic.Dictionary<string, string> d = p.ToDictionary();
+
+            // 第2段階で追加したキーを取り除き、第1段階の XData を再現する
+            string[] added = new string[]
+            {
+                "upstream_breast_thickness", "upstream_breast_width", "upstream_breast_height",
+                "downstream_breast_thickness", "downstream_breast_width", "downstream_breast_height",
+                "cutoff_count", "cutoff_thickness", "cutoff_projection"
+            };
+            foreach (string key in added)
+            {
+                Xunit.Assert.True(d.Remove(key), "キーが存在すること: " + key);
+            }
+
+            Hikan.Core.HikanParameters q = Hikan.Core.HikanParameters.FromDictionary(d);
+            Xunit.Assert.Equal(0m, q.UpstreamBreastThickness);
+            Xunit.Assert.Equal(0m, q.DownstreamBreastThickness);
+            Xunit.Assert.Equal(0, q.CutoffCount);
+            Xunit.Assert.Equal(76.800m, Hikan.Core.HikanGeometry.ModelVolume(q));
+            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(q));
+        }
+
+        // テスト9: キーが在るのに値が不正なら、補完せずエラー停止すること。
+        [Xunit.Fact]
+        public void FromDictionary_PresentButInvalidNewKey_Throws()
+        {
+            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            System.Collections.Generic.Dictionary<string, string> d = p.ToDictionary();
+            d["cutoff_count"] = "たくさん";
+            Xunit.Assert.Throws<Hikan.Core.HikanValidationException>(
+                () => Hikan.Core.HikanParameters.FromDictionary(d));
+        }
+
         // テスト7: 敷高は底版下面ではなく底版厚ぶん上。基準点との混同を防ぐ。
         [Xunit.Fact]
         public void InvertLevel_IsBaseZPlusBottomSlab()

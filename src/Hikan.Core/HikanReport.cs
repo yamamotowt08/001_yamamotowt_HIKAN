@@ -45,6 +45,15 @@ namespace Hikan.Core
             Add(r, "excavation_margin", F(p.ExcavationMargin), "m", "入力");
             Add(r, "excavation_slope", F(p.ExcavationSlope), "", "入力");
             Add(r, "foundation_thickness", F(p.FoundationThickness), "m", "入力");
+            Add(r, "upstream_breast_thickness", F(p.UpstreamBreastThickness), "m", "入力");
+            Add(r, "upstream_breast_width", F(p.UpstreamBreastWidth), "m", "入力");
+            Add(r, "upstream_breast_height", F(p.UpstreamBreastHeight), "m", "入力");
+            Add(r, "downstream_breast_thickness", F(p.DownstreamBreastThickness), "m", "入力");
+            Add(r, "downstream_breast_width", F(p.DownstreamBreastWidth), "m", "入力");
+            Add(r, "downstream_breast_height", F(p.DownstreamBreastHeight), "m", "入力");
+            Add(r, "cutoff_count", p.CutoffCount.ToString(), "枚", "入力");
+            Add(r, "cutoff_thickness", F(p.CutoffThickness), "m", "入力");
+            Add(r, "cutoff_projection", F(p.CutoffProjection), "m", "入力");
 
             Add(r, "outer_width", F(e.OuterWidth), "m", "確定");
             Add(r, "outer_height", F(e.OuterHeight), "m", "確定");
@@ -55,6 +64,12 @@ namespace Hikan.Core
             Add(r, "top_slab_volume", F(e.TopSlabVolume), "m3", "確定");
             Add(r, "bottom_slab_volume", F(e.BottomSlabVolume), "m3", "確定");
             Add(r, "wall_volume", F(e.WallVolume), "m3", "確定");
+            Add(r, "barrel_concrete_volume", F(e.BarrelConcreteVolume), "m3", "確定");
+            Add(r, "upstream_breast_volume", F(e.UpstreamBreastVolume), "m3", "確定");
+            Add(r, "downstream_breast_volume", F(e.DownstreamBreastVolume), "m3", "確定");
+            Add(r, "cutoff_total_volume", F(e.CutoffTotalVolume), "m3", "確定");
+            Add(r, "cutoff_spacing", F(e.CutoffSpacing), "m", "確定");
+            Add(r, "seepage_path_length", F(e.SeepagePathLength), "m", "推定");
             Add(r, "concrete_volume", F(e.ConcreteVolume), "m3", "確定");
             Add(r, "horizontal_projection", F(e.HorizontalProjection), "m", "確定");
             Add(r, "drop_height", F(e.DropHeight), "m", "確定");
@@ -63,6 +78,8 @@ namespace Hikan.Core
             Add(r, "formwork_outer_side", F(e.FormworkOuterSide), "m2", "概算");
             Add(r, "formwork_top", F(e.FormworkTop), "m2", "概算");
             Add(r, "formwork_end", F(e.FormworkEnd), "m2", "概算");
+            Add(r, "formwork_breast", F(e.FormworkBreast), "m2", "概算");
+            Add(r, "formwork_cutoff", F(e.FormworkCutoff), "m2", "概算");
 
             Add(r, "block_length", F(e.BlockLength), "m", "確定");
             Add(r, "concrete_per_block", F(e.ConcretePerBlock), "m3", "確定");
@@ -81,7 +98,11 @@ namespace Hikan.Core
         /// <summary>数量化できない前提・対象外を注記として出す(金額は算出しない)。</summary>
         public static readonly string[] Notes = new string[]
         {
-            "対象範囲: ボックスカルバート型 1 連の函体(頂版・側壁・底版)のみ。胸壁・しゃ水壁・翼壁・門柱・ゲート操作台・水叩き・護床工は対象外。",
+            "対象範囲: ボックスカルバート型 1 連の函体(頂版・側壁・底版)+ 胸壁 + しゃ水壁。翼壁・門柱・ゲート操作台・水叩き・護床工は対象外。",
+            "胸壁は函体端面の外側(上流 Y<0 / 下流 Y>L)に接続する矩形板としてモデル化しています。函体延長 L に胸壁は含みません。",
+            "しゃ水壁は函体外周に全周一律(下方にも)張り出すカラーとしてモデル化し、函体延長を枚数で等分した各区間の中央に配置します。",
+            "胸壁・しゃ水壁の寸法・張出し量・設置位置は参照文書に規定がないため、全て入力値です。形状は『全部材が等厚矩形』(基準の形状単純化方針)のみを根拠にしています。",
+            "浸透路長は函体外周に沿う経路長(延長 + 張出し量 × 2 × 枚数)です。レーン則等による必要浸透路長の照査は行いません(照査式が参照文書にないため)。",
             "基準点は上流端・底版下面・函体中心線上。敷高(内空底面高)は invert_level を参照(底版厚ぶん上)。",
             "底版勾配は押出し後の回転で表現するため、上下流の端面が鉛直になりません。コンクリート体積は回転で変わりません。",
             "ブロック数は形状に反映せず数量の按分表示のみです。継手の目地幅は控除していません(目地材・止水板も対象外)。",

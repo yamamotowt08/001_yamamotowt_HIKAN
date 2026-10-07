@@ -10,11 +10,15 @@
 namespace Hikan.AutoCAD
 {
     /// <summary>
-    /// 樋管函体の Solid3d 生成・差替え・XData 入出力。
+    /// 樋管(函体 + 胸壁 + しゃ水壁)の Solid3d 生成・差替え・XData 入出力。
     ///
-    /// 生成手順: 外形/内空の断面ポリライン → Region 2 個 → BoolSubtract で穴あき Region 1 個
-    /// → Extrude 1 回(この時点で Solid3d は 1 個)→ X 軸まわり +90 度回転 → 基準点へ平行移動
-    /// → 底版勾配の回転。Region 段階で内空を抜くため、複数ソリッドが残る事故が構成上起こらない。
+    /// 生成手順: 部材ごとに 断面ポリライン → Region → Extrude で中実プリズムを作り、
+    /// BoolUnite で合成 → 最後に内空プリズムを BoolSubtract → X 軸まわり +90 度回転
+    /// → 基準点へ平行移動 → 底版勾配の回転。
+    /// 薄いシェル同士を同一平面でブーリアンしないため、部材を増やしても退化しにくい。
+    /// 合成は ModelSpace に追加したあと DB 常駐のまま行う(非常駐 Solid3d のブーリアンは
+    /// 環境によって拒否されることがあるため)。途中で失敗しても tr.Commit() に到達しないので
+    /// 図面には何も残らない。
     ///
     /// Verify は体積・3軸エクステント・3成分重心を解析解と照合する。体積とエクステントだけでは
     /// 断面の上下反転(頂版厚 ≠ 底版厚 のとき)を検出できないため重心の照合が必須。
@@ -106,7 +110,11 @@ namespace Hikan.AutoCAD
             Autodesk.AutoCAD.DatabaseServices.Database db,
             Hikan.Core.HikanParameters p)
         {
-            Autodesk.AutoCAD.DatabaseServices.Solid3d solid = BuildSolid(p);
+            Hikan.Core.HikanPart[] parts = Hikan.Core.HikanGeometry.GetParts(p);
+            decimal k = Hikan.Core.HikanGeometry.GlobalSMax(p);
+
+            // 先頭は必ず函体。これを DB に載せてから、以降の部材を DB 常駐のまま合成する。
+            Autodesk.AutoCAD.DatabaseServices.Solid3d solid = BuildPrism(parts[0], k);
             try
             {
                 Autodesk.AutoCAD.DatabaseServices.BlockTable bt = (Autodesk.AutoCAD.DatabaseServices.BlockTable)
@@ -123,6 +131,11 @@ namespace Hikan.AutoCAD
                 throw;
             }
 
+            Combine(solid, parts, k, false, Autodesk.AutoCAD.DatabaseServices.BooleanOperationType.BoolUnite);
+            Combine(solid, parts, k, true, Autodesk.AutoCAD.DatabaseServices.BooleanOperationType.BoolSubtract);
+
+            solid.TransformBy(BuildPlacement(p));
+
             EnsureLayer(tr, db);
             solid.Layer = LayerName;
             solid.ColorIndex = (short)p.ColorIndex;
@@ -131,29 +144,53 @@ namespace Hikan.AutoCAD
             return solid.ObjectId;
         }
 
-        private static Autodesk.AutoCAD.DatabaseServices.Solid3d BuildSolid(Hikan.Core.HikanParameters p)
+        /// <summary>parts のうち isVoid が一致するものを(先頭の函体を除いて)順に合成する。</summary>
+        private static void Combine(
+            Autodesk.AutoCAD.DatabaseServices.Solid3d solid,
+            Hikan.Core.HikanPart[] parts,
+            decimal k,
+            bool isVoid,
+            Autodesk.AutoCAD.DatabaseServices.BooleanOperationType operation)
         {
-            Autodesk.AutoCAD.DatabaseServices.Region outer = null;
-            Autodesk.AutoCAD.DatabaseServices.Region inner = null;
+            for (int i = 1; i < parts.Length; i++)
+            {
+                if (parts[i].IsVoid != isVoid) { continue; }
+                Autodesk.AutoCAD.DatabaseServices.Solid3d other = BuildPrism(parts[i], k);
+                try
+                {
+                    solid.BooleanOperation(operation, other);
+                }
+                finally
+                {
+                    other.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 部材 1 個ぶんの中実プリズム。断面を作図平面に置き、押出し座標 W = GlobalSMax − S になるよう
+        /// Elevation をずらしてから押出す。配置変換は全部材を合成したあとに 1 回だけ適用する。
+        /// </summary>
+        private static Autodesk.AutoCAD.DatabaseServices.Solid3d BuildPrism(Hikan.Core.HikanPart part, decimal globalSMax)
+        {
+            Autodesk.AutoCAD.DatabaseServices.Region region = null;
             Autodesk.AutoCAD.DatabaseServices.Solid3d solid = null;
             try
             {
-                outer = CreateRegion(Hikan.Core.HikanGeometry.GetOuterSectionPoints(p), "外形断面");
-                inner = CreateRegion(Hikan.Core.HikanGeometry.GetInnerSectionPoints(p), "内空断面");
+                region = CreateRegion(
+                    Hikan.Core.HikanGeometry.GetSectionPoints(part),
+                    part.Name,
+                    (double)(globalSMax - part.SMax));
 
-                outer.BooleanOperation(Autodesk.AutoCAD.DatabaseServices.BooleanOperationType.BoolSubtract, inner);
-
-                // 2D 段階の検査。ここで弾ければ 3D の変換と切り分けられる。
-                double expectedArea = (double)Hikan.Core.HikanGeometry.SectionArea(p);
-                if (System.Math.Abs(outer.Area - expectedArea) > AreaTolerance)
+                double expectedArea = (double)((part.UMax - part.UMin) * (part.VMax - part.VMin));
+                if (System.Math.Abs(region.Area - expectedArea) > AreaTolerance)
                 {
                     throw new Hikan.Core.HikanValidationException(
-                        "内空控除後の断面積 " + outer.Area + " m2 が 外形−内空 = " + expectedArea + " m2 と一致しません。");
+                        part.Name + " の断面積 " + region.Area + " m2 が " + expectedArea + " m2 と一致しません。");
                 }
 
                 solid = new Autodesk.AutoCAD.DatabaseServices.Solid3d();
-                solid.Extrude(outer, (double)p.BarrelLength, 0.0);
-                solid.TransformBy(BuildPlacement(p));
+                solid.Extrude(region, (double)(part.SMax - part.SMin), 0.0);
                 return solid;
             }
             catch
@@ -166,25 +203,23 @@ namespace Hikan.AutoCAD
             }
             finally
             {
-                if (inner != null)
+                if (region != null)
                 {
-                    inner.Dispose();
-                }
-                if (outer != null)
-                {
-                    outer.Dispose();
+                    region.Dispose();
                 }
             }
         }
 
         /// <summary>局所断面 (U, V) を作図平面に置いて閉 Region 1 個にする。</summary>
+        /// <summary>局所断面 (U, V) を作図平面の指定標高に置いて閉 Region 1 個にする。</summary>
         private static Autodesk.AutoCAD.DatabaseServices.Region CreateRegion(
             (decimal U, decimal V)[] pts,
-            string label)
+            string label,
+            double elevation)
         {
             using (Autodesk.AutoCAD.DatabaseServices.Polyline pl = new Autodesk.AutoCAD.DatabaseServices.Polyline())
             {
-                pl.Elevation = 0.0;
+                pl.Elevation = elevation;
                 for (int i = 0; i < pts.Length; i++)
                 {
                     pl.AddVertexAt(i,
@@ -211,7 +246,8 @@ namespace Hikan.AutoCAD
 
         /// <summary>
         /// 配置変換。押出し後の (U, V, W) を
-        /// (BaseX + U, BaseY + L − W, BaseZ + V) に写し、続いて底版勾配の回転をかける。
+        /// (BaseX + U, BaseY + GlobalSMax − W, BaseZ + V) に写し、続いて底版勾配の回転をかける。
+        /// 胸壁が無ければ GlobalSMax は函体延長に一致するので、第1段階と同じ配置になる。
         /// X 軸まわり +90 度は (x, y, z) → (x, −z, y) なので、断面の V が正しく Z に乗る
         /// (−90 度だと断面が上下反転し、頂版厚 ≠ 底版厚 のとき静かに誤る)。
         /// </summary>
@@ -224,7 +260,7 @@ namespace Hikan.AutoCAD
             Autodesk.AutoCAD.Geometry.Matrix3d move = Autodesk.AutoCAD.Geometry.Matrix3d.Displacement(
                 new Autodesk.AutoCAD.Geometry.Vector3d(
                     (double)p.BaseX,
-                    (double)(p.BaseY + p.BarrelLength),
+                    (double)(p.BaseY + Hikan.Core.HikanGeometry.GlobalSMax(p)),
                     (double)p.BaseZ));
             Autodesk.AutoCAD.Geometry.Matrix3d place = move * rotate;
 
@@ -252,14 +288,14 @@ namespace Hikan.AutoCAD
             if (System.Math.Abs(mp.Volume - expectedVolume) > VolumeTolerance)
             {
                 throw new Hikan.Core.HikanValidationException(
-                    "生成ソリッドの体積 " + mp.Volume + " m3 が (外形−内空)×L = " + expectedVolume + " m3 と一致しません。");
+                    "生成ソリッドの体積 " + mp.Volume + " m3 が解析解 " + expectedVolume + " m3 と一致しません。");
             }
 
-            double outerPrism = (double)(p.OuterWidth * p.OuterHeight * p.BarrelLength);
-            if (mp.Volume >= outerPrism - VolumeTolerance)
+            double envelope = (double)Hikan.Core.HikanGeometry.EnvelopeVolume(p);
+            if (mp.Volume >= envelope - VolumeTolerance)
             {
                 throw new Hikan.Core.HikanValidationException(
-                    "内空が控除されていません(体積 " + mp.Volume + " m3 が外形プリズム " + outerPrism + " m3 と同等)。");
+                    "内空が控除されていません(体積 " + mp.Volume + " m3 が外形エンベロープ " + envelope + " m3 と同等)。");
             }
 
             (decimal MinX, decimal MinY, decimal MinZ, decimal MaxX, decimal MaxY, decimal MaxZ) x =

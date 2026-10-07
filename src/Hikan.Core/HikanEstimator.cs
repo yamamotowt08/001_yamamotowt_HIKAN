@@ -14,6 +14,25 @@ namespace Hikan.Core
             return System.Math.Round(value, digits, System.MidpointRounding.AwayFromZero);
         }
 
+        /// <summary>胸壁 1 基の型枠面積 [m2]。外側面(内空開口を控除)+ 両側面 + 上面。</summary>
+        private static decimal BreastFormwork(decimal width, decimal height, decimal thickness, HikanParameters p)
+        {
+            if (thickness <= 0m) { return 0m; }
+            return (width * height - HikanGeometry.InnerSectionArea(p))
+                + 2m * height * thickness
+                + width * thickness;
+        }
+
+        /// <summary>しゃ水壁の型枠面積 [m2]。外周面 + 前後の環状面。</summary>
+        private static decimal CutoffFormwork(HikanParameters p)
+        {
+            if (p.CutoffCount <= 0) { return 0m; }
+            decimal w = p.OuterWidth + 2m * p.CutoffProjection;
+            decimal h = p.OuterHeight + 2m * p.CutoffProjection;
+            decimal ring = w * h - p.OuterWidth * p.OuterHeight;
+            return p.CutoffCount * (2m * (w + h) * p.CutoffThickness + 2m * ring);
+        }
+
         public static HikanEstimate Calculate(HikanParameters p)
         {
             HikanValidator.EnsureValid(p);
@@ -36,7 +55,21 @@ namespace Hikan.Core
             e.TopSlabVolume = RoundHalfUp(bOut * p.TopSlabThickness * l, Digits);
             e.BottomSlabVolume = RoundHalfUp(bOut * p.BottomSlabThickness * l, Digits);
             e.WallVolume = RoundHalfUp(2m * p.WallThickness * p.InnerHeight * l, Digits);
+            e.BarrelConcreteVolume = RoundHalfUp(HikanGeometry.BarrelVolume(p), Digits);
             e.ConcreteVolume = RoundHalfUp(HikanGeometry.ModelVolume(p), Digits);
+
+            // 胸壁は内空の貫通分を控除済み。しゃ水壁は函体と重なる部分を控除した正味。
+            e.UpstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(
+                p.UpstreamBreastWidth, p.UpstreamBreastHeight, p.UpstreamBreastThickness, p), Digits);
+            e.DownstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(
+                p.DownstreamBreastWidth, p.DownstreamBreastHeight, p.DownstreamBreastThickness, p), Digits);
+            e.CutoffTotalVolume = RoundHalfUp(HikanGeometry.CutoffVolume(p), Digits);
+            e.CutoffSpacing = p.CutoffCount > 0 ? RoundHalfUp(l / p.CutoffCount, Digits) : 0m;
+
+            // 浸透路長: 函体外周に沿う経路。カラー 1 枚につき張出し量の 2 倍(下り + 上り)が加わる。
+            // 具体の照査式(レーン則等)は参照文書に無いため信頼度は推定。
+            e.SeepagePathLength = RoundHalfUp(
+                l + 2m * p.CutoffProjection * p.CutoffCount, Digits);
 
             // 勾配の回転は体積を変えない。延長 L は斜距離なので水平投影長と落差を出す。
             decimal c = HikanGeometry.SlopeCosine(p);
@@ -48,14 +81,30 @@ namespace Hikan.Core
             e.FormworkOuterSide = RoundHalfUp(2m * hOut * l, Digits);
             e.FormworkTop = RoundHalfUp(bOut * l, Digits);
             e.FormworkEnd = RoundHalfUp(2m * HikanGeometry.SectionArea(p), Digits);
+            // 胸壁は外側面(内空開口を控除)+ 両側面 + 上面。函体と接する背面は計上しない。
+            e.FormworkBreast = RoundHalfUp(
+                BreastFormwork(p.UpstreamBreastWidth, p.UpstreamBreastHeight, p.UpstreamBreastThickness, p)
+                + BreastFormwork(p.DownstreamBreastWidth, p.DownstreamBreastHeight, p.DownstreamBreastThickness, p),
+                Digits);
+            // しゃ水壁は外周面 + 前後の環状面。
+            e.FormworkCutoff = RoundHalfUp(CutoffFormwork(p), Digits);
 
+            // ブロック割は函体のみに適用する(胸壁・しゃ水壁は別部材)。
             e.BlockLength = RoundHalfUp(l / p.BlockCount, Digits);
-            e.ConcretePerBlock = RoundHalfUp(HikanGeometry.ModelVolume(p) / p.BlockCount, Digits);
+            e.ConcretePerBlock = RoundHalfUp(HikanGeometry.BarrelVolume(p) / p.BlockCount, Digits);
 
             // 床掘り: 四方に法勾配 1:n を付けた角錐台。∫[0,d] (Wb+2nz)(Lb+2nz) dz の厳密解。
-            decimal wb = bOut + 2m * p.ExcavationMargin;
-            decimal lb = l + 2m * p.ExcavationMargin;
-            decimal d = p.SoilCover + hOut + p.FoundationThickness;
+            // 平面は全部材の外形を囲む大きさ、深さは最も深い部材(しゃ水壁の下方張出し)まで。
+            decimal planWidth = bOut;
+            if (p.UpstreamBreastThickness > 0m && p.UpstreamBreastWidth > planWidth) { planWidth = p.UpstreamBreastWidth; }
+            if (p.DownstreamBreastThickness > 0m && p.DownstreamBreastWidth > planWidth) { planWidth = p.DownstreamBreastWidth; }
+            if (p.CutoffCount > 0 && bOut + 2m * p.CutoffProjection > planWidth) { planWidth = bOut + 2m * p.CutoffProjection; }
+            decimal planLength = p.UpstreamBreastThickness + l + p.DownstreamBreastThickness;
+            decimal below = p.CutoffCount > 0 ? p.CutoffProjection : 0m;
+
+            decimal wb = planWidth + 2m * p.ExcavationMargin;
+            decimal lb = planLength + 2m * p.ExcavationMargin;
+            decimal d = p.SoilCover + hOut + below + p.FoundationThickness;
             decimal n = p.ExcavationSlope;
             decimal exc = wb * lb * d
                 + n * d * d * (wb + lb)
@@ -67,8 +116,9 @@ namespace Hikan.Core
             e.ExcavationVolume = RoundHalfUp(exc, Digits);
 
             decimal foundation = wb * lb * p.FoundationThickness;
-            // 地下占有体積は外形プリズム。内空は埋戻さないので断面積ではなく外形で控除する。
-            decimal occupied = bOut * hOut * l;
+            // 地下占有体積は外形エンベロープ(内空を埋め戻した状態)。
+            // 内空は埋戻さないのでコンクリート体積では控除できない。
+            decimal occupied = HikanGeometry.EnvelopeVolume(p);
             e.FoundationVolume = RoundHalfUp(foundation, Digits);
             e.OccupiedVolume = RoundHalfUp(occupied, Digits);
             e.BackfillVolume = RoundHalfUp(exc - occupied - foundation, Digits);

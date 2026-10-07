@@ -39,6 +39,10 @@ namespace Hikan.Core
             CheckThickness(errors, p.TopSlabThickness, "頂版厚");
             CheckThickness(errors, p.BottomSlabThickness, "底版厚");
 
+            CheckBreastWall(errors, p, p.UpstreamBreastThickness, p.UpstreamBreastWidth, p.UpstreamBreastHeight, "上流胸壁");
+            CheckBreastWall(errors, p, p.DownstreamBreastThickness, p.DownstreamBreastWidth, p.DownstreamBreastHeight, "下流胸壁");
+            CheckCutoff(errors, p);
+
             if (p.InnerWidth > MaxInnerDimension + Tolerance)
             {
                 errors.Add("内空幅 B が適用範囲(" + MaxInnerDimension + " m 程度以下)を超えています。");
@@ -52,20 +56,78 @@ namespace Hikan.Core
                 errors.Add("土かぶりが適用範囲(" + MaxSoilCover + " m 程度以下)を超えています。");
             }
 
-            // 整合性チェック: 部位別体積の和 == 断面積 × 延長。断面の分解と全体が食い違う入力を弾く。
+            // 整合性チェック: 函体の部位別体積の和 == 函体断面積 × 延長。断面の分解と全体が食い違う入力を弾く。
+            // 比較相手は BarrelVolume(函体のみ)であって ModelVolume(胸壁・しゃ水壁を含む総計)ではない。
             if (p.InnerWidth > 0m && p.InnerHeight > 0m && p.BarrelLength > 0m)
             {
                 decimal parts = p.OuterWidth * p.TopSlabThickness * p.BarrelLength
                     + p.OuterWidth * p.BottomSlabThickness * p.BarrelLength
                     + 2m * p.WallThickness * p.InnerHeight * p.BarrelLength;
-                decimal whole = HikanGeometry.ModelVolume(p);
+                decimal whole = HikanGeometry.BarrelVolume(p);
                 if (System.Math.Abs(parts - whole) > Tolerance)
                 {
-                    errors.Add("部位別体積の和 " + parts + " m3 が断面積×延長 " + whole + " m3 と一致しません。");
+                    errors.Add("函体の部位別体積の和 " + parts + " m3 が断面積×延長 " + whole + " m3 と一致しません。");
                 }
             }
 
             return errors;
+        }
+
+        /// <summary>
+        /// 胸壁。厚 0 は「設置しない」なので寸法を検査しない。
+        /// 幅・高を外形以上に強制するのは、内空プリズムが胸壁を完全に貫通することを保証するため。
+        /// これが崩れると体積の解析解(ModelVolume)が実形状と一致しなくなり Verify が通らない。
+        /// </summary>
+        private static void CheckBreastWall(
+            System.Collections.Generic.List<string> errors,
+            HikanParameters p,
+            decimal thickness,
+            decimal width,
+            decimal height,
+            string name)
+        {
+            if (thickness < 0m)
+            {
+                errors.Add(name + "厚は 0 以上にしてください(0 で設置しない)。");
+                return;
+            }
+            if (thickness == 0m) { return; }
+
+            CheckThickness(errors, thickness, name + "厚");
+            if (width < p.OuterWidth - Tolerance)
+            {
+                errors.Add(name + "幅は函体外形幅 " + p.OuterWidth + " m 以上にしてください。");
+            }
+            if (height < p.OuterHeight - Tolerance)
+            {
+                errors.Add(name + "高は函体外形高 " + p.OuterHeight + " m 以上にしてください。");
+            }
+        }
+
+        /// <summary>
+        /// しゃ水壁。枚数 0 は「設置しない」なので寸法を検査しない。
+        /// 厚 × 枚数 &lt; 函体延長 は、隣り合うカラー同士が接触せず、かつ両端が函体内に収まる条件
+        /// (等間隔配置なので間隔 = 延長 / 枚数)。接触するとブーリアンが同一平面で退化する。
+        /// </summary>
+        private static void CheckCutoff(System.Collections.Generic.List<string> errors, HikanParameters p)
+        {
+            if (p.CutoffCount < 0)
+            {
+                errors.Add("しゃ水壁の枚数は 0 以上にしてください(0 で設置しない)。");
+                return;
+            }
+            if (p.CutoffCount == 0) { return; }
+
+            CheckThickness(errors, p.CutoffThickness, "しゃ水壁厚");
+            if (p.CutoffProjection <= 0m)
+            {
+                errors.Add("しゃ水壁の張出し量は正の値にしてください。");
+            }
+            if (p.BarrelLength > 0m && p.CutoffThickness * p.CutoffCount >= p.BarrelLength)
+            {
+                errors.Add("しゃ水壁厚 × 枚数 = " + (p.CutoffThickness * p.CutoffCount)
+                    + " m が函体延長 " + p.BarrelLength + " m 以上です。カラーが互いに接触するか函体からはみ出します。");
+            }
         }
 
         private static void CheckThickness(System.Collections.Generic.List<string> errors, decimal t, string name)

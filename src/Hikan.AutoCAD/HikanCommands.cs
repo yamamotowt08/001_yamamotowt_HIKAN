@@ -113,8 +113,11 @@ namespace Hikan.AutoCAD
 
             try
             {
-                RunCase(ed, doc, 0.00m, "勾配なし");
-                RunCase(ed, doc, 0.02m, "勾配 0.02");
+                // 第1段階の退行確認(函体のみ)と、第2段階で追加した部材を含む構成の 2 系統。
+                RunCase(ed, doc, Case(0.00m, false), "函体のみ・勾配なし");
+                RunCase(ed, doc, Case(0.02m, false), "函体のみ・勾配 0.02");
+                RunCase(ed, doc, Case(0.00m, true), "胸壁+しゃ水壁・勾配なし");
+                RunCase(ed, doc, Case(0.02m, true), "胸壁+しゃ水壁・勾配 0.02");
             }
             catch (System.Exception ex)
             {
@@ -122,11 +125,12 @@ namespace Hikan.AutoCAD
             }
         }
 
-        private static void RunCase(
-            Autodesk.AutoCAD.EditorInput.Editor ed,
-            Autodesk.AutoCAD.ApplicationServices.Document doc,
-            decimal slope,
-            string label)
+        /// <summary>
+        /// 検証用のパラメータ。頂版厚 ≠ 底版厚 かつ基準点を 3 軸すべて非ゼロにするのが要点で、
+        /// これが無いと断面の上下反転と Z オフセットの取り違えを検出できない。
+        /// 上流胸壁と下流胸壁も別寸法にして、上下流の取り違えを検出できるようにする。
+        /// </summary>
+        private static Hikan.Core.HikanParameters Case(decimal slope, bool withExtraParts)
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
             p.TopSlabThickness = 0.4m;
@@ -136,6 +140,27 @@ namespace Hikan.AutoCAD
             p.BaseZ = 0.75m;
             p.BottomSlope = slope;
 
+            if (withExtraParts)
+            {
+                p.UpstreamBreastThickness = 0.5m;
+                p.UpstreamBreastWidth = 4.0m;
+                p.UpstreamBreastHeight = 3.5m;
+                p.DownstreamBreastThickness = 0.6m;
+                p.DownstreamBreastWidth = 5.0m;
+                p.DownstreamBreastHeight = 4.5m;
+                p.CutoffCount = 2;
+                p.CutoffThickness = 0.5m;
+                p.CutoffProjection = 0.7m;
+            }
+            return p;
+        }
+
+        private static void RunCase(
+            Autodesk.AutoCAD.EditorInput.Editor ed,
+            Autodesk.AutoCAD.ApplicationServices.Document doc,
+            Hikan.Core.HikanParameters p,
+            string label)
+        {
             Autodesk.AutoCAD.DatabaseServices.ObjectId id = HikanSolidBuilder.Create(doc.Database, p);
 
             bool xdataOk = false;
@@ -161,7 +186,7 @@ namespace Hikan.AutoCAD
 
                 Autodesk.AutoCAD.DatabaseServices.Solid3dMassProperties mp = s.MassProperties;
                 volumeOk = System.Math.Abs(mp.Volume - (double)Hikan.Core.HikanGeometry.ModelVolume(p)) <= Tolerance;
-                hollowOk = mp.Volume < (double)(p.OuterWidth * p.OuterHeight * p.BarrelLength) - Tolerance;
+                hollowOk = mp.Volume < (double)Hikan.Core.HikanGeometry.EnvelopeVolume(p) - Tolerance;
 
                 (decimal MinX, decimal MinY, decimal MinZ, decimal MaxX, decimal MaxY, decimal MaxZ) x =
                     Hikan.Core.HikanGeometry.ExpectedExtents(p);

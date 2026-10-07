@@ -34,6 +34,28 @@ namespace Hikan.Core
         public decimal ExcavationSlope { get; set; } = 0.500m;
         /// <summary>基礎材厚(均しコン等)[m]</summary>
         public decimal FoundationThickness { get; set; } = 0.100m;
+
+        // --- 胸壁(函体端面の外側に接続する矩形板)。厚 0 で「設置しない」。 ---
+        /// <summary>上流胸壁 厚(Y方向)[m]。0 で設置しない。</summary>
+        public decimal UpstreamBreastThickness { get; set; } = 0.000m;
+        /// <summary>上流胸壁 幅(X方向)[m]。外形幅以上にすること。</summary>
+        public decimal UpstreamBreastWidth { get; set; } = 4.000m;
+        /// <summary>上流胸壁 高(底版下面からの高さ)[m]。外形高以上にすること。</summary>
+        public decimal UpstreamBreastHeight { get; set; } = 4.000m;
+        /// <summary>下流胸壁 厚(Y方向)[m]。0 で設置しない。</summary>
+        public decimal DownstreamBreastThickness { get; set; } = 0.000m;
+        /// <summary>下流胸壁 幅(X方向)[m]</summary>
+        public decimal DownstreamBreastWidth { get; set; } = 4.000m;
+        /// <summary>下流胸壁 高(底版下面からの高さ)[m]</summary>
+        public decimal DownstreamBreastHeight { get; set; } = 4.000m;
+
+        // --- しゃ水壁(函体外周に全周一律で張り出すカラー)。枚数 0 で「設置しない」。 ---
+        /// <summary>しゃ水壁 枚数。函体延長を n 等分した各区間の中央に配置する。0 で設置しない。</summary>
+        public int CutoffCount { get; set; } = 0;
+        /// <summary>しゃ水壁 厚(Y方向)[m]</summary>
+        public decimal CutoffThickness { get; set; } = 0.500m;
+        /// <summary>しゃ水壁 張出し量(全周一律。下方にも張り出す)[m]</summary>
+        public decimal CutoffProjection { get; set; } = 0.500m;
         /// <summary>ソリッド色(ACI 0〜256)</summary>
         public int ColorIndex { get; set; } = 3;
 
@@ -80,6 +102,15 @@ namespace Hikan.Core
             d["excavation_margin"] = ExcavationMargin.ToString(inv);
             d["excavation_slope"] = ExcavationSlope.ToString(inv);
             d["foundation_thickness"] = FoundationThickness.ToString(inv);
+            d["upstream_breast_thickness"] = UpstreamBreastThickness.ToString(inv);
+            d["upstream_breast_width"] = UpstreamBreastWidth.ToString(inv);
+            d["upstream_breast_height"] = UpstreamBreastHeight.ToString(inv);
+            d["downstream_breast_thickness"] = DownstreamBreastThickness.ToString(inv);
+            d["downstream_breast_width"] = DownstreamBreastWidth.ToString(inv);
+            d["downstream_breast_height"] = DownstreamBreastHeight.ToString(inv);
+            d["cutoff_count"] = CutoffCount.ToString(inv);
+            d["cutoff_thickness"] = CutoffThickness.ToString(inv);
+            d["cutoff_projection"] = CutoffProjection.ToString(inv);
             d["color_index"] = ColorIndex.ToString(inv);
             d["base_x"] = BaseX.ToString(inv);
             d["base_y"] = BaseY.ToString(inv);
@@ -108,6 +139,20 @@ namespace Hikan.Core
             p.ExcavationMargin = GetDecimal(d, "excavation_margin");
             p.ExcavationSlope = GetDecimal(d, "excavation_slope");
             p.FoundationThickness = GetDecimal(d, "foundation_thickness");
+
+            // 胸壁・しゃ水壁は第2段階で追加したキー。第1段階で生成したソリッドの XData には存在しないため、
+            // 欠けている場合は既定値(= 設置しない)で補い、函体だけのモデルとして読めるようにする。
+            // キーが在るのに値が不正な場合は従来どおりエラー停止する。
+            p.UpstreamBreastThickness = GetDecimalOrDefault(d, "upstream_breast_thickness", p.UpstreamBreastThickness);
+            p.UpstreamBreastWidth = GetDecimalOrDefault(d, "upstream_breast_width", p.UpstreamBreastWidth);
+            p.UpstreamBreastHeight = GetDecimalOrDefault(d, "upstream_breast_height", p.UpstreamBreastHeight);
+            p.DownstreamBreastThickness = GetDecimalOrDefault(d, "downstream_breast_thickness", p.DownstreamBreastThickness);
+            p.DownstreamBreastWidth = GetDecimalOrDefault(d, "downstream_breast_width", p.DownstreamBreastWidth);
+            p.DownstreamBreastHeight = GetDecimalOrDefault(d, "downstream_breast_height", p.DownstreamBreastHeight);
+            p.CutoffCount = GetIntOrDefault(d, "cutoff_count", p.CutoffCount);
+            p.CutoffThickness = GetDecimalOrDefault(d, "cutoff_thickness", p.CutoffThickness);
+            p.CutoffProjection = GetDecimalOrDefault(d, "cutoff_projection", p.CutoffProjection);
+
             p.ColorIndex = GetInt(d, "color_index");
             p.BaseX = GetDecimal(d, "base_x");
             p.BaseY = GetDecimal(d, "base_y");
@@ -134,6 +179,20 @@ namespace Hikan.Core
                 throw new HikanValidationException("パラメータ " + key + " が数値ではありません: " + Get(d, key));
             }
             return v;
+        }
+
+        /// <summary>キーが無ければ既定値を返す。在るのに数値でなければエラー停止する。</summary>
+        private static decimal GetDecimalOrDefault(System.Collections.Generic.IDictionary<string, string> d, string key, decimal fallback)
+        {
+            if (!d.ContainsKey(key)) { return fallback; }
+            return GetDecimal(d, key);
+        }
+
+        /// <summary>キーが無ければ既定値を返す。在るのに整数でなければエラー停止する。</summary>
+        private static int GetIntOrDefault(System.Collections.Generic.IDictionary<string, string> d, string key, int fallback)
+        {
+            if (!d.ContainsKey(key)) { return fallback; }
+            return GetInt(d, key);
         }
 
         private static int GetInt(System.Collections.Generic.IDictionary<string, string> d, string key)
