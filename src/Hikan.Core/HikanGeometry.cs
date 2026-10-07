@@ -44,32 +44,56 @@ namespace Hikan.Core
             decimal ho = p.OuterHeight;
             decimal l = p.BarrelLength;
 
-            parts.Add(Box("函体", bo, 0m, ho, 0m, l, false));
+            parts.Add(Centred("函体", bo, 0m, ho, 0m, l, false));
 
-            if (p.UpstreamBreastThickness > 0m)
-            {
-                parts.Add(Box("上流胸壁", p.UpstreamBreastWidth, 0m, p.UpstreamBreastHeight,
-                    -p.UpstreamBreastThickness, 0m, false));
-            }
-            if (p.DownstreamBreastThickness > 0m)
-            {
-                parts.Add(Box("下流胸壁", p.DownstreamBreastWidth, 0m, p.DownstreamBreastHeight,
-                    l, l + p.DownstreamBreastThickness, false));
-            }
+            AddBreast(parts, p, p.UpstreamBreast, true);
+            AddBreast(parts, p, p.DownstreamBreast, false);
 
             decimal a = p.CutoffProjection;
             decimal tc = p.CutoffThickness;
             for (int i = 1; i <= p.CutoffCount; i++)
             {
                 decimal s = CutoffPosition(p, i);
-                parts.Add(Box("しゃ水壁" + i, bo + 2m * a, -a, ho + a, s - tc / 2m, s + tc / 2m, false));
+                parts.Add(Centred("しゃ水壁" + i, bo + 2m * a, -a, ho + a, s - tc / 2m, s + tc / 2m, false));
             }
 
-            // 内空は上下流の胸壁も貫通する 1 本。胸壁は函体外形以上の幅・高さを持つことを検証済み。
-            parts.Add(Box("内空", p.InnerWidth, p.BottomSlabThickness, p.BottomSlabThickness + p.InnerHeight,
-                -p.UpstreamBreastThickness, l + p.DownstreamBreastThickness, true));
+            // 内空は函体のみを貫通する。胸壁は函体側面より外側にあり開口を塞がないため関与しない。
+            parts.Add(Centred("内空", p.InnerWidth, p.BottomSlabThickness, p.BottomSlabThickness + p.InnerHeight,
+                0m, l, true));
 
             return parts.ToArray();
+        }
+
+        /// <summary>
+        /// 胸壁 1 端ぶん(たて壁 + 底版の 2 ボックス)を追加する。
+        /// たて壁は函体方向に垂直な 1 枚板で、函体がこれを貫通する(体積は包除で控除する)。
+        /// 底版は Y 方向に伸び、つま先版は函体から遠い側、かかと版は近い側。
+        /// 底版は根入れにより Z = 0 以下に収まるので函体とは重ならない。
+        /// </summary>
+        private static void AddBreast(
+            System.Collections.Generic.List<HikanPart> parts,
+            HikanParameters p,
+            HikanBreastWall w,
+            bool upstream)
+        {
+            if (!w.Exists) { return; }
+
+            decimal l = p.BarrelLength;
+            decimal stemMin = upstream ? 0m : l - w.StemThickness;
+            decimal stemMax = upstream ? w.StemThickness : l;
+            decimal footMin = upstream ? -w.ToeLength : l - w.StemThickness - w.HeelLength;
+            decimal footMax = upstream ? w.StemThickness + w.HeelLength : l + w.ToeLength;
+
+            string side = upstream ? "上流" : "下流";
+            parts.Add(Centred(side + "胸壁たて壁", w.Width, w.FootingTop, w.CrownHeight, stemMin, stemMax, false));
+            parts.Add(Centred(side + "胸壁底版", w.Width, -w.Embedment, w.FootingTop, footMin, footMax, false));
+        }
+
+        /// <summary>たて壁と函体の重なり体積 [m3]。たて壁が函体外形を完全に含むことを検証済み。</summary>
+        public static decimal BreastStemOverlap(HikanParameters p, HikanBreastWall w)
+        {
+            if (!w.Exists) { return 0m; }
+            return p.OuterWidth * p.OuterHeight * w.StemThickness;
         }
 
         /// <summary>
@@ -78,7 +102,11 @@ namespace Hikan.Core
         /// </summary>
         public static decimal GlobalSMax(HikanParameters p)
         {
-            return p.BarrelLength + p.DownstreamBreastThickness;
+            if (p.DownstreamBreast.Exists)
+            {
+                return p.BarrelLength + p.DownstreamBreast.ToeLength;
+            }
+            return p.BarrelLength;
         }
 
         /// <summary>i 枚目(1 始まり)のしゃ水壁の中心位置 S。函体延長を n 等分した各区間の中央。</summary>
@@ -87,18 +115,25 @@ namespace Hikan.Core
             return p.BarrelLength * (2m * index - 1m) / (2m * p.CutoffCount);
         }
 
-        private static HikanPart Box(string name, decimal width, decimal vMin, decimal vMax, decimal sMin, decimal sMax, bool isVoid)
+        private static HikanPart Box(
+            string name, decimal uMin, decimal uMax, decimal vMin, decimal vMax, decimal sMin, decimal sMax, bool isVoid)
         {
             HikanPart part = new HikanPart();
             part.Name = name;
-            part.UMin = -width / 2m;
-            part.UMax = width / 2m;
+            part.UMin = uMin;
+            part.UMax = uMax;
             part.VMin = vMin;
             part.VMax = vMax;
             part.SMin = sMin;
             part.SMax = sMax;
             part.IsVoid = isVoid;
             return part;
+        }
+
+        /// <summary>中心線 U = 0 に対称なボックス。</summary>
+        private static HikanPart Centred(string name, decimal width, decimal vMin, decimal vMax, decimal sMin, decimal sMax, bool isVoid)
+        {
+            return Box(name, -width / 2m, width / 2m, vMin, vMax, sMin, sMax, isVoid);
         }
 
         /// <summary>部材断面(反時計回り、始点 = 左下隅)。</summary>
@@ -116,13 +151,13 @@ namespace Hikan.Core
         /// <summary>函体の外形断面(反時計回り、始点 = 左下隅)。</summary>
         public static (decimal U, decimal V)[] GetOuterSectionPoints(HikanParameters p)
         {
-            return GetSectionPoints(Box("函体", p.OuterWidth, 0m, p.OuterHeight, 0m, p.BarrelLength, false));
+            return GetSectionPoints(Centred("函体", p.OuterWidth, 0m, p.OuterHeight, 0m, p.BarrelLength, false));
         }
 
         /// <summary>内空断面(反時計回り、始点 = 左下隅)。外形の厳密な内側にある。</summary>
         public static (decimal U, decimal V)[] GetInnerSectionPoints(HikanParameters p)
         {
-            return GetSectionPoints(Box("内空", p.InnerWidth, p.BottomSlabThickness,
+            return GetSectionPoints(Centred("内空", p.InnerWidth, p.BottomSlabThickness,
                 p.BottomSlabThickness + p.InnerHeight, 0m, p.BarrelLength, true));
         }
 
@@ -148,11 +183,13 @@ namespace Hikan.Core
             return SectionArea(p) * p.BarrelLength;
         }
 
-        /// <summary>胸壁 1 基の体積 [m3]。内空の貫通分を控除済み。厚 0 のときは 0。</summary>
-        public static decimal BreastWallVolume(decimal width, decimal height, decimal thickness, HikanParameters p)
+        /// <summary>
+        /// 胸壁 1 端ぶんの体積 [m3]。たて壁(函体との重なりを控除)+ 底版。たて壁厚 0 のときは 0。
+        /// </summary>
+        public static decimal BreastWallVolume(HikanParameters p, HikanBreastWall w)
         {
-            if (thickness <= 0m) { return 0m; }
-            return (width * height - InnerSectionArea(p)) * thickness;
+            if (!w.Exists) { return 0m; }
+            return w.StemGrossVolume - BreastStemOverlap(p, w) + w.FootingVolume;
         }
 
         /// <summary>しゃ水壁の合計体積 [m3]。函体と重なる部分を控除した正味。</summary>
@@ -172,15 +209,15 @@ namespace Hikan.Core
         public static decimal ModelVolume(HikanParameters p)
         {
             return BarrelVolume(p)
-                + BreastWallVolume(p.UpstreamBreastWidth, p.UpstreamBreastHeight, p.UpstreamBreastThickness, p)
-                + BreastWallVolume(p.DownstreamBreastWidth, p.DownstreamBreastHeight, p.DownstreamBreastThickness, p)
+                + BreastWallVolume(p, p.UpstreamBreast)
+                + BreastWallVolume(p, p.DownstreamBreast)
                 + CutoffVolume(p);
         }
 
-        /// <summary>内空の全長 [m]。上下流の胸壁も貫通する。</summary>
+        /// <summary>内空の全長 [m]。胸壁は開口を塞がないので函体延長に等しい。</summary>
         public static decimal VoidLength(HikanParameters p)
         {
-            return p.UpstreamBreastThickness + p.BarrelLength + p.DownstreamBreastThickness;
+            return p.BarrelLength;
         }
 
         /// <summary>
@@ -249,55 +286,55 @@ namespace Hikan.Core
 
         /// <summary>
         /// 生成後の期待重心(WCS)。体積とエクステントだけでは検出できない
-        /// 断面の上下反転(頂版厚 ≠ 底版厚 のとき)を検出するために使う。
-        /// 全部材が U = 0 対称なので X は厳密に BaseX になる。
+        /// 断面の上下反転(頂版厚 ≠ 底版厚 のとき)や上下流の取り違えを検出するために使う。
+        /// 部材は左右対称に配置されるので X は厳密に BaseX になる。
         /// </summary>
         public static (decimal X, decimal Y, decimal Z) ExpectedCentroid(HikanParameters p)
         {
-            decimal bo = p.OuterWidth;
-            decimal ho = p.OuterHeight;
-            decimal l = p.BarrelLength;
-
             decimal mass = 0m;
+            decimal mu = 0m;
             decimal mv = 0m;
             decimal ms = 0m;
 
-            Accumulate(ref mass, ref mv, ref ms, bo * ho * l, ho / 2m, l / 2m);
-
-            if (p.UpstreamBreastThickness > 0m)
+            foreach (HikanPart part in GetParts(p))
             {
-                decimal t = p.UpstreamBreastThickness;
-                Accumulate(ref mass, ref mv, ref ms,
-                    p.UpstreamBreastWidth * p.UpstreamBreastHeight * t, p.UpstreamBreastHeight / 2m, -t / 2m);
-            }
-            if (p.DownstreamBreastThickness > 0m)
-            {
-                decimal t = p.DownstreamBreastThickness;
-                Accumulate(ref mass, ref mv, ref ms,
-                    p.DownstreamBreastWidth * p.DownstreamBreastHeight * t, p.DownstreamBreastHeight / 2m, l + t / 2m);
+                decimal sign = part.IsVoid ? -1m : 1m;
+                Accumulate(ref mass, ref mu, ref mv, ref ms, sign * part.Volume,
+                    (part.UMin + part.UMax) / 2m, (part.VMin + part.VMax) / 2m, (part.SMin + part.SMax) / 2m);
             }
 
-            // しゃ水壁の正味(カラー外形 − 函体外形)は V = ho/2 を共有する同心矩形の差なので重心も ho/2。
-            decimal a = p.CutoffProjection;
-            decimal ring = ((bo + 2m * a) * (ho + 2m * a) - bo * ho) * p.CutoffThickness;
+            // 重なり補正: しゃ水壁と胸壁たて壁のボックスは函体と重なるので、その分を 1 回引く。
+            // 胸壁底版は根入れにより Z = 0 以下に収まるため函体とは重ならない。
+            decimal collarOverlap = p.OuterWidth * p.OuterHeight * p.CutoffThickness;
             for (int k = 1; k <= p.CutoffCount; k++)
             {
-                Accumulate(ref mass, ref mv, ref ms, ring, ho / 2m, CutoffPosition(p, k));
+                Accumulate(ref mass, ref mu, ref mv, ref ms, -collarOverlap,
+                    0m, p.OuterHeight / 2m, CutoffPosition(p, k));
             }
+            SubtractStemOverlap(ref mass, ref mu, ref mv, ref ms, p, p.UpstreamBreast, true);
+            SubtractStemOverlap(ref mass, ref mu, ref mv, ref ms, p, p.DownstreamBreast, false);
 
-            // 内空(控除)。上下流の胸壁も貫通する。
-            decimal voidLength = p.UpstreamBreastThickness + l + p.DownstreamBreastThickness;
-            Accumulate(ref mass, ref mv, ref ms,
-                -InnerSectionArea(p) * voidLength,
-                p.BottomSlabThickness + p.InnerHeight / 2m,
-                (l + p.DownstreamBreastThickness - p.UpstreamBreastThickness) / 2m);
-
-            return ToWorld(p, 0m, mv / mass, ms / mass);
+            return ToWorld(p, mu / mass, mv / mass, ms / mass);
         }
 
-        private static void Accumulate(ref decimal mass, ref decimal mv, ref decimal ms, decimal volume, decimal v, decimal s)
+        private static void SubtractStemOverlap(
+            ref decimal mass, ref decimal mu, ref decimal mv, ref decimal ms,
+            HikanParameters p, HikanBreastWall w, bool upstream)
+        {
+            if (!w.Exists) { return; }
+            decimal centre = upstream
+                ? w.StemThickness / 2m
+                : p.BarrelLength - w.StemThickness / 2m;
+            Accumulate(ref mass, ref mu, ref mv, ref ms, -BreastStemOverlap(p, w),
+                0m, p.OuterHeight / 2m, centre);
+        }
+
+        private static void Accumulate(
+            ref decimal mass, ref decimal mu, ref decimal mv, ref decimal ms,
+            decimal volume, decimal u, decimal v, decimal s)
         {
             mass += volume;
+            mu += volume * u;
             mv += volume * v;
             ms += volume * s;
         }

@@ -35,19 +35,11 @@ namespace Hikan.Core
         /// <summary>基礎材厚(均しコン等)[m]</summary>
         public decimal FoundationThickness { get; set; } = 0.100m;
 
-        // --- 胸壁(函体端面の外側に接続する矩形板)。厚 0 で「設置しない」。 ---
-        /// <summary>上流胸壁 厚(Y方向)[m]。0 で設置しない。</summary>
-        public decimal UpstreamBreastThickness { get; set; } = 0.000m;
-        /// <summary>上流胸壁 幅(X方向)[m]。外形幅以上にすること。</summary>
-        public decimal UpstreamBreastWidth { get; set; } = 4.000m;
-        /// <summary>上流胸壁 高(底版下面からの高さ)[m]。外形高以上にすること。</summary>
-        public decimal UpstreamBreastHeight { get; set; } = 4.000m;
-        /// <summary>下流胸壁 厚(Y方向)[m]。0 で設置しない。</summary>
-        public decimal DownstreamBreastThickness { get; set; } = 0.000m;
-        /// <summary>下流胸壁 幅(X方向)[m]</summary>
-        public decimal DownstreamBreastWidth { get; set; } = 4.000m;
-        /// <summary>下流胸壁 高(底版下面からの高さ)[m]</summary>
-        public decimal DownstreamBreastHeight { get; set; } = 4.000m;
+        // --- 胸壁(逆T字 / L字)。函体の左右側面に 1 基ずつ取り付く。張出し長 0 で「設置しない」。 ---
+        /// <summary>上流胸壁(左右に 1 基ずつ)。函体の上流端に取り付く。</summary>
+        public HikanBreastWall UpstreamBreast { get; set; } = new HikanBreastWall();
+        /// <summary>下流胸壁(左右に 1 基ずつ)。函体の下流端に取り付く。</summary>
+        public HikanBreastWall DownstreamBreast { get; set; } = new HikanBreastWall();
 
         // --- しゃ水壁(函体外周に全周一律で張り出すカラー)。枚数 0 で「設置しない」。 ---
         /// <summary>しゃ水壁 枚数。函体延長を n 等分した各区間の中央に配置する。0 で設置しない。</summary>
@@ -102,12 +94,8 @@ namespace Hikan.Core
             d["excavation_margin"] = ExcavationMargin.ToString(inv);
             d["excavation_slope"] = ExcavationSlope.ToString(inv);
             d["foundation_thickness"] = FoundationThickness.ToString(inv);
-            d["upstream_breast_thickness"] = UpstreamBreastThickness.ToString(inv);
-            d["upstream_breast_width"] = UpstreamBreastWidth.ToString(inv);
-            d["upstream_breast_height"] = UpstreamBreastHeight.ToString(inv);
-            d["downstream_breast_thickness"] = DownstreamBreastThickness.ToString(inv);
-            d["downstream_breast_width"] = DownstreamBreastWidth.ToString(inv);
-            d["downstream_breast_height"] = DownstreamBreastHeight.ToString(inv);
+            UpstreamBreast.Write(d, "upstream_breast_");
+            DownstreamBreast.Write(d, "downstream_breast_");
             d["cutoff_count"] = CutoffCount.ToString(inv);
             d["cutoff_thickness"] = CutoffThickness.ToString(inv);
             d["cutoff_projection"] = CutoffProjection.ToString(inv);
@@ -143,12 +131,8 @@ namespace Hikan.Core
             // 胸壁・しゃ水壁は第2段階で追加したキー。第1段階で生成したソリッドの XData には存在しないため、
             // 欠けている場合は既定値(= 設置しない)で補い、函体だけのモデルとして読めるようにする。
             // キーが在るのに値が不正な場合は従来どおりエラー停止する。
-            p.UpstreamBreastThickness = GetDecimalOrDefault(d, "upstream_breast_thickness", p.UpstreamBreastThickness);
-            p.UpstreamBreastWidth = GetDecimalOrDefault(d, "upstream_breast_width", p.UpstreamBreastWidth);
-            p.UpstreamBreastHeight = GetDecimalOrDefault(d, "upstream_breast_height", p.UpstreamBreastHeight);
-            p.DownstreamBreastThickness = GetDecimalOrDefault(d, "downstream_breast_thickness", p.DownstreamBreastThickness);
-            p.DownstreamBreastWidth = GetDecimalOrDefault(d, "downstream_breast_width", p.DownstreamBreastWidth);
-            p.DownstreamBreastHeight = GetDecimalOrDefault(d, "downstream_breast_height", p.DownstreamBreastHeight);
+            p.UpstreamBreast.Read(d, "upstream_breast_", GetDecimalOrDefault);
+            p.DownstreamBreast.Read(d, "downstream_breast_", GetDecimalOrDefault);
             p.CutoffCount = GetIntOrDefault(d, "cutoff_count", p.CutoffCount);
             p.CutoffThickness = GetDecimalOrDefault(d, "cutoff_thickness", p.CutoffThickness);
             p.CutoffProjection = GetDecimalOrDefault(d, "cutoff_projection", p.CutoffProjection);

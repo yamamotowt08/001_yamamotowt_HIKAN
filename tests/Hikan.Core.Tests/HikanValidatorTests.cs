@@ -103,50 +103,96 @@ namespace Hikan.Core.Tests
             AssertInvalid(p);
         }
 
-        // テスト10: 胸壁。厚 0 は「設置しない」なので寸法を検査しない。
+        private static Hikan.Core.HikanBreastWall Wall()
+        {
+            Hikan.Core.HikanBreastWall w = new Hikan.Core.HikanBreastWall();
+            w.StemThickness = 0.5m;
+            w.Width = 6.0m;
+            w.CrownHeight = 4.0m;
+            w.Embedment = 1.0m;
+            w.FootingThickness = 0.5m;
+            w.ToeLength = 0.8m;
+            w.HeelLength = 1.2m;
+            return w;
+        }
+
+        // テスト10: 胸壁。たて壁厚 0 は「設置しない」なので寸法を検査しない。
         [Xunit.Fact]
-        public void BreastWall_ZeroThickness_SkipsDimensionChecks()
+        public void BreastWall_ZeroStemThickness_SkipsDimensionChecks()
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
-            p.UpstreamBreastThickness = 0m;
-            p.UpstreamBreastWidth = 0.1m;   // 外形幅未満だが設置しないので無視される
-            p.UpstreamBreastHeight = 0.1m;
+            p.UpstreamBreast.StemThickness = 0m;
+            p.UpstreamBreast.Width = 0.1m;        // 外形幅未満だが設置しないので無視される
+            p.UpstreamBreast.CrownHeight = 0.1m;
+            p.UpstreamBreast.Embedment = 0m;
             Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
         }
 
-        // テスト11: 胸壁の幅・高は函体外形以上であること。
-        // これが崩れると内空プリズムが胸壁を貫通しきらず、体積の解析解が実形状と合わなくなる。
+        // テスト11: 幅・天端高は函体外形以上、根入れ深さは底版厚以上。
+        // これが崩れるとたて壁と函体の重なりが「外形断面 × たて壁厚」でなくなり、体積の解析解が合わなくなる。
         [Xunit.Theory]
-        [Xunit.InlineData(4.0, 4.0, true)]
-        [Xunit.InlineData(2.8, 2.8, true)]   // 外形ちょうど
-        [Xunit.InlineData(2.0, 4.0, false)]  // 幅不足
-        [Xunit.InlineData(4.0, 2.0, false)]  // 高不足
-        public void BreastWall_MustCoverBarrelOuterSection(double width, double height, bool valid)
+        [Xunit.InlineData(6.0, 4.0, 1.0, true)]
+        [Xunit.InlineData(2.8, 2.8, 0.5, true)]   // 外形ちょうど・根入れ = 底版厚
+        [Xunit.InlineData(2.0, 4.0, 1.0, false)]  // 幅不足
+        [Xunit.InlineData(6.0, 2.0, 1.0, false)]  // 天端高不足
+        [Xunit.InlineData(6.0, 4.0, 0.3, false)]  // 根入れが底版厚未満
+        public void BreastWall_MustEncloseBarrelAndClearFooting(double width, double crown, double embedment, bool valid)
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
-            p.UpstreamBreastThickness = 0.5m;
-            p.UpstreamBreastWidth = (decimal)width;
-            p.UpstreamBreastHeight = (decimal)height;
+            p.UpstreamBreast = Wall();
+            p.UpstreamBreast.Width = (decimal)width;
+            p.UpstreamBreast.CrownHeight = (decimal)crown;
+            p.UpstreamBreast.Embedment = (decimal)embedment;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
             else { AssertInvalid(p); }
         }
 
-        // テスト12: 胸壁厚も最小部材厚 0.40 m・0.10 m ピッチの対象。
+        // テスト12: たて壁厚・底版厚も最小部材厚 0.40 m・0.10 m ピッチの対象。
         [Xunit.Theory]
         [Xunit.InlineData(0.0, true)]
         [Xunit.InlineData(0.5, true)]
         [Xunit.InlineData(0.3, false)]
         [Xunit.InlineData(0.45, false)]
         [Xunit.InlineData(-0.1, false)]
-        public void BreastWall_ThicknessFollowsStandard(double t, bool valid)
+        public void BreastWall_StemThicknessFollowsStandard(double t, bool valid)
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
-            p.DownstreamBreastThickness = (decimal)t;
+            p.DownstreamBreast = Wall();
+            p.DownstreamBreast.StemThickness = (decimal)t;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
             else { AssertInvalid(p); }
         }
 
-        // テスト13: しゃ水壁は厚 × 枚数 < 函体延長。等しいと隣接カラーが接触してブーリアンが退化する。
+        // テスト12b: 上下流の胸壁が函体の中で干渉しないこと。
+        [Xunit.Fact]
+        public void BreastWalls_MustNotOverlapEachOther()
+        {
+            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            p.UpstreamBreast = Wall();
+            p.DownstreamBreast = Wall();
+            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
+
+            // かかと版を伸ばして函体の中央で突き合わせる
+            p.UpstreamBreast.HeelLength = 10m;
+            p.DownstreamBreast.HeelLength = 10m;
+            AssertInvalid(p);
+        }
+
+        // テスト12c: 胸壁としゃ水壁が Y 方向で離れていること。
+        [Xunit.Fact]
+        public void BreastWall_MustNotOverlapCutoff()
+        {
+            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            p.UpstreamBreast = Wall();
+            p.CutoffCount = 2;
+            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
+
+            // 1 枚目のカラーは S = 5.0。かかと版を伸ばすと干渉する。
+            p.UpstreamBreast.HeelLength = 5m;
+            AssertInvalid(p);
+        }
+
+        // テスト13: しゃ水壁は厚 × 枚数 < 函体延長。        // テスト13: しゃ水壁は厚 × 枚数 < 函体延長。等しいと隣接カラーが接触してブーリアンが退化する。
         [Xunit.Theory]
         [Xunit.InlineData(2, 0.5, true)]
         [Xunit.InlineData(39, 0.5, true)]    // 19.5 < 20.0

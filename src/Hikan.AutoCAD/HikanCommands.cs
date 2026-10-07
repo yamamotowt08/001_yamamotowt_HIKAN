@@ -128,7 +128,8 @@ namespace Hikan.AutoCAD
         /// <summary>
         /// 検証用のパラメータ。頂版厚 ≠ 底版厚 かつ基準点を 3 軸すべて非ゼロにするのが要点で、
         /// これが無いと断面の上下反転と Z オフセットの取り違えを検出できない。
-        /// 上流胸壁と下流胸壁も別寸法にして、上下流の取り違えを検出できるようにする。
+        /// 上流胸壁(0.5/6.0/4.0/1.0/0.5/0.8/1.2)と下流胸壁(0.6/7.0/4.5/1.2/0.6/1.0/1.5)を
+        /// 別寸法にして、上下流の取り違えを検出できるようにする。
         /// </summary>
         private static Hikan.Core.HikanParameters Case(decimal slope, bool withExtraParts)
         {
@@ -142,12 +143,20 @@ namespace Hikan.AutoCAD
 
             if (withExtraParts)
             {
-                p.UpstreamBreastThickness = 0.5m;
-                p.UpstreamBreastWidth = 4.0m;
-                p.UpstreamBreastHeight = 3.5m;
-                p.DownstreamBreastThickness = 0.6m;
-                p.DownstreamBreastWidth = 5.0m;
-                p.DownstreamBreastHeight = 4.5m;
+                p.UpstreamBreast.StemThickness = 0.5m;
+                p.UpstreamBreast.Width = 6.0m;
+                p.UpstreamBreast.CrownHeight = 4.0m;
+                p.UpstreamBreast.Embedment = 1.0m;
+                p.UpstreamBreast.FootingThickness = 0.5m;
+                p.UpstreamBreast.ToeLength = 0.8m;
+                p.UpstreamBreast.HeelLength = 1.2m;
+                p.DownstreamBreast.StemThickness = 0.6m;
+                p.DownstreamBreast.Width = 7.0m;
+                p.DownstreamBreast.CrownHeight = 4.5m;
+                p.DownstreamBreast.Embedment = 1.2m;
+                p.DownstreamBreast.FootingThickness = 0.6m;
+                p.DownstreamBreast.ToeLength = 1.0m;
+                p.DownstreamBreast.HeelLength = 1.5m;
                 p.CutoffCount = 2;
                 p.CutoffThickness = 0.5m;
                 p.CutoffProjection = 0.7m;

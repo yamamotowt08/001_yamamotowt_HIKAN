@@ -14,12 +14,20 @@ namespace Hikan.Core.Tests
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
             p.TopSlabThickness = 0.4m;
             p.BottomSlabThickness = 0.6m;
-            p.UpstreamBreastThickness = 0.5m;
-            p.UpstreamBreastWidth = 4.0m;
-            p.UpstreamBreastHeight = 3.5m;
-            p.DownstreamBreastThickness = 0.6m;
-            p.DownstreamBreastWidth = 5.0m;
-            p.DownstreamBreastHeight = 4.5m;
+            p.UpstreamBreast.StemThickness = 0.5m;
+            p.UpstreamBreast.Width = 6.0m;
+            p.UpstreamBreast.CrownHeight = 4.0m;
+            p.UpstreamBreast.Embedment = 1.0m;
+            p.UpstreamBreast.FootingThickness = 0.5m;
+            p.UpstreamBreast.ToeLength = 0.8m;
+            p.UpstreamBreast.HeelLength = 1.2m;
+            p.DownstreamBreast.StemThickness = 0.6m;
+            p.DownstreamBreast.Width = 7.0m;
+            p.DownstreamBreast.CrownHeight = 4.5m;
+            p.DownstreamBreast.Embedment = 1.2m;
+            p.DownstreamBreast.FootingThickness = 0.6m;
+            p.DownstreamBreast.ToeLength = 1.0m;
+            p.DownstreamBreast.HeelLength = 1.5m;
             p.CutoffCount = 2;
             p.CutoffThickness = 0.5m;
             p.CutoffProjection = 0.7m;
@@ -134,8 +142,8 @@ namespace Hikan.Core.Tests
             Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(breastOnly), SlabVolume(breastOnly));
 
             Hikan.Core.HikanParameters cutoffOnly = Full();
-            cutoffOnly.UpstreamBreastThickness = 0m;
-            cutoffOnly.DownstreamBreastThickness = 0m;
+            cutoffOnly.UpstreamBreast.StemThickness = 0m;
+            cutoffOnly.DownstreamBreast.StemThickness = 0m;
             Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(cutoffOnly), SlabVolume(cutoffOnly));
         }
 
@@ -152,12 +160,13 @@ namespace Hikan.Core.Tests
             {
                 Xunit.Assert.False(parts[i].IsVoid, "内空は 1 個だけで最後にあること: " + parts[i].Name);
             }
-            // 函体 + 上流胸壁 + 下流胸壁 + しゃ水壁 2 枚 + 内空
-            Xunit.Assert.Equal(6, parts.Length);
+            // 函体 + 胸壁(たて壁 + 底版)× 2 端 + しゃ水壁 2 枚 + 内空
+            Xunit.Assert.Equal(8, parts.Length);
 
+            // 内空は函体のみを貫通する(胸壁は開口を塞がないので延長しない)
             Hikan.Core.HikanPart hollow = parts[parts.Length - 1];
-            Xunit.Assert.Equal(-0.5m, hollow.SMin);
-            Xunit.Assert.Equal(20.6m, hollow.SMax);
+            Xunit.Assert.Equal(0m, hollow.SMin);
+            Xunit.Assert.Equal(20m, hollow.SMax);
         }
 
         // テスト5: しゃ水壁は等間隔で、互いに接触せず函体内に収まること。
@@ -195,14 +204,14 @@ namespace Hikan.Core.Tests
             (decimal MinX, decimal MinY, decimal MinZ, decimal MaxX, decimal MaxY, decimal MaxZ) x =
                 Hikan.Core.HikanGeometry.ExpectedExtents(p);
 
-            // 幅は下流胸壁 5.0 m が最大
-            Xunit.Assert.Equal(-2.5m, x.MinX);
-            Xunit.Assert.Equal(2.5m, x.MaxX);
-            // 上流胸壁が Y<0 に、下流胸壁が Y>L に張り出す
-            Xunit.Assert.Equal(-0.5m, x.MinY);
-            Xunit.Assert.Equal(20.6m, x.MaxY);
-            // しゃ水壁が下方に 0.7 m 張り出し、上端は下流胸壁の 4.5 m
-            Xunit.Assert.Equal(-0.7m, x.MinZ);
+            // 幅は下流胸壁 7.0 m が最大
+            Xunit.Assert.Equal(-3.5m, x.MinX);
+            Xunit.Assert.Equal(3.5m, x.MaxX);
+            // 上流つま先版が Y<0 に、下流つま先版が Y>L に張り出す
+            Xunit.Assert.Equal(-0.8m, x.MinY);
+            Xunit.Assert.Equal(21.0m, x.MaxY);
+            // 下端は下流胸壁の根入れ 1.2 m、上端は下流胸壁の天端 4.5 m
+            Xunit.Assert.Equal(-1.2m, x.MinZ);
             Xunit.Assert.Equal(4.5m, x.MaxZ);
         }
 
@@ -219,12 +228,9 @@ namespace Hikan.Core.Tests
 
             // 上下流を入れ替えたら鏡像の位置になること
             Hikan.Core.HikanParameters q = Full();
-            q.UpstreamBreastThickness = p.DownstreamBreastThickness;
-            q.UpstreamBreastWidth = p.DownstreamBreastWidth;
-            q.UpstreamBreastHeight = p.DownstreamBreastHeight;
-            q.DownstreamBreastThickness = p.UpstreamBreastThickness;
-            q.DownstreamBreastWidth = p.UpstreamBreastWidth;
-            q.DownstreamBreastHeight = p.UpstreamBreastHeight;
+            Hikan.Core.HikanBreastWall up = q.UpstreamBreast;
+            q.UpstreamBreast = q.DownstreamBreast;
+            q.DownstreamBreast = up;
             (decimal X, decimal Y, decimal Z) h = Hikan.Core.HikanGeometry.ExpectedCentroid(q);
             Xunit.Assert.True(h.Y < 10m, "入れ替えると上流寄りになること。実際: " + h.Y);
             Xunit.Assert.Equal(g.Z, h.Z);
@@ -238,7 +244,7 @@ namespace Hikan.Core.Tests
             decimal expected = Hikan.Core.HikanGeometry.ModelVolume(p)
                 + Hikan.Core.HikanGeometry.InnerSectionArea(p) * Hikan.Core.HikanGeometry.VoidLength(p);
             Xunit.Assert.Equal(expected, Hikan.Core.HikanGeometry.EnvelopeVolume(p));
-            Xunit.Assert.Equal(21.1m, Hikan.Core.HikanGeometry.VoidLength(p));
+            Xunit.Assert.Equal(20m, Hikan.Core.HikanGeometry.VoidLength(p));
         }
 
         // テスト9: 部材なしのとき GlobalSMax は函体延長に一致する(第1段階と同じ配置になること)。
@@ -249,7 +255,7 @@ namespace Hikan.Core.Tests
             Xunit.Assert.Equal(p.BarrelLength, Hikan.Core.HikanGeometry.GlobalSMax(p));
 
             Hikan.Core.HikanParameters q = Full();
-            Xunit.Assert.Equal(20.6m, Hikan.Core.HikanGeometry.GlobalSMax(q));
+            Xunit.Assert.Equal(21.0m, Hikan.Core.HikanGeometry.GlobalSMax(q));
         }
     }
 }

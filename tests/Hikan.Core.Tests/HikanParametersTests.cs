@@ -107,8 +107,12 @@ namespace Hikan.Core.Tests
             // 第2段階で追加したキーを取り除き、第1段階の XData を再現する
             string[] added = new string[]
             {
-                "upstream_breast_thickness", "upstream_breast_width", "upstream_breast_height",
-                "downstream_breast_thickness", "downstream_breast_width", "downstream_breast_height",
+                "upstream_breast_stem_thickness", "upstream_breast_width", "upstream_breast_crown_height",
+                "upstream_breast_embedment", "upstream_breast_footing_thickness",
+                "upstream_breast_toe_length", "upstream_breast_heel_length",
+                "downstream_breast_stem_thickness", "downstream_breast_width", "downstream_breast_crown_height",
+                "downstream_breast_embedment", "downstream_breast_footing_thickness",
+                "downstream_breast_toe_length", "downstream_breast_heel_length",
                 "cutoff_count", "cutoff_thickness", "cutoff_projection"
             };
             foreach (string key in added)
@@ -117,8 +121,8 @@ namespace Hikan.Core.Tests
             }
 
             Hikan.Core.HikanParameters q = Hikan.Core.HikanParameters.FromDictionary(d);
-            Xunit.Assert.Equal(0m, q.UpstreamBreastThickness);
-            Xunit.Assert.Equal(0m, q.DownstreamBreastThickness);
+            Xunit.Assert.Equal(0m, q.UpstreamBreast.StemThickness);
+            Xunit.Assert.Equal(0m, q.DownstreamBreast.StemThickness);
             Xunit.Assert.Equal(0, q.CutoffCount);
             Xunit.Assert.Equal(76.800m, Hikan.Core.HikanGeometry.ModelVolume(q));
             Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(q));

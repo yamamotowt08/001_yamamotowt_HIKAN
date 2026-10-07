@@ -14,13 +14,23 @@ namespace Hikan.Core
             return System.Math.Round(value, digits, System.MidpointRounding.AwayFromZero);
         }
 
-        /// <summary>胸壁 1 基の型枠面積 [m2]。外側面(内空開口を控除)+ 両側面 + 上面。</summary>
-        private static decimal BreastFormwork(decimal width, decimal height, decimal thickness, HikanParameters p)
+        /// <summary>
+        /// 胸壁 1 端ぶんの型枠面積 [m2]。
+        /// たて壁は上下流 2 面(函体が貫通する外形断面を控除)+ 両側面 + 天端。
+        /// 底版は両側面 + 両端面 + つま先版・かかと版の上面。函体や地盤と接する面は計上しない。
+        /// </summary>
+        private static decimal BreastFormwork(HikanParameters p, HikanBreastWall w)
         {
-            if (thickness <= 0m) { return 0m; }
-            return (width * height - HikanGeometry.InnerSectionArea(p))
-                + 2m * height * thickness
-                + width * thickness;
+            if (!w.Exists) { return 0m; }
+            decimal stemHeight = w.CrownHeight - w.FootingTop;
+            decimal stem = 2m * (w.Width * stemHeight - HikanGeometry.OuterSectionArea(p))
+                + 2m * stemHeight * w.StemThickness
+                + w.Width * w.StemThickness;
+            decimal footingLength = w.ToeLength + w.StemThickness + w.HeelLength;
+            decimal footing = 2m * footingLength * w.FootingThickness
+                + 2m * w.Width * w.FootingThickness
+                + w.Width * (w.ToeLength + w.HeelLength);
+            return stem + footing;
         }
 
         /// <summary>しゃ水壁の型枠面積 [m2]。外周面 + 前後の環状面。</summary>
@@ -59,10 +69,8 @@ namespace Hikan.Core
             e.ConcreteVolume = RoundHalfUp(HikanGeometry.ModelVolume(p), Digits);
 
             // 胸壁は内空の貫通分を控除済み。しゃ水壁は函体と重なる部分を控除した正味。
-            e.UpstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(
-                p.UpstreamBreastWidth, p.UpstreamBreastHeight, p.UpstreamBreastThickness, p), Digits);
-            e.DownstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(
-                p.DownstreamBreastWidth, p.DownstreamBreastHeight, p.DownstreamBreastThickness, p), Digits);
+            e.UpstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(p, p.UpstreamBreast), Digits);
+            e.DownstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(p, p.DownstreamBreast), Digits);
             e.CutoffTotalVolume = RoundHalfUp(HikanGeometry.CutoffVolume(p), Digits);
             e.CutoffSpacing = p.CutoffCount > 0 ? RoundHalfUp(l / p.CutoffCount, Digits) : 0m;
 
@@ -83,9 +91,7 @@ namespace Hikan.Core
             e.FormworkEnd = RoundHalfUp(2m * HikanGeometry.SectionArea(p), Digits);
             // 胸壁は外側面(内空開口を控除)+ 両側面 + 上面。函体と接する背面は計上しない。
             e.FormworkBreast = RoundHalfUp(
-                BreastFormwork(p.UpstreamBreastWidth, p.UpstreamBreastHeight, p.UpstreamBreastThickness, p)
-                + BreastFormwork(p.DownstreamBreastWidth, p.DownstreamBreastHeight, p.DownstreamBreastThickness, p),
-                Digits);
+                BreastFormwork(p, p.UpstreamBreast) + BreastFormwork(p, p.DownstreamBreast), Digits);
             // しゃ水壁は外周面 + 前後の環状面。
             e.FormworkCutoff = RoundHalfUp(CutoffFormwork(p), Digits);
 
@@ -96,11 +102,17 @@ namespace Hikan.Core
             // 床掘り: 四方に法勾配 1:n を付けた角錐台。∫[0,d] (Wb+2nz)(Lb+2nz) dz の厳密解。
             // 平面は全部材の外形を囲む大きさ、深さは最も深い部材(しゃ水壁の下方張出し)まで。
             decimal planWidth = bOut;
-            if (p.UpstreamBreastThickness > 0m && p.UpstreamBreastWidth > planWidth) { planWidth = p.UpstreamBreastWidth; }
-            if (p.DownstreamBreastThickness > 0m && p.DownstreamBreastWidth > planWidth) { planWidth = p.DownstreamBreastWidth; }
+            if (p.UpstreamBreast.Exists && p.UpstreamBreast.Width > planWidth) { planWidth = p.UpstreamBreast.Width; }
+            if (p.DownstreamBreast.Exists && p.DownstreamBreast.Width > planWidth) { planWidth = p.DownstreamBreast.Width; }
             if (p.CutoffCount > 0 && bOut + 2m * p.CutoffProjection > planWidth) { planWidth = bOut + 2m * p.CutoffProjection; }
-            decimal planLength = p.UpstreamBreastThickness + l + p.DownstreamBreastThickness;
+
+            // 平面は最上流(上流つま先版)から最下流(下流つま先版)まで、深さは最も深い部材まで。
+            decimal planLength = l
+                + (p.UpstreamBreast.Exists ? p.UpstreamBreast.ToeLength : 0m)
+                + (p.DownstreamBreast.Exists ? p.DownstreamBreast.ToeLength : 0m);
             decimal below = p.CutoffCount > 0 ? p.CutoffProjection : 0m;
+            if (p.UpstreamBreast.Exists && p.UpstreamBreast.Embedment > below) { below = p.UpstreamBreast.Embedment; }
+            if (p.DownstreamBreast.Exists && p.DownstreamBreast.Embedment > below) { below = p.DownstreamBreast.Embedment; }
 
             decimal wb = planWidth + 2m * p.ExcavationMargin;
             decimal lb = planLength + 2m * p.ExcavationMargin;

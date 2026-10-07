@@ -39,8 +39,9 @@ namespace Hikan.Core
             CheckThickness(errors, p.TopSlabThickness, "頂版厚");
             CheckThickness(errors, p.BottomSlabThickness, "底版厚");
 
-            CheckBreastWall(errors, p, p.UpstreamBreastThickness, p.UpstreamBreastWidth, p.UpstreamBreastHeight, "上流胸壁");
-            CheckBreastWall(errors, p, p.DownstreamBreastThickness, p.DownstreamBreastWidth, p.DownstreamBreastHeight, "下流胸壁");
+            CheckBreastWall(errors, p, p.UpstreamBreast, "上流胸壁");
+            CheckBreastWall(errors, p, p.DownstreamBreast, "下流胸壁");
+            CheckBreastClearance(errors, p);
             CheckCutoff(errors, p);
 
             if (p.InnerWidth > MaxInnerDimension + Tolerance)
@@ -74,33 +75,58 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 胸壁。厚 0 は「設置しない」なので寸法を検査しない。
-        /// 幅・高を外形以上に強制するのは、内空プリズムが胸壁を完全に貫通することを保証するため。
-        /// これが崩れると体積の解析解(ModelVolume)が実形状と一致しなくなり Verify が通らない。
+        /// 胸壁。たて壁厚 0 は「設置しない」なので寸法を検査しない。
+        /// 幅・天端高を函体外形以上に、根入れ深さを底版厚以上に強制するのは、
+        /// たて壁と函体の重なりが厳密に「外形断面 × たて壁厚」になり、底版が函体と重ならないことを保証するため。
+        /// これが崩れると体積の解析解(ModelVolume)が実形状と一致せず Verify が通らない。
         /// </summary>
         private static void CheckBreastWall(
             System.Collections.Generic.List<string> errors,
             HikanParameters p,
-            decimal thickness,
-            decimal width,
-            decimal height,
+            HikanBreastWall w,
             string name)
         {
-            if (thickness < 0m)
+            if (w.StemThickness < 0m)
             {
-                errors.Add(name + "厚は 0 以上にしてください(0 で設置しない)。");
+                errors.Add(name + "のたて壁厚は 0 以上にしてください(0 で設置しない)。");
                 return;
             }
-            if (thickness == 0m) { return; }
+            if (!w.Exists) { return; }
 
-            CheckThickness(errors, thickness, name + "厚");
-            if (width < p.OuterWidth - Tolerance)
+            CheckThickness(errors, w.StemThickness, name + "のたて壁厚");
+            CheckThickness(errors, w.FootingThickness, name + "の底版厚");
+
+            if (w.Width < p.OuterWidth - Tolerance)
             {
-                errors.Add(name + "幅は函体外形幅 " + p.OuterWidth + " m 以上にしてください。");
+                errors.Add(name + "の幅は函体外形幅 " + p.OuterWidth + " m 以上にしてください。");
             }
-            if (height < p.OuterHeight - Tolerance)
+            if (w.CrownHeight < p.OuterHeight - Tolerance)
             {
-                errors.Add(name + "高は函体外形高 " + p.OuterHeight + " m 以上にしてください。");
+                errors.Add(name + "の天端高は函体外形高 " + p.OuterHeight + " m 以上にしてください。");
+            }
+            if (w.Embedment < w.FootingThickness - Tolerance)
+            {
+                errors.Add(name + "の根入れ深さは底版厚 " + w.FootingThickness
+                    + " m 以上にしてください(底版が函体と干渉します)。");
+            }
+            if (w.ToeLength < 0m) { errors.Add(name + "のつま先版長は 0 以上にしてください。"); }
+            if (w.HeelLength < 0m) { errors.Add(name + "のかかと版長は 0 以上にしてください。"); }
+            if (p.BarrelLength > 0m && w.StemThickness > p.BarrelLength)
+            {
+                errors.Add(name + "のたて壁厚が函体延長を超えています。");
+            }
+        }
+
+        /// <summary>上下流の胸壁が函体の中で干渉しないこと。かかと版どうしが重なると体積の解析解が崩れる。</summary>
+        private static void CheckBreastClearance(System.Collections.Generic.List<string> errors, HikanParameters p)
+        {
+            if (!p.UpstreamBreast.Exists || !p.DownstreamBreast.Exists) { return; }
+            decimal upstreamEnd = p.UpstreamBreast.StemThickness + p.UpstreamBreast.HeelLength;
+            decimal downstreamStart = p.BarrelLength - p.DownstreamBreast.StemThickness - p.DownstreamBreast.HeelLength;
+            if (upstreamEnd >= downstreamStart)
+            {
+                errors.Add("上流胸壁の下流端 " + upstreamEnd + " m と下流胸壁の上流端 " + downstreamStart
+                    + " m が干渉します。たて壁厚とかかと版長を見直してください。");
             }
         }
 
@@ -127,6 +153,27 @@ namespace Hikan.Core
             {
                 errors.Add("しゃ水壁厚 × 枚数 = " + (p.CutoffThickness * p.CutoffCount)
                     + " m が函体延長 " + p.BarrelLength + " m 以上です。カラーが互いに接触するか函体からはみ出します。");
+                return;
+            }
+
+            // 胸壁とカラーは X・Z で重なるので、Y で離れていないと体積の解析解が崩れる。
+            decimal firstMin = HikanGeometry.CutoffPosition(p, 1) - p.CutoffThickness / 2m;
+            decimal lastMax = HikanGeometry.CutoffPosition(p, p.CutoffCount) + p.CutoffThickness / 2m;
+            if (p.UpstreamBreast.Exists)
+            {
+                decimal end = p.UpstreamBreast.StemThickness + p.UpstreamBreast.HeelLength;
+                if (end >= firstMin)
+                {
+                    errors.Add("上流胸壁の下流端 " + end + " m が 1 枚目のしゃ水壁(" + firstMin + " m)と干渉します。");
+                }
+            }
+            if (p.DownstreamBreast.Exists)
+            {
+                decimal start = p.BarrelLength - p.DownstreamBreast.StemThickness - p.DownstreamBreast.HeelLength;
+                if (start <= lastMax)
+                {
+                    errors.Add("下流胸壁の上流端 " + start + " m が最後のしゃ水壁(" + lastMax + " m)と干渉します。");
+                }
             }
         }
 

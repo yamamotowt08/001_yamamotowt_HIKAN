@@ -29,6 +29,17 @@ namespace Hikan.Core
             list.Add(item);
         }
 
+        private static void AddBreast(System.Collections.Generic.List<HikanItem> list, HikanBreastWall w, string prefix)
+        {
+            Add(list, prefix + "stem_thickness", F(w.StemThickness), "m", "入力");
+            Add(list, prefix + "width", F(w.Width), "m", "入力");
+            Add(list, prefix + "crown_height", F(w.CrownHeight), "m", "入力");
+            Add(list, prefix + "embedment", F(w.Embedment), "m", "入力");
+            Add(list, prefix + "footing_thickness", F(w.FootingThickness), "m", "入力");
+            Add(list, prefix + "toe_length", F(w.ToeLength), "m", "入力");
+            Add(list, prefix + "heel_length", F(w.HeelLength), "m", "入力");
+        }
+
         public static System.Collections.Generic.List<HikanItem> Build(HikanParameters p, HikanEstimate e)
         {
             System.Collections.Generic.List<HikanItem> r = new System.Collections.Generic.List<HikanItem>();
@@ -45,12 +56,8 @@ namespace Hikan.Core
             Add(r, "excavation_margin", F(p.ExcavationMargin), "m", "入力");
             Add(r, "excavation_slope", F(p.ExcavationSlope), "", "入力");
             Add(r, "foundation_thickness", F(p.FoundationThickness), "m", "入力");
-            Add(r, "upstream_breast_thickness", F(p.UpstreamBreastThickness), "m", "入力");
-            Add(r, "upstream_breast_width", F(p.UpstreamBreastWidth), "m", "入力");
-            Add(r, "upstream_breast_height", F(p.UpstreamBreastHeight), "m", "入力");
-            Add(r, "downstream_breast_thickness", F(p.DownstreamBreastThickness), "m", "入力");
-            Add(r, "downstream_breast_width", F(p.DownstreamBreastWidth), "m", "入力");
-            Add(r, "downstream_breast_height", F(p.DownstreamBreastHeight), "m", "入力");
+            AddBreast(r, p.UpstreamBreast, "upstream_breast_");
+            AddBreast(r, p.DownstreamBreast, "downstream_breast_");
             Add(r, "cutoff_count", p.CutoffCount.ToString(), "枚", "入力");
             Add(r, "cutoff_thickness", F(p.CutoffThickness), "m", "入力");
             Add(r, "cutoff_projection", F(p.CutoffProjection), "m", "入力");
@@ -99,7 +106,8 @@ namespace Hikan.Core
         public static readonly string[] Notes = new string[]
         {
             "対象範囲: ボックスカルバート型 1 連の函体(頂版・側壁・底版)+ 胸壁 + しゃ水壁。翼壁・門柱・ゲート操作台・水叩き・護床工は対象外。",
-            "胸壁は函体端面の外側(上流 Y<0 / 下流 Y>L)に接続する矩形板としてモデル化しています。函体延長 L に胸壁は含みません。",
+            "胸壁は たて壁 + 底版 の 1 枚の逆T字擁壁で、たて壁を函体が貫通する形にモデル化しています。つま先版長またはかかと版長を 0 にすれば L 字になります。",
+            "胸壁のたて壁は函体延長の内側(上流 Y∈[0,たて壁厚] / 下流 Y∈[L−たて壁厚,L])に置き、底版だけが函体より外へ張り出します。",
             "しゃ水壁は函体外周に全周一律(下方にも)張り出すカラーとしてモデル化し、函体延長を枚数で等分した各区間の中央に配置します。",
             "胸壁・しゃ水壁の寸法・張出し量・設置位置は参照文書に規定がないため、全て入力値です。形状は『全部材が等厚矩形』(基準の形状単純化方針)のみを根拠にしています。",
             "浸透路長は函体外周に沿う経路長(延長 + 張出し量 × 2 × 枚数)です。レーン則等による必要浸透路長の照査は行いません(照査式が参照文書にないため)。",

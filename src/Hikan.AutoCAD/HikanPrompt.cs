@@ -36,6 +36,32 @@ namespace Hikan.AutoCAD
             return true;
         }
 
+        /// <summary>胸壁 1 端ぶん。たて壁厚 0 なら「設置しない」として残りを聞かない。</summary>
+        private static bool PromptBreast(
+            Autodesk.AutoCAD.EditorInput.Editor ed,
+            Hikan.Core.HikanBreastWall w,
+            string name)
+        {
+            decimal d;
+            if (!GetDecimal(ed, name + " たて壁厚 [m] (0 で設置しない)", w.StemThickness, out d)) { return false; }
+            w.StemThickness = d;
+            if (!w.Exists) { return true; }
+
+            if (!GetDecimal(ed, name + " 幅 [m] (函体外形幅以上)", w.Width, out d)) { return false; }
+            w.Width = d;
+            if (!GetDecimal(ed, name + " 天端高 [m] (函体底版下面から、外形高以上)", w.CrownHeight, out d)) { return false; }
+            w.CrownHeight = d;
+            if (!GetDecimal(ed, name + " 根入れ深さ [m] (底版厚以上)", w.Embedment, out d)) { return false; }
+            w.Embedment = d;
+            if (!GetDecimal(ed, name + " 底版厚 [m]", w.FootingThickness, out d)) { return false; }
+            w.FootingThickness = d;
+            if (!GetDecimal(ed, name + " つま先版長 [m] (函体から遠い側。0 で L 字)", w.ToeLength, out d)) { return false; }
+            w.ToeLength = d;
+            if (!GetDecimal(ed, name + " かかと版長 [m] (函体に近い側。0 で L 字)", w.HeelLength, out d)) { return false; }
+            w.HeelLength = d;
+            return true;
+        }
+
         /// <summary>全パラメータを順に入力する。p を直接更新する。基準点は Create 時のみ askBasePoint=true で入力。</summary>
         public static bool PromptAll(Autodesk.AutoCAD.EditorInput.Editor ed, Hikan.Core.HikanParameters p, bool askBasePoint)
         {
@@ -85,25 +111,9 @@ namespace Hikan.AutoCAD
             if (!GetDecimal(ed, "基礎材厚 (均しコン等) [m]", p.FoundationThickness, out d)) { return false; }
             p.FoundationThickness = d;
 
-            // 胸壁。厚 0 なら設置しないので幅・高は聞かない。
-            if (!GetDecimal(ed, "上流胸壁 厚 [m] (0 で設置しない)", p.UpstreamBreastThickness, out d)) { return false; }
-            p.UpstreamBreastThickness = d;
-            if (p.UpstreamBreastThickness > 0m)
-            {
-                if (!GetDecimal(ed, "上流胸壁 幅 [m] (外形幅以上)", p.UpstreamBreastWidth, out d)) { return false; }
-                p.UpstreamBreastWidth = d;
-                if (!GetDecimal(ed, "上流胸壁 高 [m] (底版下面から、外形高以上)", p.UpstreamBreastHeight, out d)) { return false; }
-                p.UpstreamBreastHeight = d;
-            }
-            if (!GetDecimal(ed, "下流胸壁 厚 [m] (0 で設置しない)", p.DownstreamBreastThickness, out d)) { return false; }
-            p.DownstreamBreastThickness = d;
-            if (p.DownstreamBreastThickness > 0m)
-            {
-                if (!GetDecimal(ed, "下流胸壁 幅 [m] (外形幅以上)", p.DownstreamBreastWidth, out d)) { return false; }
-                p.DownstreamBreastWidth = d;
-                if (!GetDecimal(ed, "下流胸壁 高 [m] (底版下面から、外形高以上)", p.DownstreamBreastHeight, out d)) { return false; }
-                p.DownstreamBreastHeight = d;
-            }
+            // 胸壁。たて壁厚 0 なら設置しないので残りは聞かない。
+            if (!PromptBreast(ed, p.UpstreamBreast, "上流胸壁")) { return false; }
+            if (!PromptBreast(ed, p.DownstreamBreast, "下流胸壁")) { return false; }
 
             // しゃ水壁。枚数 0 なら設置しないので厚・張出しは聞かない。
             if (!GetInt(ed, "しゃ水壁 枚数 (0 で設置しない。等間隔配置)", p.CutoffCount, out n)) { return false; }
