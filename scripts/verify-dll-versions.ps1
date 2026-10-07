@@ -16,17 +16,18 @@ param(
 $ng = $false
 $rows = @()
 
-function Check-Dll([string]$dir, [string]$name, [string]$expectPattern, [string]$expectLabel) {
+# $gate = $false の DLL は実測値を表示するだけで合否判定には使わない(csproj が参照していないもの)。
+function Check-Dll([string]$dir, [string]$name, [string]$expectPattern, [string]$expectLabel, [bool]$gate = $true) {
     $path = Join-Path $dir $name
     if (-not (Test-Path $path)) {
-        $script:rows += [pscustomobject]@{ Name = $name; FileVersion = '(未検出)'; ProductVersion = ''; Expected = $expectLabel; Result = 'NG'; Path = $path }
-        $script:ng = $true
+        $script:rows += [pscustomobject]@{ Name = $name; FileVersion = '(未検出)'; ProductVersion = ''; Expected = $expectLabel; Result = $(if ($gate) { 'NG' } else { '-' }); Path = $path }
+        if ($gate) { $script:ng = $true }
         return
     }
     $vi = (Get-Item $path).VersionInfo
     $ok = ($vi.FileVersion -match $expectPattern)
-    if (-not $ok) { $script:ng = $true }
-    $script:rows += [pscustomobject]@{ Name = $name; FileVersion = $vi.FileVersion; ProductVersion = $vi.ProductVersion; Expected = $expectLabel; Result = $(if ($ok) { 'OK' } else { 'NG' }); Path = $path }
+    if ((-not $ok) -and $gate) { $script:ng = $true }
+    $script:rows += [pscustomobject]@{ Name = $name; FileVersion = $vi.FileVersion; ProductVersion = $vi.ProductVersion; Expected = $expectLabel; Result = $(if (-not $gate) { '-' } elseif ($ok) { 'OK' } else { 'NG' }); Path = $path }
 }
 
 # Step 1: csproj の Private=False
@@ -46,7 +47,10 @@ Check-Dll $AcadDir 'AcCoreMgd.dll' '^25\.' '25.x'
 Check-Dll $AcadDir 'AcDbMgd.dll'   '^25\.' '25.x'
 Check-Dll $AcadDir 'AcMgd.dll'     '^25\.' '25.x'
 Check-Dll $DynamoCoreDir 'DynamoServices.dll' '^3\.3\.' '3.3.x'
-Check-Dll $DynamoCoreDir 'ProtoGeometry.dll'  '^3\.3\.' '3.3.x (参考: 第1段階では未使用)'
+# ProtoGeometry.dll は Dynamo 本体と独立したバージョン体系(ジオメトリライブラリ由来で 3.0.x 系)。
+# Dynamo 3.3 環境でも 3.3.x にはならない。かつ csproj が参照していないため合否判定には使わない。
+# 第2段階でジオメトリ型を Dynamo に公開する際は、実測値に合わせて期待パターンを決め直し gate を $true にする。
+Check-Dll $DynamoCoreDir 'ProtoGeometry.dll'  '.*' '(参考: 未参照)' $false
 
 # Aecc*Mgd はバージョン体系が AutoCAD と異なるため一覧表示のみ(第1段階では未使用)
 $c3d = Join-Path $AcadDir 'C3D'

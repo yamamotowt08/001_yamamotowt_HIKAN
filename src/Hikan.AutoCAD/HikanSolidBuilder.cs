@@ -1,12 +1,12 @@
-// === 参照DLLバージョン検証: 未検証 ===
-// AcCoreMgd.dll     : 25.x.x.x 期待 (C:\Program Files\Autodesk\AutoCAD 2025\)   未検証
-// AcDbMgd.dll       : 25.x.x.x 期待 (同上)                                      未検証
-// AcMgd.dll         : 25.x.x.x 期待 (同上)                                      未検証
-// AeccDbMgd.dll     : 第1段階では未使用(参照しない)
-// 検証日: 未実施(この開発環境に Autodesk 製品と PowerShell が無いため実測できていない)
+// === 参照DLLバージョン検証済み ===
+// AcCoreMgd.dll     : 25.0.154.0.0  (C:\Program Files\Autodesk\AutoCAD 2025\)  期待 25.x  OK
+// AcDbMgd.dll       : 25.0.154.0.0  (同上)                                     期待 25.x  OK
+// AcMgd.dll         : 25.0.154.0.0  (同上)                                     期待 25.x  OK
+// AeccDbMgd.dll     : 13.7.1175.0   (...\AutoCAD 2025\C3D\)  Civil 3D 2025。参照しない(参考)
+// 検証日: 2026-10-07
 // 検証コマンド: scripts/verify-dll-versions.ps1
-// 未検証リスク: バージョン不一致は TypeLoadException / MissingMethodException を実行時に起こし、
-//               ビルド成功では検出できない。NETLOAD の前に必ず上記スクリプトを Windows 側で実行すること。
+// 注: AutoCAD 系はメジャー 25.x が一致していれば ABI 互換。マイナーが異なる環境で
+//     TypeLoadException / MissingMethodException が出た場合は上記スクリプトを再実行すること。
 namespace Hikan.AutoCAD
 {
     /// <summary>

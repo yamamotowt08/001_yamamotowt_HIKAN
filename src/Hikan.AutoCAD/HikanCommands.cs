@@ -1,4 +1,4 @@
-// === 参照DLLバージョン検証: 未検証 === (詳細は HikanSolidBuilder.cs 先頭を参照。scripts/verify-dll-versions.ps1 で検証)
+// === 参照DLLバージョン検証済み(2026-10-07) === (詳細は HikanSolidBuilder.cs 先頭を参照。scripts/verify-dll-versions.ps1 で検証)
 namespace Hikan.AutoCAD
 {
     /// <summary>

@@ -1,9 +1,9 @@
-// === 参照DLLバージョン検証: 未検証 ===
-// DynamoServices.dll : 3.3.x 期待 (C:\Program Files\Autodesk\AutoCAD 2025\C3D\Dynamo\Core\)  未検証
-// 検証日: 未実施(この開発環境に Autodesk 製品と PowerShell が無いため実測できていない)
+// === 参照DLLバージョン検証済み ===
+// DynamoServices.dll : 3.3.0.6316  (C:\Program Files\Autodesk\AutoCAD 2025\C3D\Dynamo\Core\)  期待 3.3.x  OK
+// ProtoGeometry.dll  : 3.0.0.5365  (同上)  参照しない(参考)。Dynamo 本体と独立したバージョン体系で
+//                      Dynamo 3.3 環境でも 3.0.x 系になる。3.3.x を期待してはいけない。
+// 検証日: 2026-10-07
 // 検証コマンド: scripts/verify-dll-versions.ps1
-// 未検証リスク: Dynamo のバージョン不一致は MultiReturn 属性の解決に失敗してノードが現れない、
-//               または TypeLoadException を起こす。いずれもビルド成功では検出できない。
 namespace Hikan.Dynamo
 {
     /// <summary>

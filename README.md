@@ -4,10 +4,10 @@
 **函体**(頂版・側壁・底版)の 3D モデル(Solid3d 1個)生成と、ジオメトリから確定的に出せる数量の計算を行う DLL 群。
 単位はメートル統一。
 
-> **状態**: Core(ジオメトリ・整合性・数量)は **xunit 53 ケース全合格**。
-> AutoCAD / Dynamo 層は **参照DLLバージョン未検証**(Windows 実機未確認)。
-> ただし Autodesk 公式 NuGet(AutoCAD.NET 25.0.1 / DynamoVisualProgramming.DynamoServices 3.3.1)の
-> 参照アセンブリに対して **コンパイル検証済み**(0 エラー・0 警告)なので、API の存在とシグネチャは確認できている。
+> **状態**: Core(ジオメトリ・整合性・数量)は **xunit 53 ケース全合格**(Windows 実機でも確認済み)。
+> **参照DLLバージョンは 2026-10-07 に Civil 3D 2025 実機で検証済み**(§2 の表)。
+> AutoCAD / Dynamo 層は Autodesk 公式 NuGet の参照アセンブリに対して **コンパイル検証済み**(0 エラー・0 警告)。
+> 残るは実機での `HIKAN_SelfTest` の通過確認。
 
 ## 1. 概略図
 
@@ -39,16 +39,21 @@ Region 段階で内空を抜くため、**Solid3d は構成上最初から 1 個
 
 ## 2. 参照アセンブリ
 
-| プロジェクト | 参照 | 期待バージョン | Private |
-|---|---|---|---|
-| Hikan.Core | なし(net8.0) | ― | ― |
-| Hikan.AutoCAD | AcCoreMgd.dll / AcDbMgd.dll / AcMgd.dll | 25.x(**未検証**) | False |
-| Hikan.AutoCAD | AeccDbMgd.dll | 第1段階では不使用(参照しない) | ― |
-| Hikan.Dynamo | DynamoServices.dll | 3.3.x(**未検証**) | False |
-| Hikan.Core.Tests | xunit 2.9.2 / Microsoft.NET.Test.Sdk 17.11.1 / xunit.runner.visualstudio 2.8.2 | ― | ― |
+| プロジェクト | 参照 | 期待 | 実測(2026-10-07) | Private |
+|---|---|---|---|---|
+| Hikan.Core | なし(net8.0) | ― | ― | ― |
+| Hikan.AutoCAD | AcCoreMgd.dll / AcDbMgd.dll / AcMgd.dll | 25.x | **25.0.154.0.0** OK | False |
+| Hikan.AutoCAD | AeccDbMgd.dll(Civil 3D) | 参照しない | 13.7.1175.0(参考) | ― |
+| Hikan.Dynamo | DynamoServices.dll | 3.3.x | **3.3.0.6316** OK | False |
+| Hikan.Dynamo | ProtoGeometry.dll | 参照しない | 3.0.0.5365(参考) | ― |
+| Hikan.Core.Tests | xunit 2.9.2 / Microsoft.NET.Test.Sdk 17.11.1 / xunit.runner.visualstudio 2.8.2 | ― | ― | ― |
 
 検証: Windows 側で `scripts/verify-dll-versions.ps1` を実行。**NETLOAD の前に必ず実行すること**(バージョン不一致は
 `TypeLoadException` / `MissingMethodException` を実行時に起こし、ビルド成功では検出できない)。
+
+**`ProtoGeometry.dll` は Dynamo 本体と独立したバージョン体系**(ジオメトリライブラリ由来)で、Dynamo 3.3 環境でも
+`3.0.x` 系になる。`3.3.x` を期待してはいけない。本プロジェクトは参照していないため合否判定にも使わない
+(第2段階で Dynamo にジオメトリ型を公開する場合は、実測値に合わせて期待パターンを決め直すこと)。
 
 ## 3. AutoCAD / Civil 3D コマンド(`NETLOAD` で `Hikan.AutoCAD.dll` を読み込む)
 
