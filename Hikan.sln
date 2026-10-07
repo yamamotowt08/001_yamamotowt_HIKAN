@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{57ECA1F5-CA5C-4A55-95CD-1DC05CF3AA75}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hikan.Core", "src\Hikan.Core\Hikan.Core.csproj", "{E64AC0BF-B3D1-496B-81B1-F2AE13285C35}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hikan.AutoCAD", "src\Hikan.AutoCAD\Hikan.AutoCAD.csproj", "{B0164470-2F95-42A5-9B3B-C079CBF810B9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hikan.Dynamo", "src\Hikan.Dynamo\Hikan.Dynamo.csproj", "{51F23483-021C-4AB9-B302-7E5641BEC214}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{26C3D06F-297D-41E9-AD9A-4ABB59E5AEF0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hikan.Core.Tests", "tests\Hikan.Core.Tests\Hikan.Core.Tests.csproj", "{4F736941-3911-4AEB-9878-9E64A34B7B08}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E64AC0BF-B3D1-496B-81B1-F2AE13285C35}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E64AC0BF-B3D1-496B-81B1-F2AE13285C35}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E64AC0BF-B3D1-496B-81B1-F2AE13285C35}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E64AC0BF-B3D1-496B-81B1-F2AE13285C35}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0164470-2F95-42A5-9B3B-C079CBF810B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0164470-2F95-42A5-9B3B-C079CBF810B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0164470-2F95-42A5-9B3B-C079CBF810B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0164470-2F95-42A5-9B3B-C079CBF810B9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{51F23483-021C-4AB9-B302-7E5641BEC214}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51F23483-021C-4AB9-B302-7E5641BEC214}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{51F23483-021C-4AB9-B302-7E5641BEC214}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{51F23483-021C-4AB9-B302-7E5641BEC214}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4F736941-3911-4AEB-9878-9E64A34B7B08}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4F736941-3911-4AEB-9878-9E64A34B7B08}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4F736941-3911-4AEB-9878-9E64A34B7B08}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4F736941-3911-4AEB-9878-9E64A34B7B08}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{E64AC0BF-B3D1-496B-81B1-F2AE13285C35} = {57ECA1F5-CA5C-4A55-95CD-1DC05CF3AA75}
+		{B0164470-2F95-42A5-9B3B-C079CBF810B9} = {57ECA1F5-CA5C-4A55-95CD-1DC05CF3AA75}
+		{51F23483-021C-4AB9-B302-7E5641BEC214} = {57ECA1F5-CA5C-4A55-95CD-1DC05CF3AA75}
+		{4F736941-3911-4AEB-9878-9E64A34B7B08} = {26C3D06F-297D-41E9-AD9A-4ABB59E5AEF0}
+	EndGlobalSection
+EndGlobal

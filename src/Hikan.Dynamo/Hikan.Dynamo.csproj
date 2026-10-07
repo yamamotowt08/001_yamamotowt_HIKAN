@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Civil 3D 2025 同梱 Dynamo 3.3 用 Zero Touch Node。Dynamo 本体 DLL は Private=False。 -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <RootNamespace>Hikan.Dynamo</RootNamespace>
+    <AssemblyName>Hikan.Dynamo</AssemblyName>
+    <!-- 別の場所にインストールしている場合: dotnet build -p:DynamoCoreDir="D:\...\Dynamo\Core\" -->
+    <DynamoCoreDir Condition="'$(DynamoCoreDir)' == ''">C:\Program Files\Autodesk\AutoCAD 2025\C3D\Dynamo\Core\</DynamoCoreDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="DynamoServices">
+      <HintPath>$(DynamoCoreDir)DynamoServices.dll</HintPath>
+      <Private>False</Private>
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <!-- 数値のみ返すため ProtoGeometry.dll / DSCoreNodes.dll は参照しない。 -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hikan.Core\Hikan.Core.csproj" />
+  </ItemGroup>
+
+</Project>

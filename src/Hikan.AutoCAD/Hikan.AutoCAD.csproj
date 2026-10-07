@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- AutoCAD 2025 / Civil 3D 2025 用プラグイン。AutoCAD 本体 DLL は Private=False(配布物に同梱しない)。 -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <RootNamespace>Hikan.AutoCAD</RootNamespace>
+    <AssemblyName>Hikan.AutoCAD</AssemblyName>
+    <!-- 別の場所にインストールしている場合: dotnet build -p:AcadDir="D:\Autodesk\AutoCAD 2025\" -->
+    <AcadDir Condition="'$(AcadDir)' == ''">C:\Program Files\Autodesk\AutoCAD 2025\</AcadDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="AcCoreMgd">
+      <HintPath>$(AcadDir)AcCoreMgd.dll</HintPath>
+      <Private>False</Private>
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="AcDbMgd">
+      <HintPath>$(AcadDir)AcDbMgd.dll</HintPath>
+      <Private>False</Private>
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="AcMgd">
+      <HintPath>$(AcadDir)AcMgd.dll</HintPath>
+      <Private>False</Private>
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <!-- AeccDbMgd(Civil 3D)は第1段階では使わないため参照しない。アライメントに沿わせる拡張時に追加する。 -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hikan.Core\Hikan.Core.csproj" />
+  </ItemGroup>
+
+</Project>

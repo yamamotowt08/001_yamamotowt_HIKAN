@@ -1,0 +1,54 @@
+namespace Hikan.Core
+{
+    /// <summary>英語パラメータ名 → 日本語説明の対応(内部保持)。schema_version は含めない。</summary>
+    public static class HikanNames
+    {
+        public static readonly System.Collections.Generic.Dictionary<string, string> Japanese =
+            new System.Collections.Generic.Dictionary<string, string>
+            {
+                { "inner_width", "内空幅 B" },
+                { "inner_height", "内空高 H" },
+                { "wall_thickness", "側壁厚" },
+                { "top_slab_thickness", "頂版厚" },
+                { "bottom_slab_thickness", "底版厚" },
+                { "barrel_length", "函体延長 L(斜距離)" },
+                { "bottom_slope", "底版勾配 i(下流下がり)" },
+                { "soil_cover", "土かぶり" },
+                { "block_count", "ブロック数" },
+                { "excavation_margin", "床掘り余裕幅(片側)" },
+                { "excavation_slope", "床掘り法勾配 1:n の n" },
+                { "foundation_thickness", "基礎材厚(均しコン等)" },
+                { "color_index", "ソリッド色(ACI)" },
+                { "base_x", "基準点 X(函体中心線)" },
+                { "base_y", "基準点 Y(上流端)" },
+                { "base_z", "基準点 Z(底版下面)" },
+
+                { "outer_width", "外形幅 B_out" },
+                { "outer_height", "外形高 H_out" },
+                { "invert_level", "敷高(内空底面高)" },
+                { "outer_section_area", "外形断面積" },
+                { "inner_section_area", "内空断面積" },
+                { "concrete_section_area", "コンクリート断面積" },
+                { "top_slab_volume", "頂版コンクリート" },
+                { "bottom_slab_volume", "底版コンクリート" },
+                { "wall_volume", "側壁コンクリート" },
+                { "concrete_volume", "コンクリート計" },
+                { "horizontal_projection", "水平投影長" },
+                { "drop_height", "上下流端の落差" },
+                { "formwork_inner", "型枠(内空面)" },
+                { "formwork_outer_side", "型枠(外側面)" },
+                { "formwork_top", "型枠(頂版上面)" },
+                { "formwork_end", "型枠(端面)" },
+                { "block_length", "ブロック長" },
+                { "concrete_per_block", "ブロック当りコンクリート" },
+                { "excavation_bottom_width", "床掘り底面幅" },
+                { "excavation_bottom_length", "床掘り底面長" },
+                { "excavation_depth", "床掘り深さ" },
+                { "excavation_volume", "床掘り体積" },
+                { "foundation_volume", "基礎材体積" },
+                { "occupied_volume", "構造物地下占有体積" },
+                { "backfill_volume", "埋戻体積" },
+                { "surplus_volume", "残土(地山換算)" }
+            };
+    }
+}
