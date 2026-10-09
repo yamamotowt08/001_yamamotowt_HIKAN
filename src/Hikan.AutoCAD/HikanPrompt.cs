@@ -48,6 +48,8 @@ namespace Hikan.AutoCAD
             w.StemThickness = d;
             if (!w.Exists) { return true; }
 
+            if (!GetDecimal(ed, name + " たて壁軸位置 [m] (川裏函体端からたて壁厚の中心まで)", w.Position, out d)) { return false; }
+            w.Position = d;
             if (!GetDecimal(ed, name + " 張出し長 [m] (函体側面から外向き。左右同一)", w.Length, out d)) { return false; }
             w.Length = d;
             if (!GetDecimal(ed, name + " 天端高 [m] (函体底版下面から)", w.CrownHeight, out d)) { return false; }
@@ -56,9 +58,9 @@ namespace Hikan.AutoCAD
             w.Embedment = d;
             if (!GetDecimal(ed, name + " 底版厚 [m]", w.FootingThickness, out d)) { return false; }
             w.FootingThickness = d;
-            if (!GetDecimal(ed, name + " つま先版長 [m] (函体から遠い側。0 で L 字)", w.ToeLength, out d)) { return false; }
+            if (!GetDecimal(ed, name + " つま先版長 [m] (近い方の函体端の側。0 で L 字)", w.ToeLength, out d)) { return false; }
             w.ToeLength = d;
-            if (!GetDecimal(ed, name + " かかと版長 [m] (函体に近い側。0 で L 字)", w.HeelLength, out d)) { return false; }
+            if (!GetDecimal(ed, name + " かかと版長 [m] (函体中央の側。0 で L 字)", w.HeelLength, out d)) { return false; }
             w.HeelLength = d;
             return true;
         }
@@ -113,8 +115,8 @@ namespace Hikan.AutoCAD
             p.FoundationThickness = d;
 
             // 胸壁。たて壁厚 0 なら設置しないので残りは聞かない。
-            if (!PromptBreast(ed, p.UpstreamBreast, "上流胸壁")) { return false; }
-            if (!PromptBreast(ed, p.DownstreamBreast, "下流胸壁")) { return false; }
+            if (!PromptBreast(ed, p.UpstreamBreast, "川裏側胸壁")) { return false; }
+            if (!PromptBreast(ed, p.DownstreamBreast, "川表側胸壁")) { return false; }
 
             // しゃ水壁。枚数 0 なら設置しないので厚・張出しは聞かない。
             if (!GetInt(ed, "しゃ水壁 枚数 (0 で設置しない。等間隔配置)", p.CutoffCount, out n)) { return false; }

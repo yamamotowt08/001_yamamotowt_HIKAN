@@ -98,25 +98,12 @@ namespace Hikan.Core
             e.ConcretePerBlock = RoundHalfUp(HikanGeometry.BarrelVolume(p) / p.BlockCount, Digits);
 
             // 床掘り: 四方に法勾配 1:n を付けた角錐台。∫[0,d] (Wb+2nz)(Lb+2nz) dz の厳密解。
-            // 平面幅は全部材の外形を囲む大きさ(胸壁は函体外形幅 + 左右の張出し長)。
-            decimal planWidth = bOut;
-            if (p.UpstreamBreast.Exists && bOut + 2m * p.UpstreamBreast.Length > planWidth)
-            {
-                planWidth = bOut + 2m * p.UpstreamBreast.Length;
-            }
-            if (p.DownstreamBreast.Exists && bOut + 2m * p.DownstreamBreast.Length > planWidth)
-            {
-                planWidth = bOut + 2m * p.DownstreamBreast.Length;
-            }
-            if (p.CutoffCount > 0 && bOut + 2m * p.CutoffProjection > planWidth) { planWidth = bOut + 2m * p.CutoffProjection; }
-
-            // 平面は最上流(上流つま先版)から最下流(下流つま先版)まで、深さは最も深い部材まで。
-            decimal planLength = l
-                + (p.UpstreamBreast.Exists ? p.UpstreamBreast.ToeLength : 0m)
-                + (p.DownstreamBreast.Exists ? p.DownstreamBreast.ToeLength : 0m);
-            decimal below = p.CutoffCount > 0 ? p.CutoffProjection : 0m;
-            if (p.UpstreamBreast.Exists && p.UpstreamBreast.Embedment > below) { below = p.UpstreamBreast.Embedment; }
-            if (p.DownstreamBreast.Exists && p.DownstreamBreast.Embedment > below) { below = p.DownstreamBreast.Embedment; }
+            // 平面と深さは全部材の実際の外接範囲から求める。胸壁の位置は自由なので、
+            // つま先版が函体端より外に出るとは限らず、決め打ちの式では過大・過小になる。
+            (decimal HalfWidth, decimal VMin, decimal SMin, decimal SMax) range = HikanGeometry.SolidRange(p);
+            decimal planWidth = 2m * range.HalfWidth;
+            decimal planLength = range.SMax - range.SMin;
+            decimal below = -range.VMin;
 
             decimal wb = planWidth + 2m * p.ExcavationMargin;
             decimal lb = planLength + 2m * p.ExcavationMargin;

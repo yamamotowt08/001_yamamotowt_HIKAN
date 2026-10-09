@@ -107,10 +107,12 @@ namespace Hikan.Core.Tests
             // 第2段階で追加したキーを取り除き、第1段階の XData を再現する
             string[] added = new string[]
             {
-                "upstream_breast_stem_thickness", "upstream_breast_length", "upstream_breast_crown_height",
+                "upstream_breast_stem_thickness", "upstream_breast_position",
+                "upstream_breast_length", "upstream_breast_crown_height",
                 "upstream_breast_embedment", "upstream_breast_footing_thickness",
                 "upstream_breast_toe_length", "upstream_breast_heel_length",
-                "downstream_breast_stem_thickness", "downstream_breast_length", "downstream_breast_crown_height",
+                "downstream_breast_stem_thickness", "downstream_breast_position",
+                "downstream_breast_length", "downstream_breast_crown_height",
                 "downstream_breast_embedment", "downstream_breast_footing_thickness",
                 "downstream_breast_toe_length", "downstream_breast_heel_length",
                 "cutoff_count", "cutoff_thickness", "cutoff_projection"

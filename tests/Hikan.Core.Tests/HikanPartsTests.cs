@@ -14,7 +14,9 @@ namespace Hikan.Core.Tests
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
             p.TopSlabThickness = 0.4m;
             p.BottomSlabThickness = 0.6m;
+            // 軸位置は函体端にたて壁面を合わせた値(川裏側 = 厚/2、川表側 = L − 厚/2)。
             p.UpstreamBreast.StemThickness = 0.5m;
+            p.UpstreamBreast.Position = 0.25m;
             p.UpstreamBreast.Length = 1.5m;
             p.UpstreamBreast.CrownHeight = 4.0m;
             p.UpstreamBreast.Embedment = 1.0m;
@@ -22,6 +24,7 @@ namespace Hikan.Core.Tests
             p.UpstreamBreast.ToeLength = 0.8m;
             p.UpstreamBreast.HeelLength = 1.2m;
             p.DownstreamBreast.StemThickness = 0.6m;
+            p.DownstreamBreast.Position = 19.7m;
             p.DownstreamBreast.Length = 2.0m;
             p.DownstreamBreast.CrownHeight = 4.5m;
             p.DownstreamBreast.Embedment = 1.2m;
@@ -182,7 +185,7 @@ namespace Hikan.Core.Tests
                 byName[part.Name] = part;
             }
 
-            string[] bases = new string[] { "上流胸壁", "下流胸壁" };
+            string[] bases = new string[] { "川裏側胸壁", "川表側胸壁" };
             string[] pieces = new string[] { "たて壁", "底版" };
             foreach (string b in bases)
             {
@@ -260,14 +263,88 @@ namespace Hikan.Core.Tests
             // 下流胸壁の方が大きいので重心は函体中央 10.0 より下流側
             Xunit.Assert.True(g.Y > 10m, "重心 Y が下流寄りになること。実際: " + g.Y);
 
-            // 上下流を入れ替えたら鏡像の位置になること
+            // 川裏・川表を入れ替えて函体中央 S = 10 について鏡映した配置にすると、重心も鏡映の位置になること。
+            // 軸位置は入れ替え後の厚さで函体端に合わせ直す(川裏側 = 厚/2、川表側 = L − 厚/2)。
             Hikan.Core.HikanParameters q = Full();
             Hikan.Core.HikanBreastWall up = q.UpstreamBreast;
             q.UpstreamBreast = q.DownstreamBreast;
             q.DownstreamBreast = up;
+            q.UpstreamBreast.Position = q.UpstreamBreast.StemThickness / 2m;
+            q.DownstreamBreast.Position = q.BarrelLength - q.DownstreamBreast.StemThickness / 2m;
             (decimal X, decimal Y, decimal Z) h = Hikan.Core.HikanGeometry.ExpectedCentroid(q);
             Xunit.Assert.True(h.Y < 10m, "入れ替えると上流寄りになること。実際: " + h.Y);
+            Xunit.Assert.True(System.Math.Abs(h.Y - (20m - g.Y)) < 0.000000001m, "鏡映の位置になること");
             Xunit.Assert.Equal(g.Z, h.Z);
+        }
+
+        // テスト7b: 軸位置で胸壁が函体方向に動くこと。たて壁は軸 ± 厚/2、つま先版は近い方の函体端の側。
+        [Xunit.Fact]
+        public void BreastWall_IsPlacedByAxisPosition()
+        {
+            Hikan.Core.HikanParameters p = Full();
+            p.CutoffCount = 0;
+            p.UpstreamBreast.Position = 5.0m;      // 厚 0.5、つま先 0.8、かかと 1.2
+            p.DownstreamBreast.Position = 14.0m;   // 厚 0.6、つま先 1.0、かかと 1.5
+
+            System.Collections.Generic.Dictionary<string, Hikan.Core.HikanPart> byName =
+                new System.Collections.Generic.Dictionary<string, Hikan.Core.HikanPart>();
+            foreach (Hikan.Core.HikanPart part in Hikan.Core.HikanGeometry.GetParts(p))
+            {
+                byName[part.Name] = part;
+            }
+
+            Hikan.Core.HikanPart upStem = byName["川裏側胸壁右たて壁"];
+            Xunit.Assert.Equal(4.75m, upStem.SMin);
+            Xunit.Assert.Equal(5.25m, upStem.SMax);
+            Hikan.Core.HikanPart upFoot = byName["川裏側胸壁右底版"];
+            Xunit.Assert.Equal(3.95m, upFoot.SMin);   // つま先は川裏側へ 0.8
+            Xunit.Assert.Equal(6.45m, upFoot.SMax);   // かかとは函体中央側へ 1.2
+
+            Hikan.Core.HikanPart downStem = byName["川表側胸壁左たて壁"];
+            Xunit.Assert.Equal(13.7m, downStem.SMin);
+            Xunit.Assert.Equal(14.3m, downStem.SMax);
+            Hikan.Core.HikanPart downFoot = byName["川表側胸壁左底版"];
+            Xunit.Assert.Equal(12.2m, downFoot.SMin); // かかとは函体中央側へ 1.5
+            Xunit.Assert.Equal(15.3m, downFoot.SMax); // つま先は川表側へ 1.0
+
+            // 胸壁が函体の中に収まるので、配置の基準長は函体延長のまま
+            Xunit.Assert.Equal(20m, Hikan.Core.HikanGeometry.GlobalSMax(p));
+            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
+        }
+
+        // テスト7c: 胸壁を函体中ほどに置いても、包除の体積式と独立検算が一致すること。
+        [Xunit.Theory]
+        [Xunit.InlineData(0.25, 19.7, 2)]
+        [Xunit.InlineData(2.0, 17.5, 2)]
+        [Xunit.InlineData(10.0, 17.5, 2)]   // 川裏側胸壁が 2 枚のしゃ水壁の間にある
+        [Xunit.InlineData(3.0, 9.0, 0)]
+        public void SlabVolume_MatchesModelVolume_AtAnyPosition(double up, double down, int cutoffs)
+        {
+            Hikan.Core.HikanParameters p = Full();
+            p.UpstreamBreast.Position = (decimal)up;
+            p.DownstreamBreast.Position = (decimal)down;
+            p.CutoffCount = cutoffs;
+            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
+            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p), SlabVolume(p));
+        }
+
+        // テスト7d: 床掘りの平面長は実際の部材範囲から求める。
+        // 胸壁を函体の中に置けば、つま先版は函体端から出ないので床掘り長は函体延長 + 余裕幅になる。
+        [Xunit.Fact]
+        public void ExcavationLength_FollowsActualPartRange()
+        {
+            Hikan.Core.HikanParameters atEnds = Full();
+            atEnds.CutoffCount = 0;
+            Hikan.Core.HikanEstimate e1 = Hikan.Core.HikanEstimator.Calculate(atEnds);
+            // 川裏つま先 0.8 + 函体 20 + 川表つま先 1.0 + 余裕幅 2 × 0.5
+            Xunit.Assert.Equal(22.8m, e1.ExcavationBottomLength);
+
+            Hikan.Core.HikanParameters inside = Full();
+            inside.CutoffCount = 0;
+            inside.UpstreamBreast.Position = 5.0m;
+            inside.DownstreamBreast.Position = 14.0m;
+            Hikan.Core.HikanEstimate e2 = Hikan.Core.HikanEstimator.Calculate(inside);
+            Xunit.Assert.Equal(21.0m, e2.ExcavationBottomLength);
         }
 
         // テスト8: エンベロープ体積 = コンクリート + 内空。埋戻の控除に使う。

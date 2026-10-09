@@ -14,11 +14,16 @@ namespace Hikan.Core
     ///   └──┘              └──┘              ├つま先┤      ├かかと┤
     ///   ├Lw┤              ├Lw┤  Lw = Length(函体側面から外向きの張出し長)
     ///                              底版は Embedment ぶん Z = 0 より下
+    ///
+    /// 函体方向の位置は Position(川裏函体端 = 上流端 S = 0 から、たて壁の軸 = 厚さの中心までの距離)で決める。
+    /// つま先版は近い方の函体端の側、かかと版は函体中央の側に伸びる。
     /// </summary>
     public sealed class HikanBreastWall
     {
         /// <summary>たて壁厚(Y方向)[m]。0 で設置しない。</summary>
         public decimal StemThickness { get; set; } = 0.000m;
+        /// <summary>たて壁の軸位置(川裏函体端からの距離、底版下面に沿う斜距離)[m]</summary>
+        public decimal Position { get; set; } = 1.000m;
         /// <summary>張出し長(X方向、函体側面から外向き。左右それぞれ)[m]</summary>
         public decimal Length { get; set; } = 2.000m;
         /// <summary>天端高(函体底版下面 Z = 0 からの高さ)[m]</summary>
@@ -27,10 +32,22 @@ namespace Hikan.Core
         public decimal Embedment { get; set; } = 1.000m;
         /// <summary>底版厚 [m]</summary>
         public decimal FootingThickness { get; set; } = 0.500m;
-        /// <summary>つま先版長(Y方向、函体端から遠い側)[m]。0 で L 字になる。</summary>
+        /// <summary>つま先版長(Y方向、近い方の函体端の側)[m]。0 で L 字になる。</summary>
         public decimal ToeLength { get; set; } = 0.800m;
-        /// <summary>かかと版長(Y方向、函体端に近い側)[m]。0 で L 字になる。</summary>
+        /// <summary>かかと版長(Y方向、函体中央の側)[m]。0 で L 字になる。</summary>
         public decimal HeelLength { get; set; } = 1.200m;
+
+        /// <summary>たて壁の川裏側の面の位置 S = 軸位置 − たて壁厚/2 [m]</summary>
+        public decimal StemStart
+        {
+            get { return Position - StemThickness / 2m; }
+        }
+
+        /// <summary>たて壁の川表側の面の位置 S = 軸位置 + たて壁厚/2 [m]</summary>
+        public decimal StemEnd
+        {
+            get { return Position + StemThickness / 2m; }
+        }
 
         /// <summary>設置するか。たて壁厚 0 は「設置しない」。</summary>
         public bool Exists
@@ -66,6 +83,7 @@ namespace Hikan.Core
         {
             System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
             d[prefix + "stem_thickness"] = StemThickness.ToString(inv);
+            d[prefix + "position"] = Position.ToString(inv);
             d[prefix + "length"] = Length.ToString(inv);
             d[prefix + "crown_height"] = CrownHeight.ToString(inv);
             d[prefix + "embedment"] = Embedment.ToString(inv);
@@ -81,6 +99,7 @@ namespace Hikan.Core
             System.Func<System.Collections.Generic.IDictionary<string, string>, string, decimal, decimal> get)
         {
             StemThickness = get(d, prefix + "stem_thickness", StemThickness);
+            Position = get(d, prefix + "position", Position);
             Length = get(d, prefix + "length", Length);
             CrownHeight = get(d, prefix + "crown_height", CrownHeight);
             Embedment = get(d, prefix + "embedment", Embedment);

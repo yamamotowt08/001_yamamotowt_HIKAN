@@ -65,10 +65,11 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 胸壁 1 端ぶん(左右 2 基 × たて壁 + 底版 = 4 ボックス)を追加する。
-        /// たて壁は函体方向に垂直な板で、函体の左右側面に接して外側へ張り出す。
-        /// 底版は Y 方向に伸び、つま先版は函体端から遠い側、かかと版は近い側。
-        /// 函体とは側面で接するだけで重ならない。
+        /// 胸壁 1 基ぶん(左右 2 基 × たて壁 + 底版 = 4 ボックス)を追加する。
+        /// たて壁は函体方向に垂直な板で、軸位置(川裏函体端からの距離)を中心に置き、
+        /// 函体の左右側面に接して外側へ張り出す。函体とは側面で接するだけで重ならない。
+        /// 底版のつま先版は近い方の函体端の側(川裏側胸壁なら川裏、川表側胸壁なら川表)、
+        /// かかと版は函体中央の側に伸びる。
         /// </summary>
         private static void AddBreast(
             System.Collections.Generic.List<HikanPart> parts,
@@ -79,13 +80,9 @@ namespace Hikan.Core
             if (!w.Exists) { return; }
 
             decimal half = p.OuterWidth / 2m;
-            decimal l = p.BarrelLength;
-            decimal stemMin = upstream ? 0m : l - w.StemThickness;
-            decimal stemMax = upstream ? w.StemThickness : l;
-            decimal footMin = upstream ? -w.ToeLength : l - w.StemThickness - w.HeelLength;
-            decimal footMax = upstream ? w.StemThickness + w.HeelLength : l + w.ToeLength;
+            (decimal Min, decimal Max) foot = BreastFootingRange(w, upstream);
 
-            string end = upstream ? "上流" : "下流";
+            string end = upstream ? "川裏側" : "川表側";
             for (int k = 0; k < 2; k++)
             {
                 bool right = k == 1;
@@ -93,22 +90,52 @@ namespace Hikan.Core
                 decimal uMax = right ? half + w.Length : -half;
                 string name = end + "胸壁" + (right ? "右" : "左");
 
-                parts.Add(Box(name + "たて壁", uMin, uMax, w.FootingTop, w.CrownHeight, stemMin, stemMax, false));
-                parts.Add(Box(name + "底版", uMin, uMax, -w.Embedment, w.FootingTop, footMin, footMax, false));
+                parts.Add(Box(name + "たて壁", uMin, uMax, w.FootingTop, w.CrownHeight, w.StemStart, w.StemEnd, false));
+                parts.Add(Box(name + "底版", uMin, uMax, -w.Embedment, w.FootingTop, foot.Min, foot.Max, false));
             }
         }
 
         /// <summary>
-        /// 全部材を通した S の最大値(= 下流端)。作図平面での押出し座標 W と S の対応 S = GlobalSMax − W に使う。
-        /// 配置変換がこの値ぶん +Y に平行移動するので、胸壁が無ければ従来どおり函体延長に一致する。
+        /// 胸壁底版の S 範囲。底版はたて壁を含むので、これが胸壁全体の S 範囲になる。
+        /// 川裏側胸壁(upstream)はつま先版が川裏(−S)側、川表側胸壁はつま先版が川表(+S)側。
+        /// </summary>
+        public static (decimal Min, decimal Max) BreastFootingRange(HikanBreastWall w, bool upstream)
+        {
+            return upstream
+                ? (w.StemStart - w.ToeLength, w.StemEnd + w.HeelLength)
+                : (w.StemStart - w.HeelLength, w.StemEnd + w.ToeLength);
+        }
+
+        /// <summary>
+        /// 加算部材(内空を除く)の外接範囲。U は中心線対称なので半幅で返す。
+        /// 胸壁の位置が自由なので、つま先版が函体端より外に出るとは限らない。床掘り範囲や配置の基準は
+        /// 決め打ちの式ではなく、実際の部材範囲から求める。
+        /// </summary>
+        public static (decimal HalfWidth, decimal VMin, decimal SMin, decimal SMax) SolidRange(HikanParameters p)
+        {
+            decimal half = 0m;
+            decimal vMin = 0m;
+            decimal sMin = 0m;
+            decimal sMax = p.BarrelLength;
+            foreach (HikanPart part in GetParts(p))
+            {
+                if (part.IsVoid) { continue; }
+                if (part.UMax > half) { half = part.UMax; }
+                if (-part.UMin > half) { half = -part.UMin; }
+                if (part.VMin < vMin) { vMin = part.VMin; }
+                if (part.SMin < sMin) { sMin = part.SMin; }
+                if (part.SMax > sMax) { sMax = part.SMax; }
+            }
+            return (half, vMin, sMin, sMax);
+        }
+
+        /// <summary>
+        /// 全部材を通した S の最大値(= 最も川表側)。作図平面での押出し座標 W と S の対応 S = GlobalSMax − W に使う。
+        /// 配置変換がこの値ぶん +Y に平行移動するので、函体より川表へ出る部材が無ければ函体延長に一致する。
         /// </summary>
         public static decimal GlobalSMax(HikanParameters p)
         {
-            if (p.DownstreamBreast.Exists)
-            {
-                return p.BarrelLength + p.DownstreamBreast.ToeLength;
-            }
-            return p.BarrelLength;
+            return SolidRange(p).SMax;
         }
 
         /// <summary>i 枚目(1 始まり)のしゃ水壁の中心位置 S。函体延長を n 等分した各区間の中央。</summary>

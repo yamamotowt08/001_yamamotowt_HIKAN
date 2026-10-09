@@ -21,8 +21,8 @@ namespace Hikan.Dynamo
             "敷高_m",
             "コンクリート総計_m3",
             "函体_m3",
-            "上流胸壁_m3",
-            "下流胸壁_m3",
+            "川裏側胸壁_m3",
+            "川表側胸壁_m3",
             "しゃ水壁_m3",
             "浸透路長_m",
             "頂版_m3",
@@ -56,6 +56,7 @@ namespace Hikan.Dynamo
             double excavationSlope = 0.5,
             double foundationThickness = 0.1,
             double upstreamBreastStemThickness = 0.0,
+            double upstreamBreastPosition = 1.0,
             double upstreamBreastLength = 2.0,
             double upstreamBreastCrownHeight = 4.0,
             double upstreamBreastEmbedment = 1.0,
@@ -63,6 +64,7 @@ namespace Hikan.Dynamo
             double upstreamBreastToeLength = 0.8,
             double upstreamBreastHeelLength = 1.2,
             double downstreamBreastStemThickness = 0.0,
+            double downstreamBreastPosition = 19.0,
             double downstreamBreastLength = 2.0,
             double downstreamBreastCrownHeight = 4.0,
             double downstreamBreastEmbedment = 1.0,
@@ -87,6 +89,7 @@ namespace Hikan.Dynamo
             p.ExcavationSlope = (decimal)excavationSlope;
             p.FoundationThickness = (decimal)foundationThickness;
             p.UpstreamBreast.StemThickness = (decimal)upstreamBreastStemThickness;
+            p.UpstreamBreast.Position = (decimal)upstreamBreastPosition;
             p.UpstreamBreast.Length = (decimal)upstreamBreastLength;
             p.UpstreamBreast.CrownHeight = (decimal)upstreamBreastCrownHeight;
             p.UpstreamBreast.Embedment = (decimal)upstreamBreastEmbedment;
@@ -94,6 +97,7 @@ namespace Hikan.Dynamo
             p.UpstreamBreast.ToeLength = (decimal)upstreamBreastToeLength;
             p.UpstreamBreast.HeelLength = (decimal)upstreamBreastHeelLength;
             p.DownstreamBreast.StemThickness = (decimal)downstreamBreastStemThickness;
+            p.DownstreamBreast.Position = (decimal)downstreamBreastPosition;
             p.DownstreamBreast.Length = (decimal)downstreamBreastLength;
             p.DownstreamBreast.CrownHeight = (decimal)downstreamBreastCrownHeight;
             p.DownstreamBreast.Embedment = (decimal)downstreamBreastEmbedment;
@@ -113,8 +117,8 @@ namespace Hikan.Dynamo
             r["敷高_m"] = (double)e.InvertLevel;
             r["コンクリート総計_m3"] = (double)e.ConcreteVolume;
             r["函体_m3"] = (double)e.BarrelConcreteVolume;
-            r["上流胸壁_m3"] = (double)e.UpstreamBreastVolume;
-            r["下流胸壁_m3"] = (double)e.DownstreamBreastVolume;
+            r["川裏側胸壁_m3"] = (double)e.UpstreamBreastVolume;
+            r["川表側胸壁_m3"] = (double)e.DownstreamBreastVolume;
             r["しゃ水壁_m3"] = (double)e.CutoffTotalVolume;
             r["浸透路長_m"] = (double)e.SeepagePathLength;
             r["頂版_m3"] = (double)e.TopSlabVolume;

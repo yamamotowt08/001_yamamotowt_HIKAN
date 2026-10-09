@@ -39,8 +39,8 @@ namespace Hikan.Core
             CheckThickness(errors, p.TopSlabThickness, "頂版厚");
             CheckThickness(errors, p.BottomSlabThickness, "底版厚");
 
-            CheckBreastWall(errors, p, p.UpstreamBreast, "上流胸壁");
-            CheckBreastWall(errors, p, p.DownstreamBreast, "下流胸壁");
+            CheckBreastWall(errors, p, p.UpstreamBreast, "川裏側胸壁");
+            CheckBreastWall(errors, p, p.DownstreamBreast, "川表側胸壁");
             CheckBreastClearance(errors, p);
             CheckCutoff(errors, p);
 
@@ -110,22 +110,27 @@ namespace Hikan.Core
             }
             if (w.ToeLength < 0m) { errors.Add(name + "のつま先版長は 0 以上にしてください。"); }
             if (w.HeelLength < 0m) { errors.Add(name + "のかかと版長は 0 以上にしてください。"); }
-            if (p.BarrelLength > 0m && w.StemThickness > p.BarrelLength)
+            // たて壁が函体側面に全厚で接するには、たて壁が函体延長の中に収まっている必要がある。
+            if (w.StemStart < -Tolerance || w.StemEnd > p.BarrelLength + Tolerance)
             {
-                errors.Add(name + "のたて壁厚が函体延長を超えています。");
+                errors.Add(name + "のたて壁(軸位置 " + w.Position + " m ± 厚/2 = " + w.StemStart + "〜" + w.StemEnd
+                    + " m)が函体延長 0〜" + p.BarrelLength + " m からはみ出しています。");
             }
         }
 
-        /// <summary>上下流の胸壁が函体の中で干渉しないこと。かかと版どうしが重なると体積の解析解が崩れる。</summary>
+        /// <summary>
+        /// 川裏側・川表側の胸壁どうしが干渉せず、川裏側が川表側より川裏にあること。
+        /// 底版どうしが重なる(接する場合も含む)と体積の解析解が崩れ、ブーリアンも退化する。
+        /// </summary>
         private static void CheckBreastClearance(System.Collections.Generic.List<string> errors, HikanParameters p)
         {
             if (!p.UpstreamBreast.Exists || !p.DownstreamBreast.Exists) { return; }
-            decimal upstreamEnd = p.UpstreamBreast.StemThickness + p.UpstreamBreast.HeelLength;
-            decimal downstreamStart = p.BarrelLength - p.DownstreamBreast.StemThickness - p.DownstreamBreast.HeelLength;
-            if (upstreamEnd >= downstreamStart)
+            (decimal Min, decimal Max) up = HikanGeometry.BreastFootingRange(p.UpstreamBreast, true);
+            (decimal Min, decimal Max) down = HikanGeometry.BreastFootingRange(p.DownstreamBreast, false);
+            if (up.Max >= down.Min)
             {
-                errors.Add("上流胸壁の下流端 " + upstreamEnd + " m と下流胸壁の上流端 " + downstreamStart
-                    + " m が干渉します。たて壁厚とかかと版長を見直してください。");
+                errors.Add("川裏側胸壁(" + up.Min + "〜" + up.Max + " m)と川表側胸壁(" + down.Min + "〜" + down.Max
+                    + " m)が干渉するか順序が逆です。軸位置・たて壁厚・かかと版長を見直してください。");
             }
         }
 
@@ -155,23 +160,30 @@ namespace Hikan.Core
                 return;
             }
 
-            // 胸壁とカラーは X・Z で重なるので、Y で離れていないと体積の解析解が崩れる。
-            decimal firstMin = HikanGeometry.CutoffPosition(p, 1) - p.CutoffThickness / 2m;
-            decimal lastMax = HikanGeometry.CutoffPosition(p, p.CutoffCount) + p.CutoffThickness / 2m;
-            if (p.UpstreamBreast.Exists)
+            // 胸壁とカラーは X・Z で重なるので、Y(S)で離れていないと体積の解析解が崩れる。
+            // 胸壁の位置は自由なので、全カラーとの区間の重なりを個別に調べる(接する場合も不可)。
+            CheckBreastAgainstCutoffs(errors, p, p.UpstreamBreast, true, "川裏側胸壁");
+            CheckBreastAgainstCutoffs(errors, p, p.DownstreamBreast, false, "川表側胸壁");
+        }
+
+        private static void CheckBreastAgainstCutoffs(
+            System.Collections.Generic.List<string> errors,
+            HikanParameters p,
+            HikanBreastWall w,
+            bool upstream,
+            string name)
+        {
+            if (!w.Exists) { return; }
+            (decimal Min, decimal Max) b = HikanGeometry.BreastFootingRange(w, upstream);
+            for (int i = 1; i <= p.CutoffCount; i++)
             {
-                decimal end = p.UpstreamBreast.StemThickness + p.UpstreamBreast.HeelLength;
-                if (end >= firstMin)
+                decimal c = HikanGeometry.CutoffPosition(p, i);
+                decimal cMin = c - p.CutoffThickness / 2m;
+                decimal cMax = c + p.CutoffThickness / 2m;
+                if (b.Min <= cMax && cMin <= b.Max)
                 {
-                    errors.Add("上流胸壁の下流端 " + end + " m が 1 枚目のしゃ水壁(" + firstMin + " m)と干渉します。");
-                }
-            }
-            if (p.DownstreamBreast.Exists)
-            {
-                decimal start = p.BarrelLength - p.DownstreamBreast.StemThickness - p.DownstreamBreast.HeelLength;
-                if (start <= lastMax)
-                {
-                    errors.Add("下流胸壁の上流端 " + start + " m が最後のしゃ水壁(" + lastMax + " m)と干渉します。");
+                    errors.Add(name + "(" + b.Min + "〜" + b.Max + " m)が " + i + " 枚目のしゃ水壁("
+                        + cMin + "〜" + cMax + " m)と干渉します。");
                 }
             }
         }

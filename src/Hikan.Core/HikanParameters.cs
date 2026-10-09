@@ -35,11 +35,12 @@ namespace Hikan.Core
         /// <summary>基礎材厚(均しコン等)[m]</summary>
         public decimal FoundationThickness { get; set; } = 0.100m;
 
-        // --- 胸壁(逆T字 / L字)。函体の左右側面に 1 基ずつ取り付く。張出し長 0 で「設置しない」。 ---
-        /// <summary>上流胸壁(左右に 1 基ずつ)。函体の上流端に取り付く。</summary>
-        public HikanBreastWall UpstreamBreast { get; set; } = new HikanBreastWall();
-        /// <summary>下流胸壁(左右に 1 基ずつ)。函体の下流端に取り付く。</summary>
-        public HikanBreastWall DownstreamBreast { get; set; } = new HikanBreastWall();
+        // --- 胸壁(逆T字 / L字)。函体の左右側面に 1 基ずつ取り付く。たて壁厚 0 で「設置しない」。 ---
+        // 上流端 = 川裏 とする(排水樋管の向き)。位置はどちらも川裏函体端からたて壁の軸までの距離で指定する。
+        /// <summary>川裏側胸壁(左右に 1 基ずつ)。つま先版は川裏側に伸びる。</summary>
+        public HikanBreastWall UpstreamBreast { get; set; } = new HikanBreastWall { Position = 1.000m };
+        /// <summary>川表側胸壁(左右に 1 基ずつ)。つま先版は川表側に伸びる。</summary>
+        public HikanBreastWall DownstreamBreast { get; set; } = new HikanBreastWall { Position = 19.000m };
 
         // --- しゃ水壁(函体外周に全周一律で張り出すカラー)。枚数 0 で「設置しない」。 ---
         /// <summary>しゃ水壁 枚数。函体延長を n 等分した各区間の中央に配置する。0 で設置しない。</summary>
