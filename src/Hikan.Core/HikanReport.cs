@@ -32,7 +32,7 @@ namespace Hikan.Core
         private static void AddBreast(System.Collections.Generic.List<HikanItem> list, HikanBreastWall w, string prefix)
         {
             Add(list, prefix + "stem_thickness", F(w.StemThickness), "m", "入力");
-            Add(list, prefix + "width", F(w.Width), "m", "入力");
+            Add(list, prefix + "length", F(w.Length), "m", "入力");
             Add(list, prefix + "crown_height", F(w.CrownHeight), "m", "入力");
             Add(list, prefix + "embedment", F(w.Embedment), "m", "入力");
             Add(list, prefix + "footing_thickness", F(w.FootingThickness), "m", "入力");
@@ -106,8 +106,8 @@ namespace Hikan.Core
         public static readonly string[] Notes = new string[]
         {
             "対象範囲: ボックスカルバート型 1 連の函体(頂版・側壁・底版)+ 胸壁 + しゃ水壁。翼壁・門柱・ゲート操作台・水叩き・護床工は対象外。",
-            "胸壁は たて壁 + 底版 の 1 枚の逆T字擁壁で、たて壁を函体が貫通する形にモデル化しています。つま先版長またはかかと版長を 0 にすれば L 字になります。",
-            "胸壁のたて壁は函体延長の内側(上流 Y∈[0,たて壁厚] / 下流 Y∈[L−たて壁厚,L])に置き、底版だけが函体より外へ張り出します。",
+            "胸壁は函体の左右側面にそれぞれ取り付く逆T字擁壁(たて壁 + 底版)としてモデル化しています。左右は同一形状で、入力は片側分です。つま先版長またはかかと版長を 0 にすれば L 字になります。",
+            "胸壁のたて壁は函体方向に垂直で、函体延長の内側(上流 Y∈[0,たて壁厚] / 下流 Y∈[L−たて壁厚,L])に置きます。函体の上は跨がず、底版のつま先版だけが函体端より外へ張り出します。",
             "しゃ水壁は函体外周に全周一律(下方にも)張り出すカラーとしてモデル化し、函体延長を枚数で等分した各区間の中央に配置します。",
             "胸壁・しゃ水壁の寸法・張出し量・設置位置は参照文書に規定がないため、全て入力値です。形状は『全部材が等厚矩形』(基準の形状単純化方針)のみを根拠にしています。",
             "浸透路長は函体外周に沿う経路長(延長 + 張出し量 × 2 × 枚数)です。レーン則等による必要浸透路長の照査は行いません(照査式が参照文書にないため)。",

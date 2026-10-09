@@ -107,7 +107,7 @@ namespace Hikan.Core.Tests
         {
             Hikan.Core.HikanBreastWall w = new Hikan.Core.HikanBreastWall();
             w.StemThickness = 0.5m;
-            w.Width = 6.0m;
+            w.Length = 1.5m;
             w.CrownHeight = 4.0m;
             w.Embedment = 1.0m;
             w.FootingThickness = 0.5m;
@@ -122,25 +122,25 @@ namespace Hikan.Core.Tests
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
             p.UpstreamBreast.StemThickness = 0m;
-            p.UpstreamBreast.Width = 0.1m;        // 外形幅未満だが設置しないので無視される
-            p.UpstreamBreast.CrownHeight = 0.1m;
+            p.UpstreamBreast.Length = 0m;          // 不正値だが設置しないので無視される
+            p.UpstreamBreast.CrownHeight = 0m;
             p.UpstreamBreast.Embedment = 0m;
             Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
         }
 
-        // テスト11: 幅・天端高は函体外形以上、根入れ深さは底版厚以上。
-        // これが崩れるとたて壁と函体の重なりが「外形断面 × たて壁厚」でなくなり、体積の解析解が合わなくなる。
+        // テスト11: 張出し長・天端高は正、根入れ深さは底版厚以上。
+        // 根入れ不足だと底版上面が函体底版下面より上に出る。天端高 0 以下だとたて壁が函体側面に接しない。
         [Xunit.Theory]
-        [Xunit.InlineData(6.0, 4.0, 1.0, true)]
-        [Xunit.InlineData(2.8, 2.8, 0.5, true)]   // 外形ちょうど・根入れ = 底版厚
-        [Xunit.InlineData(2.0, 4.0, 1.0, false)]  // 幅不足
-        [Xunit.InlineData(6.0, 2.0, 1.0, false)]  // 天端高不足
-        [Xunit.InlineData(6.0, 4.0, 0.3, false)]  // 根入れが底版厚未満
-        public void BreastWall_MustEncloseBarrelAndClearFooting(double width, double crown, double embedment, bool valid)
+        [Xunit.InlineData(1.5, 4.0, 1.0, true)]
+        [Xunit.InlineData(1.5, 1.0, 0.5, true)]   // 天端高が函体より低い / 根入れ = 底版厚
+        [Xunit.InlineData(0.0, 4.0, 1.0, false)]  // 張出し長 0
+        [Xunit.InlineData(1.5, 0.0, 1.0, false)]  // 天端高 0
+        [Xunit.InlineData(1.5, 4.0, 0.3, false)]  // 根入れが底版厚未満
+        public void BreastWall_DimensionsMustConnectToBarrel(double length, double crown, double embedment, bool valid)
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
             p.UpstreamBreast = Wall();
-            p.UpstreamBreast.Width = (decimal)width;
+            p.UpstreamBreast.Length = (decimal)length;
             p.UpstreamBreast.CrownHeight = (decimal)crown;
             p.UpstreamBreast.Embedment = (decimal)embedment;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }

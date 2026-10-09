@@ -75,10 +75,9 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 胸壁。たて壁厚 0 は「設置しない」なので寸法を検査しない。
-        /// 幅・天端高を函体外形以上に、根入れ深さを底版厚以上に強制するのは、
-        /// たて壁と函体の重なりが厳密に「外形断面 × たて壁厚」になり、底版が函体と重ならないことを保証するため。
-        /// これが崩れると体積の解析解(ModelVolume)が実形状と一致せず Verify が通らない。
+        /// 胸壁(左右それぞれの逆 T 字擁壁)。たて壁厚 0 は「設置しない」なので寸法を検査しない。
+        /// 根入れ深さ ≥ 底版厚 は、底版上面が函体底版下面(Z = 0)以下に収まり、
+        /// たて壁が Z = 0 から立ち上がって函体側面に確実に接する(ソリッドが 1 個に繋がる)ための条件。
         /// </summary>
         private static void CheckBreastWall(
             System.Collections.Generic.List<string> errors,
@@ -96,18 +95,18 @@ namespace Hikan.Core
             CheckThickness(errors, w.StemThickness, name + "のたて壁厚");
             CheckThickness(errors, w.FootingThickness, name + "の底版厚");
 
-            if (w.Width < p.OuterWidth - Tolerance)
+            if (w.Length <= 0m)
             {
-                errors.Add(name + "の幅は函体外形幅 " + p.OuterWidth + " m 以上にしてください。");
+                errors.Add(name + "の張出し長は正の値にしてください。");
             }
-            if (w.CrownHeight < p.OuterHeight - Tolerance)
+            if (w.CrownHeight <= 0m)
             {
-                errors.Add(name + "の天端高は函体外形高 " + p.OuterHeight + " m 以上にしてください。");
+                errors.Add(name + "の天端高は正の値にしてください(たて壁が函体側面に接しません)。");
             }
             if (w.Embedment < w.FootingThickness - Tolerance)
             {
                 errors.Add(name + "の根入れ深さは底版厚 " + w.FootingThickness
-                    + " m 以上にしてください(底版が函体と干渉します)。");
+                    + " m 以上にしてください(底版上面が函体底版下面より上に出ます)。");
             }
             if (w.ToeLength < 0m) { errors.Add(name + "のつま先版長は 0 以上にしてください。"); }
             if (w.HeelLength < 0m) { errors.Add(name + "のかかと版長は 0 以上にしてください。"); }

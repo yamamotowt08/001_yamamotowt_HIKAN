@@ -65,10 +65,10 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 胸壁 1 端ぶん(たて壁 + 底版の 2 ボックス)を追加する。
-        /// たて壁は函体方向に垂直な 1 枚板で、函体がこれを貫通する(体積は包除で控除する)。
-        /// 底版は Y 方向に伸び、つま先版は函体から遠い側、かかと版は近い側。
-        /// 底版は根入れにより Z = 0 以下に収まるので函体とは重ならない。
+        /// 胸壁 1 端ぶん(左右 2 基 × たて壁 + 底版 = 4 ボックス)を追加する。
+        /// たて壁は函体方向に垂直な板で、函体の左右側面に接して外側へ張り出す。
+        /// 底版は Y 方向に伸び、つま先版は函体端から遠い側、かかと版は近い側。
+        /// 函体とは側面で接するだけで重ならない。
         /// </summary>
         private static void AddBreast(
             System.Collections.Generic.List<HikanPart> parts,
@@ -78,22 +78,24 @@ namespace Hikan.Core
         {
             if (!w.Exists) { return; }
 
+            decimal half = p.OuterWidth / 2m;
             decimal l = p.BarrelLength;
             decimal stemMin = upstream ? 0m : l - w.StemThickness;
             decimal stemMax = upstream ? w.StemThickness : l;
             decimal footMin = upstream ? -w.ToeLength : l - w.StemThickness - w.HeelLength;
             decimal footMax = upstream ? w.StemThickness + w.HeelLength : l + w.ToeLength;
 
-            string side = upstream ? "上流" : "下流";
-            parts.Add(Centred(side + "胸壁たて壁", w.Width, w.FootingTop, w.CrownHeight, stemMin, stemMax, false));
-            parts.Add(Centred(side + "胸壁底版", w.Width, -w.Embedment, w.FootingTop, footMin, footMax, false));
-        }
+            string end = upstream ? "上流" : "下流";
+            for (int k = 0; k < 2; k++)
+            {
+                bool right = k == 1;
+                decimal uMin = right ? half : -half - w.Length;
+                decimal uMax = right ? half + w.Length : -half;
+                string name = end + "胸壁" + (right ? "右" : "左");
 
-        /// <summary>たて壁と函体の重なり体積 [m3]。たて壁が函体外形を完全に含むことを検証済み。</summary>
-        public static decimal BreastStemOverlap(HikanParameters p, HikanBreastWall w)
-        {
-            if (!w.Exists) { return 0m; }
-            return p.OuterWidth * p.OuterHeight * w.StemThickness;
+                parts.Add(Box(name + "たて壁", uMin, uMax, w.FootingTop, w.CrownHeight, stemMin, stemMax, false));
+                parts.Add(Box(name + "底版", uMin, uMax, -w.Embedment, w.FootingTop, footMin, footMax, false));
+            }
         }
 
         /// <summary>
@@ -184,12 +186,13 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 胸壁 1 端ぶんの体積 [m3]。たて壁(函体との重なりを控除)+ 底版。たて壁厚 0 のときは 0。
+        /// 胸壁 1 端ぶん(左右 2 基)の体積 [m3]。たて壁 + 底版。
+        /// 函体とは側面で接するだけで重ならないので控除は不要。たて壁厚 0 のときは 0。
         /// </summary>
-        public static decimal BreastWallVolume(HikanParameters p, HikanBreastWall w)
+        public static decimal BreastWallVolume(HikanBreastWall w)
         {
             if (!w.Exists) { return 0m; }
-            return w.StemGrossVolume - BreastStemOverlap(p, w) + w.FootingVolume;
+            return 2m * (w.StemVolume + w.FootingVolume);
         }
 
         /// <summary>しゃ水壁の合計体積 [m3]。函体と重なる部分を控除した正味。</summary>
@@ -204,13 +207,13 @@ namespace Hikan.Core
         /// <summary>
         /// モデル全体のコンクリート体積 [m3]。勾配の回転は体積を変えない。
         /// 部材の重なりは「しゃ水壁 ∩ 函体」のみで、CutoffVolume が控除済み。
-        /// 内空は函体と上下流胸壁を貫通する分を 1 本で控除する。
+        /// 胸壁は函体と側面で接するだけ、内空は函体のみを貫通する(BarrelVolume が控除済み)。
         /// </summary>
         public static decimal ModelVolume(HikanParameters p)
         {
             return BarrelVolume(p)
-                + BreastWallVolume(p, p.UpstreamBreast)
-                + BreastWallVolume(p, p.DownstreamBreast)
+                + BreastWallVolume(p.UpstreamBreast)
+                + BreastWallVolume(p.DownstreamBreast)
                 + CutoffVolume(p);
         }
 
@@ -303,30 +306,16 @@ namespace Hikan.Core
                     (part.UMin + part.UMax) / 2m, (part.VMin + part.VMax) / 2m, (part.SMin + part.SMax) / 2m);
             }
 
-            // 重なり補正: しゃ水壁と胸壁たて壁のボックスは函体と重なるので、その分を 1 回引く。
-            // 胸壁底版は根入れにより Z = 0 以下に収まるため函体とは重ならない。
+            // 重なり補正: しゃ水壁のボックスは函体と重なるので、その分を 1 回引く。
+            // 胸壁は函体と側面で接するだけで重ならないため補正不要。
             decimal collarOverlap = p.OuterWidth * p.OuterHeight * p.CutoffThickness;
             for (int k = 1; k <= p.CutoffCount; k++)
             {
                 Accumulate(ref mass, ref mu, ref mv, ref ms, -collarOverlap,
                     0m, p.OuterHeight / 2m, CutoffPosition(p, k));
             }
-            SubtractStemOverlap(ref mass, ref mu, ref mv, ref ms, p, p.UpstreamBreast, true);
-            SubtractStemOverlap(ref mass, ref mu, ref mv, ref ms, p, p.DownstreamBreast, false);
 
             return ToWorld(p, mu / mass, mv / mass, ms / mass);
-        }
-
-        private static void SubtractStemOverlap(
-            ref decimal mass, ref decimal mu, ref decimal mv, ref decimal ms,
-            HikanParameters p, HikanBreastWall w, bool upstream)
-        {
-            if (!w.Exists) { return; }
-            decimal centre = upstream
-                ? w.StemThickness / 2m
-                : p.BarrelLength - w.StemThickness / 2m;
-            Accumulate(ref mass, ref mu, ref mv, ref ms, -BreastStemOverlap(p, w),
-                0m, p.OuterHeight / 2m, centre);
         }
 
         private static void Accumulate(

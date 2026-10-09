@@ -37,6 +37,7 @@ namespace Hikan.AutoCAD
         }
 
         /// <summary>胸壁 1 端ぶん。たて壁厚 0 なら「設置しない」として残りを聞かない。</summary>
+        /// <remarks>左右の胸壁は同一形状なので、入力は片側分だけ。</remarks>
         private static bool PromptBreast(
             Autodesk.AutoCAD.EditorInput.Editor ed,
             Hikan.Core.HikanBreastWall w,
@@ -47,9 +48,9 @@ namespace Hikan.AutoCAD
             w.StemThickness = d;
             if (!w.Exists) { return true; }
 
-            if (!GetDecimal(ed, name + " 幅 [m] (函体外形幅以上)", w.Width, out d)) { return false; }
-            w.Width = d;
-            if (!GetDecimal(ed, name + " 天端高 [m] (函体底版下面から、外形高以上)", w.CrownHeight, out d)) { return false; }
+            if (!GetDecimal(ed, name + " 張出し長 [m] (函体側面から外向き。左右同一)", w.Length, out d)) { return false; }
+            w.Length = d;
+            if (!GetDecimal(ed, name + " 天端高 [m] (函体底版下面から)", w.CrownHeight, out d)) { return false; }
             w.CrownHeight = d;
             if (!GetDecimal(ed, name + " 根入れ深さ [m] (底版厚以上)", w.Embedment, out d)) { return false; }
             w.Embedment = d;

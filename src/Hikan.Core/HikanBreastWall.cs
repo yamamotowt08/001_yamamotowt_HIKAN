@@ -1,36 +1,35 @@
 namespace Hikan.Core
 {
     /// <summary>
-    /// 胸壁 1 端ぶんの寸法。たて壁 + 底版からなる 1 枚の逆 T 字擁壁で、
-    /// たて壁は函体方向に垂直な板(厚さは Y 方向)。函体はたて壁を貫通する。
-    /// つま先版長・かかと版長のどちらかを 0 にすれば L 字になる。
+    /// 胸壁 1 端ぶんの寸法(左右 2 基で同一寸法)。函体の左右側面にそれぞれ取り付く逆 T 字擁壁。
+    /// たて壁は函体方向に垂直な板(厚さは Y 方向)で、函体側面から外側へ張り出す。
+    /// 底版は Y 方向に伸び、つま先版長・かかと版長のどちらかを 0 にすれば L 字になる。
+    /// 函体とは側面で接するだけで重ならない(函体の上は跨がない)。
     ///
-    ///   断面(XZ・下流を見る)                 側面(YZ)
-    ///   ┌────────────────────┐                   ┌──┐   ← たて壁(厚 = StemThickness)
-    ///   │      たて壁        │                   │  │
-    ///   │   ┌────────────┐   │           ┌───────┴──┴───────┐
-    ///   │   │ 函体(貫通) │   │           └────── 底版 ──────┘
-    ///   │   └────────────┘   │            ├つま先┤  ├かかと┤
-    ///   └─┬────────────────┬─┘            ↑ Embedment ぶん Z = 0 より下
-    ///   ┌─┴────────────────┴─┐
-    ///   └──── 底 版 ─────────┘
-    ///   ├──── Width ────────┤  (たて壁・底版とも同幅、中心線 X = 0 に対称)
+    ///   断面(XZ・下流を見る)                   側面(YZ・片側)
+    ///   ┌──┐              ┌──┐                     ┌──┐   ← たて壁(厚 = StemThickness)
+    ///   │  │ ┌──────────┐ │  │                     │  │
+    ///   │  │ │   函体   │ │  │             ┌───────┴──┴───────┐
+    ///  ─┴──┴─┴──────────┴─┴──┴─ Z = 0       └────── 底版 ──────┘
+    ///   └──┘              └──┘              ├つま先┤      ├かかと┤
+    ///   ├Lw┤              ├Lw┤  Lw = Length(函体側面から外向きの張出し長)
+    ///                              底版は Embedment ぶん Z = 0 より下
     /// </summary>
     public sealed class HikanBreastWall
     {
         /// <summary>たて壁厚(Y方向)[m]。0 で設置しない。</summary>
         public decimal StemThickness { get; set; } = 0.000m;
-        /// <summary>たて壁・底版の幅(X方向の全幅、中心線に対称)[m]。函体外形幅以上にすること。</summary>
-        public decimal Width { get; set; } = 6.000m;
-        /// <summary>天端高(函体底版下面 Z = 0 からの高さ)[m]。函体外形高以上にすること。</summary>
+        /// <summary>張出し長(X方向、函体側面から外向き。左右それぞれ)[m]</summary>
+        public decimal Length { get; set; } = 2.000m;
+        /// <summary>天端高(函体底版下面 Z = 0 からの高さ)[m]</summary>
         public decimal CrownHeight { get; set; } = 4.000m;
         /// <summary>根入れ深さ(Z = 0 から下げる量)[m]。底版厚以上にすること。</summary>
         public decimal Embedment { get; set; } = 1.000m;
         /// <summary>底版厚 [m]</summary>
         public decimal FootingThickness { get; set; } = 0.500m;
-        /// <summary>つま先版長(Y方向、函体から遠い側)[m]。0 で L 字になる。</summary>
+        /// <summary>つま先版長(Y方向、函体端から遠い側)[m]。0 で L 字になる。</summary>
         public decimal ToeLength { get; set; } = 0.800m;
-        /// <summary>かかと版長(Y方向、函体に近い側)[m]。0 で L 字になる。</summary>
+        /// <summary>かかと版長(Y方向、函体端に近い側)[m]。0 で L 字になる。</summary>
         public decimal HeelLength { get; set; } = 1.200m;
 
         /// <summary>設置するか。たて壁厚 0 は「設置しない」。</summary>
@@ -45,23 +44,29 @@ namespace Hikan.Core
             get { return FootingThickness - Embedment; }
         }
 
-        /// <summary>たて壁の体積 [m3](函体との重なりを含む総量。控除は HikanGeometry 側で行う)。</summary>
-        public decimal StemGrossVolume
+        /// <summary>底版の Y 方向全長 = つま先版長 + たて壁厚 + かかと版長 [m]</summary>
+        public decimal FootingLength
         {
-            get { return Width * (CrownHeight - FootingTop) * StemThickness; }
+            get { return ToeLength + StemThickness + HeelLength; }
         }
 
-        /// <summary>底版の体積 [m3]。函体とは重ならない(根入れにより Z = 0 以下に収まるため)。</summary>
+        /// <summary>たて壁 1 基の体積 [m3]</summary>
+        public decimal StemVolume
+        {
+            get { return Length * (CrownHeight - FootingTop) * StemThickness; }
+        }
+
+        /// <summary>底版 1 基の体積 [m3]</summary>
         public decimal FootingVolume
         {
-            get { return Width * FootingThickness * (ToeLength + StemThickness + HeelLength); }
+            get { return Length * FootingThickness * FootingLength; }
         }
 
         public void Write(System.Collections.Generic.Dictionary<string, string> d, string prefix)
         {
             System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
             d[prefix + "stem_thickness"] = StemThickness.ToString(inv);
-            d[prefix + "width"] = Width.ToString(inv);
+            d[prefix + "length"] = Length.ToString(inv);
             d[prefix + "crown_height"] = CrownHeight.ToString(inv);
             d[prefix + "embedment"] = Embedment.ToString(inv);
             d[prefix + "footing_thickness"] = FootingThickness.ToString(inv);
@@ -76,7 +81,7 @@ namespace Hikan.Core
             System.Func<System.Collections.Generic.IDictionary<string, string>, string, decimal, decimal> get)
         {
             StemThickness = get(d, prefix + "stem_thickness", StemThickness);
-            Width = get(d, prefix + "width", Width);
+            Length = get(d, prefix + "length", Length);
             CrownHeight = get(d, prefix + "crown_height", CrownHeight);
             Embedment = get(d, prefix + "embedment", Embedment);
             FootingThickness = get(d, prefix + "footing_thickness", FootingThickness);
