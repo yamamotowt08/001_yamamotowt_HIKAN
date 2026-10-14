@@ -7,6 +7,8 @@
     <Nullable>disable</Nullable>
     <LangVersion>12.0</LangVersion>
     <PlatformTarget>x64</PlatformTarget>
+    <!-- 入力画面(HikanDialog)用。WinForms は .NET のフレームワーク参照なので配布物には同梱されない。 -->
+    <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>Hikan.AutoCAD</RootNamespace>
     <AssemblyName>Hikan.AutoCAD</AssemblyName>
     <!-- 別の場所にインストールしている場合: dotnet build -p:AcadDir="D:\Autodesk\AutoCAD 2025\" -->

@@ -91,29 +91,30 @@ namespace Hikan.AutoCAD
             return true;
         }
 
+        /// <summary>基準点を入力する。Enter で (0,0,0)、ESC でキャンセル(false)。</summary>
+        public static bool PromptBasePoint(Autodesk.AutoCAD.EditorInput.Editor ed, Hikan.Core.HikanParameters p)
+        {
+            Autodesk.AutoCAD.EditorInput.PromptPointOptions po =
+                new Autodesk.AutoCAD.EditorInput.PromptPointOptions("\n基準点(上流端・底版下面・函体中心線上)を指定 <0,0,0>: ");
+            po.AllowNone = true;
+            Autodesk.AutoCAD.EditorInput.PromptPointResult pr = ed.GetPoint(po);
+            if (pr.Status == Autodesk.AutoCAD.EditorInput.PromptStatus.OK)
+            {
+                p.BaseX = (decimal)pr.Value.X;
+                p.BaseY = (decimal)pr.Value.Y;
+                p.BaseZ = (decimal)pr.Value.Z;
+                return true;
+            }
+            return pr.Status == Autodesk.AutoCAD.EditorInput.PromptStatus.None;
+        }
+
         /// <summary>全パラメータを順に入力する。p を直接更新する。基準点は Create 時のみ askBasePoint=true で入力。</summary>
         public static bool PromptAll(Autodesk.AutoCAD.EditorInput.Editor ed, Hikan.Core.HikanParameters p, bool askBasePoint)
         {
             decimal d;
             int n;
 
-            if (askBasePoint)
-            {
-                Autodesk.AutoCAD.EditorInput.PromptPointOptions po =
-                    new Autodesk.AutoCAD.EditorInput.PromptPointOptions("\n基準点(上流端・底版下面・函体中心線上)を指定 <0,0,0>: ");
-                po.AllowNone = true;
-                Autodesk.AutoCAD.EditorInput.PromptPointResult pr = ed.GetPoint(po);
-                if (pr.Status == Autodesk.AutoCAD.EditorInput.PromptStatus.OK)
-                {
-                    p.BaseX = (decimal)pr.Value.X;
-                    p.BaseY = (decimal)pr.Value.Y;
-                    p.BaseZ = (decimal)pr.Value.Z;
-                }
-                else if (pr.Status != Autodesk.AutoCAD.EditorInput.PromptStatus.None)
-                {
-                    return false;
-                }
-            }
+            if (askBasePoint && !PromptBasePoint(ed, p)) { return false; }
 
             if (!GetDecimal(ed, "内空幅 B [m]", p.InnerWidth, out d)) { return false; }
             p.InnerWidth = d;

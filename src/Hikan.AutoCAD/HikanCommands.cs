@@ -3,7 +3,8 @@ namespace Hikan.AutoCAD
 {
     /// <summary>
     /// 樋管函体の AutoCAD / Civil 3D コマンド。NETLOAD で Hikan.AutoCAD.dll を読み込んで使う。
-    /// HIKAN_Create / HIKAN_Action / HIKAN_Query / HIKAN_SelfTest の 4 本。
+    /// HIKAN_Create / HIKAN_Action(入力画面)、-HIKAN_Create / -HIKAN_Action(コマンドライン入力)、
+    /// HIKAN_Query / HIKAN_SelfTest の 6 本。
     /// </summary>
     public class HikanCommands
     {
@@ -11,6 +12,32 @@ namespace Hikan.AutoCAD
 
         [Autodesk.AutoCAD.Runtime.CommandMethod("HIKAN_Create")]
         public void Create()
+        {
+            CreateCore(true);
+        }
+
+        /// <summary>コマンドライン入力版(スクリプト実行用)。</summary>
+        [Autodesk.AutoCAD.Runtime.CommandMethod("-HIKAN_Create")]
+        public void CreateCommandLine()
+        {
+            CreateCore(false);
+        }
+
+        [Autodesk.AutoCAD.Runtime.CommandMethod("HIKAN_Action")]
+        public void Action()
+        {
+            ActionCore(true);
+        }
+
+        /// <summary>コマンドライン入力版(スクリプト実行用)。</summary>
+        [Autodesk.AutoCAD.Runtime.CommandMethod("-HIKAN_Action")]
+        public void ActionCommandLine()
+        {
+            ActionCore(false);
+        }
+
+        /// <summary>入力画面版は寸法を先に決めてから基準点を指定する。コマンドライン版は従来どおり基準点が先。</summary>
+        private static void CreateCore(bool useDialog)
         {
             Autodesk.AutoCAD.ApplicationServices.Document doc =
                 Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
@@ -20,7 +47,16 @@ namespace Hikan.AutoCAD
             try
             {
                 Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
-                if (!HikanPrompt.PromptAll(ed, p, true))
+                if (useDialog)
+                {
+                    p = HikanDialog.Edit(p, "樋管 作成");
+                    if (p == null || !HikanPrompt.PromptBasePoint(ed, p))
+                    {
+                        ed.WriteMessage("\nキャンセルしました。");
+                        return;
+                    }
+                }
+                else if (!HikanPrompt.PromptAll(ed, p, true))
                 {
                     ed.WriteMessage("\nキャンセルしました。");
                     return;
@@ -38,8 +74,7 @@ namespace Hikan.AutoCAD
             }
         }
 
-        [Autodesk.AutoCAD.Runtime.CommandMethod("HIKAN_Action")]
-        public void Action()
+        private static void ActionCore(bool useDialog)
         {
             Autodesk.AutoCAD.ApplicationServices.Document doc =
                 Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
@@ -52,7 +87,16 @@ namespace Hikan.AutoCAD
                 Hikan.Core.HikanParameters p;
                 if (!SelectAndRead(doc, out id, out p)) { return; }
 
-                if (!HikanPrompt.PromptAll(ed, p, false))
+                if (useDialog)
+                {
+                    p = HikanDialog.Edit(p, "樋管 修正");
+                    if (p == null)
+                    {
+                        ed.WriteMessage("\nキャンセルしました。");
+                        return;
+                    }
+                }
+                else if (!HikanPrompt.PromptAll(ed, p, false))
                 {
                     ed.WriteMessage("\nキャンセルしました。");
                     return;
