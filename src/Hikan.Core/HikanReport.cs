@@ -41,6 +41,19 @@ namespace Hikan.Core
             Add(list, prefix + "heel_length", F(w.HeelLength), "m", "入力");
         }
 
+        private static void AddWing(System.Collections.Generic.List<HikanItem> list, HikanWingWall w, string prefix)
+        {
+            Add(list, prefix + "stem_thickness", F(w.StemThickness), "m", "入力");
+            Add(list, prefix + "length", F(w.Length), "m", "入力");
+            Add(list, prefix + "end_width", F(w.EndWidth), "m", "入力");
+            Add(list, prefix + "crown_start", F(w.CrownStart), "m", "入力");
+            Add(list, prefix + "crown_end", F(w.CrownEnd), "m", "入力");
+            Add(list, prefix + "embedment", F(w.Embedment), "m", "入力");
+            Add(list, prefix + "footing_thickness", F(w.FootingThickness), "m", "入力");
+            Add(list, prefix + "toe_length", F(w.ToeLength), "m", "入力");
+            Add(list, prefix + "heel_length", F(w.HeelLength), "m", "入力");
+        }
+
         public static System.Collections.Generic.List<HikanItem> Build(HikanParameters p, HikanEstimate e)
         {
             System.Collections.Generic.List<HikanItem> r = new System.Collections.Generic.List<HikanItem>();
@@ -59,6 +72,8 @@ namespace Hikan.Core
             Add(r, "foundation_thickness", F(p.FoundationThickness), "m", "入力");
             AddBreast(r, p.UpstreamBreast, "upstream_breast_");
             AddBreast(r, p.DownstreamBreast, "downstream_breast_");
+            AddWing(r, p.UpstreamWing, "upstream_wing_");
+            AddWing(r, p.DownstreamWing, "downstream_wing_");
             Add(r, "cutoff_count", p.CutoffCount.ToString(), "枚", "入力");
             Add(r, "cutoff_thickness", F(p.CutoffThickness), "m", "入力");
             Add(r, "cutoff_projection", F(p.CutoffProjection), "m", "入力");
@@ -75,6 +90,10 @@ namespace Hikan.Core
             Add(r, "barrel_concrete_volume", F(e.BarrelConcreteVolume), "m3", "確定");
             Add(r, "upstream_breast_volume", F(e.UpstreamBreastVolume), "m3", "確定");
             Add(r, "downstream_breast_volume", F(e.DownstreamBreastVolume), "m3", "確定");
+            Add(r, "upstream_wing_volume", F(e.UpstreamWingVolume), "m3", "確定");
+            Add(r, "downstream_wing_volume", F(e.DownstreamWingVolume), "m3", "確定");
+            Add(r, "upstream_wing_flare_angle", F(e.UpstreamWingFlareAngle), "度", "確定");
+            Add(r, "downstream_wing_flare_angle", F(e.DownstreamWingFlareAngle), "度", "確定");
             Add(r, "cutoff_total_volume", F(e.CutoffTotalVolume), "m3", "確定");
             Add(r, "cutoff_spacing", F(e.CutoffSpacing), "m", "確定");
             Add(r, "seepage_path_length", F(e.SeepagePathLength), "m", "推定");
@@ -88,6 +107,7 @@ namespace Hikan.Core
             Add(r, "formwork_end", F(e.FormworkEnd), "m2", "概算");
             Add(r, "formwork_breast", F(e.FormworkBreast), "m2", "概算");
             Add(r, "formwork_cutoff", F(e.FormworkCutoff), "m2", "概算");
+            Add(r, "formwork_wing", F(e.FormworkWing), "m2", "概算");
 
             Add(r, "block_length", F(e.BlockLength), "m", "確定");
             Add(r, "concrete_per_block", F(e.ConcretePerBlock), "m3", "確定");
@@ -106,7 +126,10 @@ namespace Hikan.Core
         /// <summary>数量化できない前提・対象外を注記として出す(金額は算出しない)。</summary>
         public static readonly string[] Notes = new string[]
         {
-            "対象範囲: ボックスカルバート型 1 連の函体(頂版・側壁・底版)+ 胸壁 + しゃ水壁。翼壁・門柱・ゲート操作台・水叩き・護床工は対象外。",
+            "対象範囲: ボックスカルバート型 1 連の函体(頂版・側壁・底版)+ 胸壁 + しゃ水壁 + 翼壁。門柱・ゲート操作台・水叩き・護床工は対象外。",
+            "翼壁は函体端から外へ左右 1 基ずつ伸びる逆T字擁壁です。内面は函体端で内空側面に一致し、翼壁端部で入力した水路幅になります。開き角は両者の差と翼壁長(函体軸方向)から決まります(端部水路幅 = 内空幅で平行翼壁)。",
+            "翼壁の天端は函体端から翼壁端部まで直線で変わり、壁の厚さ方向には水平です。たて壁厚・つま先版長・かかと版長は壁面に直交する方向で測ります。始端・終端は函体端と平行な面で切っています。",
+            "翼壁を付ける端では、胸壁などの他部材を函体端より外へ出さないでください(翼壁と重なるため入力エラーになります)。水路の床(水叩き)はモデル化していません。",
             "胸壁は函体の左右側面にそれぞれ取り付く逆T字擁壁(たて壁 + 底版)としてモデル化しています。左右は同一形状で、入力は片側分です。つま先版長またはかかと版長を 0 にすれば L 字になります。",
             "上流端を川裏とします。胸壁のたて壁は函体方向に垂直で、軸位置(川裏函体端からたて壁厚の中心までの斜距離)を中心に置き、函体延長の内側に収めます。函体の上は跨ぎません。",
             "胸壁のつま先版は近い方の函体端の側(川裏側胸壁は川裏、川表側胸壁は川表)、かかと版は函体中央の側に伸びます。つま先版は函体端より外へ出てもかまいません。",

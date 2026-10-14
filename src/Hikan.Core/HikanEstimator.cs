@@ -42,6 +42,29 @@ namespace Hikan.Core
             return p.CutoffCount * (2m * (w + h) * p.CutoffThickness + 2m * ring);
         }
 
+        /// <summary>
+        /// 翼壁 1 端ぶん(左右 2 基)の型枠面積 [m2]。
+        /// たて壁は水路側・背面側の 2 面 + 端部の切断面 + 天端(傾斜面)。函体端面に接する始端面は計上しない。
+        /// 底版は両側面(壁に沿う)+ 両端面 + つま先版・かかと版の上面。地盤と接する下面は計上しない。
+        /// </summary>
+        private static decimal WingFormwork(HikanParameters p, HikanWingWall w)
+        {
+            if (!w.Exists) { return 0m; }
+            decimal m = HikanGeometry.WingWidthFactor(p, w);
+            decimal wallLength = w.Length * m;
+            decimal averageHeight = (w.CrownStart + w.CrownEnd) / 2m - w.FootingTop;
+            decimal endHeight = w.CrownEnd - w.FootingTop;
+            decimal rise = (w.CrownEnd - w.CrownStart) / w.Length;
+            decimal topArea = w.StemThickness * m * w.Length * HikanGeometry.Sqrt(1m + rise * rise);
+            decimal stem = 2m * wallLength * averageHeight
+                + w.StemThickness * m * endHeight
+                + topArea;
+            decimal footing = 2m * wallLength * w.FootingThickness
+                + 2m * (w.ToeLength + w.StemThickness + w.HeelLength) * m * w.FootingThickness
+                + (w.ToeLength + w.HeelLength) * m * w.Length;
+            return 2m * (stem + footing);
+        }
+
         public static HikanEstimate Calculate(HikanParameters p)
         {
             HikanValidator.EnsureValid(p);
@@ -73,6 +96,12 @@ namespace Hikan.Core
             e.CutoffTotalVolume = RoundHalfUp(HikanGeometry.CutoffVolume(p), Digits);
             e.CutoffSpacing = p.CutoffCount > 0 ? RoundHalfUp(l / p.CutoffCount, Digits) : 0m;
 
+            // 翼壁は左右 2 基の合計。開き角は幅の差から決まる派生量(度)。
+            e.UpstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallVolume(p, p.UpstreamWing), Digits);
+            e.DownstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallVolume(p, p.DownstreamWing), Digits);
+            e.UpstreamWingFlareAngle = RoundHalfUp(HikanGeometry.WingFlareAngle(p, p.UpstreamWing), Digits);
+            e.DownstreamWingFlareAngle = RoundHalfUp(HikanGeometry.WingFlareAngle(p, p.DownstreamWing), Digits);
+
             // 浸透路長: 函体外周に沿う経路。カラー 1 枚につき張出し量の 2 倍(下り + 上り)が加わる。
             // 具体の照査式(レーン則等)は参照文書に無いため信頼度は推定。
             e.SeepagePathLength = RoundHalfUp(
@@ -92,6 +121,8 @@ namespace Hikan.Core
                 BreastFormwork(p.UpstreamBreast) + BreastFormwork(p.DownstreamBreast), Digits);
             // しゃ水壁は外周面 + 前後の環状面。
             e.FormworkCutoff = RoundHalfUp(CutoffFormwork(p), Digits);
+            e.FormworkWing = RoundHalfUp(
+                WingFormwork(p, p.UpstreamWing) + WingFormwork(p, p.DownstreamWing), Digits);
 
             // ブロック割は函体のみに適用する(胸壁・しゃ水壁は別部材)。
             e.BlockLength = RoundHalfUp(l / p.BlockCount, Digits);

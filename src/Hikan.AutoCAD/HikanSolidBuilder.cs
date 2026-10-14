@@ -10,10 +10,11 @@
 namespace Hikan.AutoCAD
 {
     /// <summary>
-    /// 樋管(函体 + 胸壁 + しゃ水壁)の Solid3d 生成・差替え・XData 入出力。
+    /// 樋管(函体 + 胸壁 + しゃ水壁 + 翼壁)の Solid3d 生成・差替え・XData 入出力。
     ///
     /// 生成手順: 部材ごとに 断面ポリライン → Region → Extrude で中実プリズムを作り、
-    /// BoolUnite で合成 → 最後に内空プリズムを BoolSubtract → X 軸まわり +90 度回転
+    /// BoolUnite で合成 → 翼壁(平面プリズムと側面プリズムの共通部分)を BoolUnite
+    /// → 最後に内空プリズムを BoolSubtract → X 軸まわり +90 度回転
     /// → 基準点へ平行移動 → 底版勾配の回転。
     /// 薄いシェル同士を同一平面でブーリアンしないため、部材を増やしても退化しにくい。
     /// 合成は ModelSpace に追加したあと DB 常駐のまま行う(非常駐 Solid3d のブーリアンは
@@ -132,6 +133,7 @@ namespace Hikan.AutoCAD
             }
 
             Combine(solid, parts, k, false, Autodesk.AutoCAD.DatabaseServices.BooleanOperationType.BoolUnite);
+            CombineWings(solid, p, k);
             Combine(solid, parts, k, true, Autodesk.AutoCAD.DatabaseServices.BooleanOperationType.BoolSubtract);
 
             solid.TransformBy(BuildPlacement(p));
@@ -173,24 +175,162 @@ namespace Hikan.AutoCAD
         /// </summary>
         private static Autodesk.AutoCAD.DatabaseServices.Solid3d BuildPrism(Hikan.Core.HikanPart part, decimal globalSMax)
         {
+            return ExtrudePolygon(
+                Hikan.Core.HikanGeometry.GetSectionPoints(part),
+                part.Name,
+                (double)(globalSMax - part.SMax),
+                (double)(part.SMax - part.SMin),
+                (double)((part.UMax - part.UMin) * (part.VMax - part.VMin)));
+        }
+
+        /// <summary>
+        /// 翼壁を 1 部材ずつ合成する。翼壁は函体端より外にあって他の部材と重ならない
+        /// (HikanValidator で検査済み)ので、函体などの合成のあと・内空の控除の前に BoolUnite する。
+        /// </summary>
+        private static void CombineWings(
+            Autodesk.AutoCAD.DatabaseServices.Solid3d solid,
+            Hikan.Core.HikanParameters p,
+            decimal k)
+        {
+            foreach (Hikan.Core.HikanTaperedPart part in Hikan.Core.HikanGeometry.GetWingParts(p))
+            {
+                Autodesk.AutoCAD.DatabaseServices.Solid3d other = BuildTaperedPart(part, k);
+                try
+                {
+                    solid.BooleanOperation(Autodesk.AutoCAD.DatabaseServices.BooleanOperationType.BoolUnite, other);
+                }
+                finally
+                {
+                    other.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 翼壁の部材(平面が台形・天端が傾斜)。
+        /// 1) 平面形 (U, S) を鉛直(V)に押出した「平面プリズム」を作る。
+        /// 2) 天端が傾いていれば、側面形 (S, V) の台形を横断方向(U)に押出した「側面プリズム」と共通部分を取る。
+        /// どちらも 断面ポリライン → Region → Extrude で作り、構築座標から作図座標へ剛体変換で移す。
+        /// 作図座標は他の部材と同じ (x, y, z) = (U, V, GlobalSMax − S)。
+        /// </summary>
+        private static Autodesk.AutoCAD.DatabaseServices.Solid3d BuildTaperedPart(Hikan.Core.HikanTaperedPart part, decimal k)
+        {
+            decimal top = part.VTop0 > part.VTop1 ? part.VTop0 : part.VTop1;
+            Autodesk.AutoCAD.DatabaseServices.Solid3d plan = ExtrudePolygon(
+                part.PlanPoints(),
+                part.Name + "(平面)",
+                (double)part.VBottom,
+                (double)(top - part.VBottom),
+                (double)part.PlanArea);
+            try
+            {
+                plan.TransformBy(PlanToDrawing(k));
+                if (part.FlatTop)
+                {
+                    return plan;
+                }
+
+                // 側面プリズムは平面プリズムより S・U・下方に余裕をとって、境界の面が重ならないようにする。
+                // 天端の直線は S 方向に延長しても同じ直線なので、共通部分の天端は正しい傾きになる。
+                decimal margin = 1m;
+                decimal sA = part.S0 - margin;
+                decimal sB = part.S1 + margin;
+                decimal topA = part.TopAt(sA);
+                decimal topB = part.TopAt(sB);
+                decimal bottom = part.VBottom;
+                if (topA < bottom) { bottom = topA; }
+                if (topB < bottom) { bottom = topB; }
+                bottom -= margin;
+                decimal uMin = (part.UL0 < part.UL1 ? part.UL0 : part.UL1) - margin;
+                decimal uMax = (part.UR0 > part.UR1 ? part.UR0 : part.UR1) + margin;
+
+                (decimal U, decimal V)[] profilePoints = new (decimal U, decimal V)[]
+                {
+                    (sA, bottom), (sB, bottom), (sB, topB), (sA, topA)
+                };
+                decimal profileArea = ((topA - bottom) + (topB - bottom)) / 2m * (sB - sA);
+                Autodesk.AutoCAD.DatabaseServices.Solid3d profile = ExtrudePolygon(
+                    profilePoints,
+                    part.Name + "(側面)",
+                    (double)uMin,
+                    (double)(uMax - uMin),
+                    (double)profileArea);
+                try
+                {
+                    profile.TransformBy(ProfileToDrawing(k));
+                    plan.BooleanOperation(Autodesk.AutoCAD.DatabaseServices.BooleanOperationType.BoolIntersect, profile);
+                }
+                finally
+                {
+                    profile.Dispose();
+                }
+                return plan;
+            }
+            catch
+            {
+                plan.Dispose();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 構築座標 (x', y', z') = (U, S, V) を作図座標 (U, V, k − S) へ写す剛体変換(平面プリズム用)。
+        /// x'×y' = z' が 作図の (1,0,0)×(0,0,−1) = (0,1,0) に一致するので鏡映にならない。
+        /// </summary>
+        private static Autodesk.AutoCAD.Geometry.Matrix3d PlanToDrawing(decimal k)
+        {
+            return Autodesk.AutoCAD.Geometry.Matrix3d.AlignCoordinateSystem(
+                Autodesk.AutoCAD.Geometry.Point3d.Origin,
+                Autodesk.AutoCAD.Geometry.Vector3d.XAxis,
+                Autodesk.AutoCAD.Geometry.Vector3d.YAxis,
+                Autodesk.AutoCAD.Geometry.Vector3d.ZAxis,
+                new Autodesk.AutoCAD.Geometry.Point3d(0.0, 0.0, (double)k),
+                new Autodesk.AutoCAD.Geometry.Vector3d(1.0, 0.0, 0.0),
+                new Autodesk.AutoCAD.Geometry.Vector3d(0.0, 0.0, -1.0),
+                new Autodesk.AutoCAD.Geometry.Vector3d(0.0, 1.0, 0.0));
+        }
+
+        /// <summary>
+        /// 構築座標 (x', y', z') = (S, V, U) を作図座標 (U, V, k − S) へ写す剛体変換(側面プリズム用)。
+        /// x'×y' = z' が 作図の (0,0,−1)×(0,1,0) = (1,0,0) に一致するので鏡映にならない。
+        /// </summary>
+        private static Autodesk.AutoCAD.Geometry.Matrix3d ProfileToDrawing(decimal k)
+        {
+            return Autodesk.AutoCAD.Geometry.Matrix3d.AlignCoordinateSystem(
+                Autodesk.AutoCAD.Geometry.Point3d.Origin,
+                Autodesk.AutoCAD.Geometry.Vector3d.XAxis,
+                Autodesk.AutoCAD.Geometry.Vector3d.YAxis,
+                Autodesk.AutoCAD.Geometry.Vector3d.ZAxis,
+                new Autodesk.AutoCAD.Geometry.Point3d(0.0, 0.0, (double)k),
+                new Autodesk.AutoCAD.Geometry.Vector3d(0.0, 0.0, -1.0),
+                new Autodesk.AutoCAD.Geometry.Vector3d(0.0, 1.0, 0.0),
+                new Autodesk.AutoCAD.Geometry.Vector3d(1.0, 0.0, 0.0));
+        }
+
+        /// <summary>
+        /// 多角形を作図平面(XY)の指定標高に置いて Region にし、+Z に押出す。
+        /// 押出し前に Region の面積を期待値と照合し、2D 段階の失敗を 3D と切り分ける。
+        /// </summary>
+        private static Autodesk.AutoCAD.DatabaseServices.Solid3d ExtrudePolygon(
+            (decimal U, decimal V)[] pts,
+            string label,
+            double elevation,
+            double height,
+            double expectedArea)
+        {
             Autodesk.AutoCAD.DatabaseServices.Region region = null;
             Autodesk.AutoCAD.DatabaseServices.Solid3d solid = null;
             try
             {
-                region = CreateRegion(
-                    Hikan.Core.HikanGeometry.GetSectionPoints(part),
-                    part.Name,
-                    (double)(globalSMax - part.SMax));
-
-                double expectedArea = (double)((part.UMax - part.UMin) * (part.VMax - part.VMin));
+                region = CreateRegion(pts, label, elevation);
                 if (System.Math.Abs(region.Area - expectedArea) > AreaTolerance)
                 {
                     throw new Hikan.Core.HikanValidationException(
-                        part.Name + " の断面積 " + region.Area + " m2 が " + expectedArea + " m2 と一致しません。");
+                        label + " の断面積 " + region.Area + " m2 が " + expectedArea + " m2 と一致しません。");
                 }
 
                 solid = new Autodesk.AutoCAD.DatabaseServices.Solid3d();
-                solid.Extrude(region, (double)(part.SMax - part.SMin), 0.0);
+                solid.Extrude(region, height, 0.0);
                 return solid;
             }
             catch
@@ -210,7 +350,6 @@ namespace Hikan.AutoCAD
             }
         }
 
-        /// <summary>局所断面 (U, V) を作図平面に置いて閉 Region 1 個にする。</summary>
         /// <summary>局所断面 (U, V) を作図平面の指定標高に置いて閉 Region 1 個にする。</summary>
         private static Autodesk.AutoCAD.DatabaseServices.Region CreateRegion(
             (decimal U, decimal V)[] pts,

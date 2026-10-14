@@ -24,6 +24,10 @@ namespace Hikan.Dynamo
             "川裏側胸壁_m3",
             "川表側胸壁_m3",
             "しゃ水壁_m3",
+            "川裏側翼壁_m3",
+            "川表側翼壁_m3",
+            "川裏側翼壁開き角_度",
+            "川表側翼壁開き角_度",
             "浸透路長_m",
             "頂版_m3",
             "底版_m3",
@@ -34,6 +38,7 @@ namespace Hikan.Dynamo
             "型枠_端面_m2",
             "型枠_胸壁_m2",
             "型枠_しゃ水壁_m2",
+            "型枠_翼壁_m2",
             "水平投影長_m",
             "落差_m",
             "ブロック長_m",
@@ -71,6 +76,24 @@ namespace Hikan.Dynamo
             double downstreamBreastFootingThickness = 0.5,
             double downstreamBreastToeLength = 0.8,
             double downstreamBreastHeelLength = 1.2,
+            double upstreamWingStemThickness = 0.0,
+            double upstreamWingLength = 3.0,
+            double upstreamWingEndWidth = 3.0,
+            double upstreamWingCrownStart = 3.0,
+            double upstreamWingCrownEnd = 2.0,
+            double upstreamWingEmbedment = 1.0,
+            double upstreamWingFootingThickness = 0.5,
+            double upstreamWingToeLength = 0.5,
+            double upstreamWingHeelLength = 1.0,
+            double downstreamWingStemThickness = 0.0,
+            double downstreamWingLength = 3.0,
+            double downstreamWingEndWidth = 3.0,
+            double downstreamWingCrownStart = 3.0,
+            double downstreamWingCrownEnd = 2.0,
+            double downstreamWingEmbedment = 1.0,
+            double downstreamWingFootingThickness = 0.5,
+            double downstreamWingToeLength = 0.5,
+            double downstreamWingHeelLength = 1.0,
             int cutoffCount = 0,
             double cutoffThickness = 0.5,
             double cutoffProjection = 0.5)
@@ -104,6 +127,24 @@ namespace Hikan.Dynamo
             p.DownstreamBreast.FootingThickness = (decimal)downstreamBreastFootingThickness;
             p.DownstreamBreast.ToeLength = (decimal)downstreamBreastToeLength;
             p.DownstreamBreast.HeelLength = (decimal)downstreamBreastHeelLength;
+            p.UpstreamWing.StemThickness = (decimal)upstreamWingStemThickness;
+            p.UpstreamWing.Length = (decimal)upstreamWingLength;
+            p.UpstreamWing.EndWidth = (decimal)upstreamWingEndWidth;
+            p.UpstreamWing.CrownStart = (decimal)upstreamWingCrownStart;
+            p.UpstreamWing.CrownEnd = (decimal)upstreamWingCrownEnd;
+            p.UpstreamWing.Embedment = (decimal)upstreamWingEmbedment;
+            p.UpstreamWing.FootingThickness = (decimal)upstreamWingFootingThickness;
+            p.UpstreamWing.ToeLength = (decimal)upstreamWingToeLength;
+            p.UpstreamWing.HeelLength = (decimal)upstreamWingHeelLength;
+            p.DownstreamWing.StemThickness = (decimal)downstreamWingStemThickness;
+            p.DownstreamWing.Length = (decimal)downstreamWingLength;
+            p.DownstreamWing.EndWidth = (decimal)downstreamWingEndWidth;
+            p.DownstreamWing.CrownStart = (decimal)downstreamWingCrownStart;
+            p.DownstreamWing.CrownEnd = (decimal)downstreamWingCrownEnd;
+            p.DownstreamWing.Embedment = (decimal)downstreamWingEmbedment;
+            p.DownstreamWing.FootingThickness = (decimal)downstreamWingFootingThickness;
+            p.DownstreamWing.ToeLength = (decimal)downstreamWingToeLength;
+            p.DownstreamWing.HeelLength = (decimal)downstreamWingHeelLength;
             p.CutoffCount = cutoffCount;
             p.CutoffThickness = (decimal)cutoffThickness;
             p.CutoffProjection = (decimal)cutoffProjection;
@@ -120,6 +161,10 @@ namespace Hikan.Dynamo
             r["川裏側胸壁_m3"] = (double)e.UpstreamBreastVolume;
             r["川表側胸壁_m3"] = (double)e.DownstreamBreastVolume;
             r["しゃ水壁_m3"] = (double)e.CutoffTotalVolume;
+            r["川裏側翼壁_m3"] = (double)e.UpstreamWingVolume;
+            r["川表側翼壁_m3"] = (double)e.DownstreamWingVolume;
+            r["川裏側翼壁開き角_度"] = (double)e.UpstreamWingFlareAngle;
+            r["川表側翼壁開き角_度"] = (double)e.DownstreamWingFlareAngle;
             r["浸透路長_m"] = (double)e.SeepagePathLength;
             r["頂版_m3"] = (double)e.TopSlabVolume;
             r["底版_m3"] = (double)e.BottomSlabVolume;
@@ -130,6 +175,7 @@ namespace Hikan.Dynamo
             r["型枠_端面_m2"] = (double)e.FormworkEnd;
             r["型枠_胸壁_m2"] = (double)e.FormworkBreast;
             r["型枠_しゃ水壁_m2"] = (double)e.FormworkCutoff;
+            r["型枠_翼壁_m2"] = (double)e.FormworkWing;
             r["水平投影長_m"] = (double)e.HorizontalProjection;
             r["落差_m"] = (double)e.DropHeight;
             r["ブロック長_m"] = (double)e.BlockLength;

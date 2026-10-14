@@ -42,6 +42,12 @@ namespace Hikan.Core
         /// <summary>川表側胸壁(左右に 1 基ずつ)。つま先版は川表側に伸びる。</summary>
         public HikanBreastWall DownstreamBreast { get; set; } = new HikanBreastWall { Position = 19.000m };
 
+        // --- 翼壁(逆T字 / L字)。函体端から外へ、左右に 1 基ずつ。たて壁厚 0 で「設置しない」。 ---
+        /// <summary>川裏側翼壁(左右に 1 基ずつ)。川裏函体端(S = 0)から川裏へ伸びる。</summary>
+        public HikanWingWall UpstreamWing { get; set; } = new HikanWingWall();
+        /// <summary>川表側翼壁(左右に 1 基ずつ)。川表函体端(S = L)から川表へ伸びる。</summary>
+        public HikanWingWall DownstreamWing { get; set; } = new HikanWingWall();
+
         // --- しゃ水壁(函体外周に全周一律で張り出すカラー)。枚数 0 で「設置しない」。 ---
         /// <summary>しゃ水壁 枚数。函体延長を n 等分した各区間の中央に配置する。0 で設置しない。</summary>
         public int CutoffCount { get; set; } = 0;
@@ -97,6 +103,8 @@ namespace Hikan.Core
             d["foundation_thickness"] = FoundationThickness.ToString(inv);
             UpstreamBreast.Write(d, "upstream_breast_");
             DownstreamBreast.Write(d, "downstream_breast_");
+            UpstreamWing.Write(d, "upstream_wing_");
+            DownstreamWing.Write(d, "downstream_wing_");
             d["cutoff_count"] = CutoffCount.ToString(inv);
             d["cutoff_thickness"] = CutoffThickness.ToString(inv);
             d["cutoff_projection"] = CutoffProjection.ToString(inv);
@@ -134,6 +142,8 @@ namespace Hikan.Core
             // キーが在るのに値が不正な場合は従来どおりエラー停止する。
             p.UpstreamBreast.Read(d, "upstream_breast_", GetDecimalOrDefault);
             p.DownstreamBreast.Read(d, "downstream_breast_", GetDecimalOrDefault);
+            p.UpstreamWing.Read(d, "upstream_wing_", GetDecimalOrDefault);
+            p.DownstreamWing.Read(d, "downstream_wing_", GetDecimalOrDefault);
             p.CutoffCount = GetIntOrDefault(d, "cutoff_count", p.CutoffCount);
             p.CutoffThickness = GetDecimalOrDefault(d, "cutoff_thickness", p.CutoffThickness);
             p.CutoffProjection = GetDecimalOrDefault(d, "cutoff_projection", p.CutoffProjection);

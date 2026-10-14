@@ -16,11 +16,17 @@ namespace Hikan.Core
         public decimal WallVolume { get; set; }
         /// <summary>函体のみのコンクリート [m3]</summary>
         public decimal BarrelConcreteVolume { get; set; }
-        /// <summary>全部材のコンクリート [m3](函体 + 胸壁 + しゃ水壁)</summary>
+        /// <summary>全部材のコンクリート [m3](函体 + 胸壁 + しゃ水壁 + 翼壁)</summary>
         public decimal ConcreteVolume { get; set; }
 
         public decimal UpstreamBreastVolume { get; set; }
         public decimal DownstreamBreastVolume { get; set; }
+        public decimal UpstreamWingVolume { get; set; }
+        public decimal DownstreamWingVolume { get; set; }
+        /// <summary>川裏側翼壁の開き角 [度]</summary>
+        public decimal UpstreamWingFlareAngle { get; set; }
+        /// <summary>川表側翼壁の開き角 [度]</summary>
+        public decimal DownstreamWingFlareAngle { get; set; }
         public decimal CutoffTotalVolume { get; set; }
         public decimal CutoffSpacing { get; set; }
         public decimal SeepagePathLength { get; set; }
@@ -34,6 +40,7 @@ namespace Hikan.Core
         public decimal FormworkEnd { get; set; }
         public decimal FormworkBreast { get; set; }
         public decimal FormworkCutoff { get; set; }
+        public decimal FormworkWing { get; set; }
 
         public decimal BlockLength { get; set; }
         public decimal ConcretePerBlock { get; set; }

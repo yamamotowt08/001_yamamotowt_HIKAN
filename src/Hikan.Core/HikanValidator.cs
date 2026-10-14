@@ -43,6 +43,8 @@ namespace Hikan.Core
             CheckBreastWall(errors, p, p.DownstreamBreast, "川表側胸壁");
             CheckBreastClearance(errors, p);
             CheckCutoff(errors, p);
+            CheckWingWall(errors, p, p.UpstreamWing, true, "川裏側翼壁");
+            CheckWingWall(errors, p, p.DownstreamWing, false, "川表側翼壁");
 
             if (p.InnerWidth > MaxInnerDimension + Tolerance)
             {
@@ -164,6 +166,82 @@ namespace Hikan.Core
             // 胸壁の位置は自由なので、全カラーとの区間の重なりを個別に調べる(接する場合も不可)。
             CheckBreastAgainstCutoffs(errors, p, p.UpstreamBreast, true, "川裏側胸壁");
             CheckBreastAgainstCutoffs(errors, p, p.DownstreamBreast, false, "川表側胸壁");
+        }
+
+        /// <summary>
+        /// 翼壁(左右それぞれの逆 T 字擁壁)。たて壁厚 0 は「設置しない」なので寸法を検査しない。
+        /// たて壁厚・底版厚は H13 マニュアル Ⅴ章の最小部材厚 0.40 m・0.10 m ピッチの対象。
+        /// 体積の解析解(ModelVolume)が成り立つ条件として、翼壁が他の部材と重ならないことも検査する。
+        /// </summary>
+        private static void CheckWingWall(
+            System.Collections.Generic.List<string> errors,
+            HikanParameters p,
+            HikanWingWall w,
+            bool upstream,
+            string name)
+        {
+            if (w.StemThickness < 0m)
+            {
+                errors.Add(name + "のたて壁厚は 0 以上にしてください(0 で設置しない)。");
+                return;
+            }
+            if (!w.Exists) { return; }
+
+            CheckThickness(errors, w.StemThickness, name + "のたて壁厚");
+            CheckThickness(errors, w.FootingThickness, name + "の底版厚");
+
+            if (w.Length <= 0m)
+            {
+                errors.Add(name + "の翼壁長は正の値にしてください。");
+                return;
+            }
+            if (w.EndWidth < p.InnerWidth - Tolerance)
+            {
+                errors.Add(name + "の端部水路幅 " + w.EndWidth + " m は内空幅 " + p.InnerWidth
+                    + " m 以上にしてください(内空幅と同じで平行、広げると八の字に開く)。");
+            }
+            if (w.CrownStart <= 0m)
+            {
+                errors.Add(name + "の函体端での天端高は正の値にしてください(たて壁が函体端面に接しません)。");
+            }
+            if (w.CrownEnd <= w.FootingTop)
+            {
+                errors.Add(name + "の端部での天端高は底版上面 " + w.FootingTop + " m より高くしてください。");
+            }
+            if (w.Embedment < w.FootingThickness - Tolerance)
+            {
+                errors.Add(name + "の根入れ深さは底版厚 " + w.FootingThickness
+                    + " m 以上にしてください(底版上面が函体底版下面より上に出ます)。");
+            }
+            if (w.ToeLength < 0m) { errors.Add(name + "のつま先版長は 0 以上にしてください。"); }
+            if (w.HeelLength < 0m) { errors.Add(name + "のかかと版長は 0 以上にしてください。"); }
+
+            // 左右のつま先版が水路の中央で接触しないこと。開く向きなので函体端が最も狭い。
+            if (w.ToeLength > 0m && w.EndWidth >= p.InnerWidth - Tolerance)
+            {
+                decimal toeWidth = w.ToeLength * HikanGeometry.WingWidthFactor(p, w);
+                if (toeWidth >= p.InnerWidth / 2m)
+                {
+                    errors.Add(name + "のつま先版(横断方向の幅 " + toeWidth + " m)が水路中央で左右接触します。"
+                        + "内空幅の半分 " + (p.InnerWidth / 2m) + " m 未満にしてください。");
+                }
+            }
+
+            // 翼壁は函体端より外を占めるので、同じ端の胸壁などが函体端より外へ出ていると重なる。
+            foreach (HikanPart part in HikanGeometry.GetParts(p))
+            {
+                if (part.IsVoid) { continue; }
+                if (upstream && part.SMin < -Tolerance)
+                {
+                    errors.Add(name + "と " + part.Name + "(S = " + part.SMin
+                        + " m まで川裏へ張り出し)が干渉します。翼壁を付ける端では、他の部材を川裏函体端(S = 0)より外へ出さないでください。");
+                }
+                if (!upstream && part.SMax > p.BarrelLength + Tolerance)
+                {
+                    errors.Add(name + "と " + part.Name + "(S = " + part.SMax
+                        + " m まで川表へ張り出し)が干渉します。翼壁を付ける端では、他の部材を川表函体端(S = L)より外へ出さないでください。");
+                }
+            }
         }
 
         private static void CheckBreastAgainstCutoffs(

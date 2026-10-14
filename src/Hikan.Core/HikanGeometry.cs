@@ -106,10 +106,127 @@ namespace Hikan.Core
                 : (w.StemStart - w.HeelLength, w.StemEnd + w.ToeLength);
         }
 
+        /// <summary>翼壁の片側の開き tanθ = (端部水路幅 − 内空幅) / (2 × 翼壁長)。端部幅 = 内空幅で 0(平行)。</summary>
+        public static decimal WingSlope(HikanParameters p, HikanWingWall w)
+        {
+            return (w.EndWidth - p.InnerWidth) / (2m * w.Length);
+        }
+
+        /// <summary>
+        /// 壁面に直交する長さを横断方向 U の長さに直す係数 1 / cosθ = √(1 + tan²θ)。
+        /// 始端・終端を S 一定の面で切るので、壁厚 t の U 方向の幅は t / cosθ になる。
+        /// </summary>
+        public static decimal WingWidthFactor(HikanParameters p, HikanWingWall w)
+        {
+            decimal k = WingSlope(p, w);
+            if (k == 0m) { return 1m; }
+            return Sqrt(1m + k * k);
+        }
+
+        /// <summary>翼壁の開き角 θ [度](表示用。幅の差から求める派生量)。</summary>
+        public static decimal WingFlareAngle(HikanParameters p, HikanWingWall w)
+        {
+            if (!w.Exists) { return 0m; }
+            double rad = System.Math.Atan((double)WingSlope(p, w));
+            return (decimal)(rad * 180.0 / System.Math.PI);
+        }
+
+        /// <summary>
+        /// 翼壁(左右 2 基 × たて壁 + 底版 = 4 部材)。川表側は S = L から +S へ、川裏側は S = 0 から −S へ伸びる。
+        /// 内面は函体端で内空側面(U = ±B/2)、翼壁端部で ±EndWidth/2。
+        /// たて壁は内面から背面側へ厚 t(壁面に直交)、底版は水路側へつま先版長、背面側へ たて壁厚 + かかと版長。
+        /// </summary>
+        public static HikanTaperedPart[] GetWingParts(HikanParameters p)
+        {
+            System.Collections.Generic.List<HikanTaperedPart> parts = new System.Collections.Generic.List<HikanTaperedPart>();
+            AddWing(parts, p, p.UpstreamWing, true);
+            AddWing(parts, p, p.DownstreamWing, false);
+            return parts.ToArray();
+        }
+
+        private static void AddWing(
+            System.Collections.Generic.List<HikanTaperedPart> parts,
+            HikanParameters p,
+            HikanWingWall w,
+            bool upstream)
+        {
+            if (!w.Exists) { return; }
+
+            decimal m = WingWidthFactor(p, w);
+            decimal innerStart = p.InnerWidth / 2m;   // 函体端での内面の U(右側)
+            decimal innerEnd = w.EndWidth / 2m;       // 翼壁端部での内面の U(右側)
+
+            // S0 < S1 になるよう、川裏側は端部が S0、川表側は函体端が S0。
+            decimal sStart = upstream ? 0m : p.BarrelLength;
+            decimal sEnd = upstream ? -w.Length : p.BarrelLength + w.Length;
+            decimal s0 = upstream ? sEnd : sStart;
+            decimal s1 = upstream ? sStart : sEnd;
+            decimal in0 = upstream ? innerEnd : innerStart;
+            decimal in1 = upstream ? innerStart : innerEnd;
+            decimal top0 = upstream ? w.CrownEnd : w.CrownStart;
+            decimal top1 = upstream ? w.CrownStart : w.CrownEnd;
+
+            string end = upstream ? "川裏側" : "川表側";
+            for (int k = 0; k < 2; k++)
+            {
+                bool right = k == 1;
+                string name = end + "翼壁" + (right ? "右" : "左");
+
+                // 右側の内面からの距離 [a, b](壁面に直交)を U に直して部材を作り、左側は鏡映する。
+                parts.Add(WingBand(name + "たて壁", right, s0, s1, in0, in1, 0m, w.StemThickness * m,
+                    w.FootingTop, top0, top1));
+                parts.Add(WingBand(name + "底版", right, s0, s1, in0, in1,
+                    -w.ToeLength * m, (w.StemThickness + w.HeelLength) * m,
+                    -w.Embedment, w.FootingTop, w.FootingTop));
+            }
+        }
+
+        private static HikanTaperedPart WingBand(
+            string name, bool right, decimal s0, decimal s1, decimal in0, decimal in1,
+            decimal a, decimal b, decimal vBottom, decimal top0, decimal top1)
+        {
+            HikanTaperedPart part = new HikanTaperedPart();
+            part.Name = name;
+            part.S0 = s0;
+            part.S1 = s1;
+            if (right)
+            {
+                part.UL0 = in0 + a;
+                part.UR0 = in0 + b;
+                part.UL1 = in1 + a;
+                part.UR1 = in1 + b;
+            }
+            else
+            {
+                part.UL0 = -(in0 + b);
+                part.UR0 = -(in0 + a);
+                part.UL1 = -(in1 + b);
+                part.UR1 = -(in1 + a);
+            }
+            part.VBottom = vBottom;
+            part.VTop0 = top0;
+            part.VTop1 = top1;
+            return part;
+        }
+
+        /// <summary>
+        /// 翼壁 1 端ぶん(左右 2 基)の体積 [m3]。開き角によらず
+        /// たて壁 = 厚 × 壁面長 × (平均天端高 − 底版上面高)、底版 = (つま先 + 厚 + かかと) × 壁面長 × 底版厚。
+        /// 壁面長 = 翼壁長 / cosθ。HikanTaperedPart のシンプソン積分とは別の式で、テストで突き合わせる。
+        /// </summary>
+        public static decimal WingWallVolume(HikanParameters p, HikanWingWall w)
+        {
+            if (!w.Exists) { return 0m; }
+            decimal wallLength = w.Length * WingWidthFactor(p, w);
+            decimal stem = w.StemThickness * wallLength * ((w.CrownStart + w.CrownEnd) / 2m - w.FootingTop);
+            decimal footing = (w.ToeLength + w.StemThickness + w.HeelLength) * wallLength * w.FootingThickness;
+            return 2m * (stem + footing);
+        }
+
         /// <summary>
         /// 加算部材(内空を除く)の外接範囲。U は中心線対称なので半幅で返す。
-        /// 胸壁の位置が自由なので、つま先版が函体端より外に出るとは限らない。床掘り範囲や配置の基準は
-        /// 決め打ちの式ではなく、実際の部材範囲から求める。
+        /// 胸壁の位置が自由で翼壁も外へ伸びるので、床掘り範囲や配置の基準は
+        /// 決め打ちの式ではなく、実際の部材範囲(翼壁は頂点)から求める。
         /// </summary>
         public static (decimal HalfWidth, decimal VMin, decimal SMin, decimal SMax) SolidRange(HikanParameters p)
         {
@@ -125,6 +242,17 @@ namespace Hikan.Core
                 if (part.VMin < vMin) { vMin = part.VMin; }
                 if (part.SMin < sMin) { sMin = part.SMin; }
                 if (part.SMax > sMax) { sMax = part.SMax; }
+            }
+            foreach (HikanTaperedPart part in GetWingParts(p))
+            {
+                foreach ((decimal U, decimal V, decimal S) v in part.Vertices())
+                {
+                    if (v.U > half) { half = v.U; }
+                    if (-v.U > half) { half = -v.U; }
+                    if (v.V < vMin) { vMin = v.V; }
+                    if (v.S < sMin) { sMin = v.S; }
+                    if (v.S > sMax) { sMax = v.S; }
+                }
             }
             return (half, vMin, sMin, sMax);
         }
@@ -235,13 +363,17 @@ namespace Hikan.Core
         /// モデル全体のコンクリート体積 [m3]。勾配の回転は体積を変えない。
         /// 部材の重なりは「しゃ水壁 ∩ 函体」のみで、CutoffVolume が控除済み。
         /// 胸壁は函体と側面で接するだけ、内空は函体のみを貫通する(BarrelVolume が控除済み)。
+        /// 翼壁は函体端より外(川裏 S ≤ 0 / 川表 S ≥ L)にあり、函体端面と面で接するだけで重ならない
+        /// (同じ端の他部材が函体端より外へ出ていないことを HikanValidator で検査済み)。
         /// </summary>
         public static decimal ModelVolume(HikanParameters p)
         {
             return BarrelVolume(p)
                 + BreastWallVolume(p.UpstreamBreast)
                 + BreastWallVolume(p.DownstreamBreast)
-                + CutoffVolume(p);
+                + CutoffVolume(p)
+                + WingWallVolume(p, p.UpstreamWing)
+                + WingWallVolume(p, p.DownstreamWing);
         }
 
         /// <summary>内空の全長 [m]。胸壁は開口を塞がないので函体延長に等しい。</summary>
@@ -296,22 +428,38 @@ namespace Hikan.Core
                     decimal u = ((k & 1) == 0) ? part.UMin : part.UMax;
                     decimal v = ((k & 2) == 0) ? part.VMin : part.VMax;
                     decimal s = ((k & 4) == 0) ? part.SMin : part.SMax;
-                    (decimal X, decimal Y, decimal Z) w = ToWorld(p, u, v, s);
-                    if (first)
-                    {
-                        minX = maxX = w.X; minY = maxY = w.Y; minZ = maxZ = w.Z;
-                        first = false;
-                        continue;
-                    }
-                    if (w.X < minX) { minX = w.X; }
-                    if (w.X > maxX) { maxX = w.X; }
-                    if (w.Y < minY) { minY = w.Y; }
-                    if (w.Y > maxY) { maxY = w.Y; }
-                    if (w.Z < minZ) { minZ = w.Z; }
-                    if (w.Z > maxZ) { maxZ = w.Z; }
+                    Extend(ref first, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ, ToWorld(p, u, v, s));
+                }
+            }
+            // 翼壁は凸多面体なので、頂点の min/max がエクステントになる。
+            foreach (HikanTaperedPart part in GetWingParts(p))
+            {
+                foreach ((decimal U, decimal V, decimal S) v in part.Vertices())
+                {
+                    Extend(ref first, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ, ToWorld(p, v.U, v.V, v.S));
                 }
             }
             return (minX, minY, minZ, maxX, maxY, maxZ);
+        }
+
+        private static void Extend(
+            ref bool first,
+            ref decimal minX, ref decimal minY, ref decimal minZ,
+            ref decimal maxX, ref decimal maxY, ref decimal maxZ,
+            (decimal X, decimal Y, decimal Z) w)
+        {
+            if (first)
+            {
+                minX = maxX = w.X; minY = maxY = w.Y; minZ = maxZ = w.Z;
+                first = false;
+                return;
+            }
+            if (w.X < minX) { minX = w.X; }
+            if (w.X > maxX) { maxX = w.X; }
+            if (w.Y < minY) { minY = w.Y; }
+            if (w.Y > maxY) { maxY = w.Y; }
+            if (w.Z < minZ) { minZ = w.Z; }
+            if (w.Z > maxZ) { maxZ = w.Z; }
         }
 
         /// <summary>
@@ -340,6 +488,16 @@ namespace Hikan.Core
             {
                 Accumulate(ref mass, ref mu, ref mv, ref ms, -collarOverlap,
                     0m, p.OuterHeight / 2m, CutoffPosition(p, k));
+            }
+
+            // 翼壁は他の部材と重ならないので、シンプソン積分した体積とモーメントをそのまま足す。
+            foreach (HikanTaperedPart part in GetWingParts(p))
+            {
+                (decimal Volume, decimal MomentU, decimal MomentV, decimal MomentS) m = part.Moments();
+                mass += m.Volume;
+                mu += m.MomentU;
+                mv += m.MomentV;
+                ms += m.MomentS;
             }
 
             return ToWorld(p, mu / mass, mv / mass, ms / mass);

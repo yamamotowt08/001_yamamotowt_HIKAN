@@ -65,6 +65,37 @@ namespace Hikan.AutoCAD
             return true;
         }
 
+        /// <summary>翼壁 1 端ぶん。たて壁厚 0 なら「設置しない」として残りを聞かない。</summary>
+        /// <remarks>左右の翼壁は同一形状なので、入力は片側分だけ。開き角は端部水路幅と内空幅の差から決まる。</remarks>
+        private static bool PromptWing(
+            Autodesk.AutoCAD.EditorInput.Editor ed,
+            Hikan.Core.HikanWingWall w,
+            string name)
+        {
+            decimal d;
+            if (!GetDecimal(ed, name + " たて壁厚 [m] (壁面に直交。0 で設置しない)", w.StemThickness, out d)) { return false; }
+            w.StemThickness = d;
+            if (!w.Exists) { return true; }
+
+            if (!GetDecimal(ed, name + " 翼壁長 [m] (函体端から翼壁端部まで、函体軸方向)", w.Length, out d)) { return false; }
+            w.Length = d;
+            if (!GetDecimal(ed, name + " 端部の水路幅 [m] (左右の翼壁内面間。内空幅と同じで平行)", w.EndWidth, out d)) { return false; }
+            w.EndWidth = d;
+            if (!GetDecimal(ed, name + " 天端高 [m] (函体端、函体底版下面から)", w.CrownStart, out d)) { return false; }
+            w.CrownStart = d;
+            if (!GetDecimal(ed, name + " 天端高 [m] (翼壁端部、函体底版下面から)", w.CrownEnd, out d)) { return false; }
+            w.CrownEnd = d;
+            if (!GetDecimal(ed, name + " 根入れ深さ [m] (底版厚以上)", w.Embedment, out d)) { return false; }
+            w.Embedment = d;
+            if (!GetDecimal(ed, name + " 底版厚 [m]", w.FootingThickness, out d)) { return false; }
+            w.FootingThickness = d;
+            if (!GetDecimal(ed, name + " つま先版長 [m] (水路側。0 で L 字)", w.ToeLength, out d)) { return false; }
+            w.ToeLength = d;
+            if (!GetDecimal(ed, name + " かかと版長 [m] (背面側。0 で L 字)", w.HeelLength, out d)) { return false; }
+            w.HeelLength = d;
+            return true;
+        }
+
         /// <summary>全パラメータを順に入力する。p を直接更新する。基準点は Create 時のみ askBasePoint=true で入力。</summary>
         public static bool PromptAll(Autodesk.AutoCAD.EditorInput.Editor ed, Hikan.Core.HikanParameters p, bool askBasePoint)
         {
@@ -117,6 +148,10 @@ namespace Hikan.AutoCAD
             // 胸壁。たて壁厚 0 なら設置しないので残りは聞かない。
             if (!PromptBreast(ed, p.UpstreamBreast, "川裏側胸壁")) { return false; }
             if (!PromptBreast(ed, p.DownstreamBreast, "川表側胸壁")) { return false; }
+
+            // 翼壁。たて壁厚 0 なら設置しないので残りは聞かない。
+            if (!PromptWing(ed, p.UpstreamWing, "川裏側翼壁")) { return false; }
+            if (!PromptWing(ed, p.DownstreamWing, "川表側翼壁")) { return false; }
 
             // しゃ水壁。枚数 0 なら設置しないので厚・張出しは聞かない。
             if (!GetInt(ed, "しゃ水壁 枚数 (0 で設置しない。等間隔配置)", p.CutoffCount, out n)) { return false; }

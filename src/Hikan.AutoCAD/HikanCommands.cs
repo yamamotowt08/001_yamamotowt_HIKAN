@@ -113,11 +113,14 @@ namespace Hikan.AutoCAD
 
             try
             {
-                // 第1段階の退行確認(函体のみ)と、第2段階で追加した部材を含む構成の 2 系統。
-                RunCase(ed, doc, Case(0.00m, false), "函体のみ・勾配なし");
-                RunCase(ed, doc, Case(0.02m, false), "函体のみ・勾配 0.02");
-                RunCase(ed, doc, Case(0.00m, true), "胸壁+しゃ水壁・勾配なし");
-                RunCase(ed, doc, Case(0.02m, true), "胸壁+しゃ水壁・勾配 0.02");
+                // 段階ごとに分けて、どの段階の部材で落ちたかを切り分けられるようにする。
+                // 第1段階(函体のみ)・第2段階(胸壁+しゃ水壁)は退行確認、第3段階(翼壁)が新規分。
+                RunCase(ed, doc, Case(0.00m, false, false), "函体のみ・勾配なし");
+                RunCase(ed, doc, Case(0.02m, false, false), "函体のみ・勾配 0.02");
+                RunCase(ed, doc, Case(0.00m, true, false), "胸壁+しゃ水壁・勾配なし");
+                RunCase(ed, doc, Case(0.02m, true, false), "胸壁+しゃ水壁・勾配 0.02");
+                RunCase(ed, doc, Case(0.00m, true, true), "胸壁+しゃ水壁+翼壁・勾配なし");
+                RunCase(ed, doc, Case(0.02m, true, true), "胸壁+しゃ水壁+翼壁・勾配 0.02");
             }
             catch (System.Exception ex)
             {
@@ -131,8 +134,10 @@ namespace Hikan.AutoCAD
         /// 川裏側胸壁(軸位置 2.0・厚 0.5・張出し 1.5・天端 4.0)と川表側胸壁(17.5・0.6・2.0・4.5)を
         /// 別寸法にして、川裏・川表の取り違えを検出できるようにする。左右は同一形状。
         /// 軸位置はどちらも函体端から離して、位置指定が効いていることを確かめる。
+        /// 翼壁は川裏側を八の字(内空幅 2.0 → 端部 3.0、翼壁長 3.0)、川表側を平行にして、
+        /// 平面が斜めの部材と天端が傾いた部材(BoolIntersect で作る)の両方を確かめる。
         /// </summary>
-        private static Hikan.Core.HikanParameters Case(decimal slope, bool withExtraParts)
+        private static Hikan.Core.HikanParameters Case(decimal slope, bool withExtraParts, bool withWings)
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
             p.TopSlabThickness = 0.4m;
@@ -163,6 +168,28 @@ namespace Hikan.AutoCAD
                 p.CutoffCount = 2;
                 p.CutoffThickness = 0.5m;
                 p.CutoffProjection = 0.7m;
+            }
+
+            if (withWings)
+            {
+                p.UpstreamWing.StemThickness = 0.5m;
+                p.UpstreamWing.Length = 3.0m;
+                p.UpstreamWing.EndWidth = 3.0m;
+                p.UpstreamWing.CrownStart = 3.5m;
+                p.UpstreamWing.CrownEnd = 2.0m;
+                p.UpstreamWing.Embedment = 1.0m;
+                p.UpstreamWing.FootingThickness = 0.5m;
+                p.UpstreamWing.ToeLength = 0.4m;
+                p.UpstreamWing.HeelLength = 1.0m;
+                p.DownstreamWing.StemThickness = 0.6m;
+                p.DownstreamWing.Length = 4.0m;
+                p.DownstreamWing.EndWidth = 2.0m;
+                p.DownstreamWing.CrownStart = 4.0m;
+                p.DownstreamWing.CrownEnd = 2.5m;
+                p.DownstreamWing.Embedment = 1.2m;
+                p.DownstreamWing.FootingThickness = 0.6m;
+                p.DownstreamWing.ToeLength = 0.5m;
+                p.DownstreamWing.HeelLength = 1.2m;
             }
             return p;
         }
