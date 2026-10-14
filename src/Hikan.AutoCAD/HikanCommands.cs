@@ -137,10 +137,12 @@ namespace Hikan.AutoCAD
         /// 川裏側胸壁(軸位置 2.0・厚 0.5・張出し 1.5・天端 4.0)と川表側胸壁(17.5・0.6・2.0・4.5)を
         /// 別寸法にして、川裏・川表の取り違えを検出できるようにする。左右は同一形状。
         /// 軸位置はどちらも函体端から離して、位置指定が効いていることを確かめる。
-        /// 翼壁は川裏側を八の字(内空幅 2.0 → 端部 3.0、翼壁長 3.0)、川表側を平行にして、
+        /// 翼壁(U 字の 3 面張り水路)は川裏側を八の字(内空幅 2.0 → 端部 3.0、翼壁長 3.0)、川表側を平行にして、
         /// 平面が斜めの部材と天端が傾いた部材(BoolIntersect で作る)の両方を確かめる。
+        /// 川表側は底版を 0.8 にして、底版下面が函体底版下面(Z = 0)より下がる場合も確かめる。
         /// </summary>
-        /// <param name="breastAtEnds">true なら胸壁のたて壁を函体端に面一で置く(つま先版が函体端より外へ出て翼壁と重なる)。</param>
+        /// <param name="breastAtEnds">true なら胸壁のたて壁を函体端に面一で置き、翼壁の底版を厚くして
+        /// 胸壁のつま先版と翼壁の底版を重ねる(BoolUnite で一体化した実体を確かめる)。</param>
         private static Hikan.Core.HikanParameters Case(decimal slope, bool withExtraParts, bool withWings, bool breastAtEnds)
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
@@ -181,25 +183,22 @@ namespace Hikan.AutoCAD
                 p.UpstreamWing.EndWidth = 3.0m;
                 p.UpstreamWing.CrownStart = 3.5m;
                 p.UpstreamWing.CrownEnd = 2.0m;
-                p.UpstreamWing.Embedment = 1.0m;
-                p.UpstreamWing.FootingThickness = 0.5m;
-                p.UpstreamWing.ToeLength = 0.4m;
-                p.UpstreamWing.HeelLength = 1.0m;
+                p.UpstreamWing.FloorThickness = 0.6m;
                 p.DownstreamWing.StemThickness = 0.6m;
                 p.DownstreamWing.Length = 4.0m;
                 p.DownstreamWing.EndWidth = 2.0m;
                 p.DownstreamWing.CrownStart = 4.0m;
                 p.DownstreamWing.CrownEnd = 2.5m;
-                p.DownstreamWing.Embedment = 1.2m;
-                p.DownstreamWing.FootingThickness = 0.6m;
-                p.DownstreamWing.ToeLength = 0.5m;
-                p.DownstreamWing.HeelLength = 1.2m;
+                p.DownstreamWing.FloorThickness = 0.8m;
             }
 
             if (breastAtEnds)
             {
                 p.UpstreamBreast.Position = p.UpstreamBreast.StemThickness / 2m;
                 p.DownstreamBreast.Position = p.BarrelLength - p.DownstreamBreast.StemThickness / 2m;
+                // 底版上面は敷高 0.6 なので、下面が胸壁のつま先版(Z = −0.5 / −0.6 以下)に届く厚さにする
+                p.UpstreamWing.FloorThickness = 1.6m;
+                p.DownstreamWing.FloorThickness = 1.8m;
             }
             return p;
         }

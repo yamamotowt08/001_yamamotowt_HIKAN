@@ -43,26 +43,25 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 翼壁 1 端ぶん(左右 2 基)の型枠面積 [m2]。
-        /// たて壁は水路側・背面側の 2 面 + 端部の切断面 + 天端(傾斜面)。函体端面に接する始端面は計上しない。
-        /// 底版は両側面(壁に沿う)+ 両端面 + つま先版・かかと版の上面。地盤と接する下面は計上しない。
+        /// 翼壁 1 端ぶん(U 字水路)の型枠面積 [m2]。
+        /// 側壁は水路側の面 + 背面(底版の側面まで続く)+ 端部の切断面 + 天端(傾斜面)。
+        /// 底版は翼壁端部の切断面のみ(上面は水路床で型枠不要、下面は地盤、側面は側壁の背面に含めた)。
+        /// 函体端面に接する始端面は計上しない。
         /// </summary>
         private static decimal WingFormwork(HikanParameters p, HikanWingWall w)
         {
             if (!w.Exists) { return 0m; }
             decimal m = HikanGeometry.WingWidthFactor(p, w);
             decimal wallLength = w.Length * m;
-            decimal averageHeight = (w.CrownStart + w.CrownEnd) / 2m - w.FootingTop;
-            decimal endHeight = w.CrownEnd - w.FootingTop;
+            decimal floorTop = HikanGeometry.WingFloorTop(p);
+            decimal averageCrown = (w.CrownStart + w.CrownEnd) / 2m;
+            decimal inner = wallLength * (averageCrown - floorTop);
+            decimal back = wallLength * (averageCrown - (floorTop - w.FloorThickness));
+            decimal endFace = w.StemThickness * m * (w.CrownEnd - floorTop);
             decimal rise = (w.CrownEnd - w.CrownStart) / w.Length;
-            decimal topArea = w.StemThickness * m * w.Length * HikanGeometry.Sqrt(1m + rise * rise);
-            decimal stem = 2m * wallLength * averageHeight
-                + w.StemThickness * m * endHeight
-                + topArea;
-            decimal footing = 2m * wallLength * w.FootingThickness
-                + 2m * (w.ToeLength + w.StemThickness + w.HeelLength) * m * w.FootingThickness
-                + (w.ToeLength + w.HeelLength) * m * w.Length;
-            return 2m * (stem + footing);
+            decimal top = w.StemThickness * m * w.Length * HikanGeometry.Sqrt(1m + rise * rise);
+            decimal floorEnd = (w.EndWidth + 2m * w.StemThickness * m) * w.FloorThickness;
+            return 2m * (inner + back + endFace + top) + floorEnd;
         }
 
         public static HikanEstimate Calculate(HikanParameters p)

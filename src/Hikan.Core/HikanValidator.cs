@@ -169,8 +169,8 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 翼壁(左右それぞれの逆 T 字擁壁)。たて壁厚 0 は「設置しない」なので寸法を検査しない。
-        /// たて壁厚・底版厚は H13 マニュアル Ⅴ章の最小部材厚 0.40 m・0.10 m ピッチの対象。
+        /// 翼壁(U 字の 3 面張り水路)。側壁厚 0 は「設置しない」なので寸法を検査しない。
+        /// 側壁厚・底版厚は H13 マニュアル Ⅴ章(翼壁)の最小部材厚 0.40 m・0.10 m ピッチの対象。
         /// 胸壁などとの重なりは許す(解析解では HikanGeometry.WingOverlapVolume で差し引く)。
         /// </summary>
         private static void CheckWingWall(
@@ -181,13 +181,13 @@ namespace Hikan.Core
         {
             if (w.StemThickness < 0m)
             {
-                errors.Add(name + "のたて壁厚は 0 以上にしてください(0 で設置しない)。");
+                errors.Add(name + "の側壁厚は 0 以上にしてください(0 で設置しない)。");
                 return;
             }
             if (!w.Exists) { return; }
 
-            CheckThickness(errors, w.StemThickness, name + "のたて壁厚");
-            CheckThickness(errors, w.FootingThickness, name + "の底版厚");
+            CheckThickness(errors, w.StemThickness, name + "の側壁厚");
+            CheckThickness(errors, w.FloorThickness, name + "の底版厚");
 
             if (w.Length <= 0m)
             {
@@ -199,31 +199,16 @@ namespace Hikan.Core
                 errors.Add(name + "の端部水路幅 " + w.EndWidth + " m は内空幅 " + p.InnerWidth
                     + " m 以上にしてください(内空幅と同じで平行、広げると八の字に開く)。");
             }
-            if (w.CrownStart <= 0m)
+            // 側壁は底版上面(= 函体の敷高)から立ち上がるので、天端はそれより高くなければならない。
+            decimal floorTop = HikanGeometry.WingFloorTop(p);
+            if (w.CrownStart <= floorTop)
             {
-                errors.Add(name + "の函体端での天端高は正の値にしてください(たて壁が函体端面に接しません)。");
+                errors.Add(name + "の函体端での天端高は底版上面(敷高 " + floorTop
+                    + " m)より高くしてください(側壁が函体端面に接しません)。");
             }
-            if (w.CrownEnd <= w.FootingTop)
+            if (w.CrownEnd <= floorTop)
             {
-                errors.Add(name + "の端部での天端高は底版上面 " + w.FootingTop + " m より高くしてください。");
-            }
-            if (w.Embedment < w.FootingThickness - Tolerance)
-            {
-                errors.Add(name + "の根入れ深さは底版厚 " + w.FootingThickness
-                    + " m 以上にしてください(底版上面が函体底版下面より上に出ます)。");
-            }
-            if (w.ToeLength < 0m) { errors.Add(name + "のつま先版長は 0 以上にしてください。"); }
-            if (w.HeelLength < 0m) { errors.Add(name + "のかかと版長は 0 以上にしてください。"); }
-
-            // 左右のつま先版が水路の中央で接触しないこと。開く向きなので函体端が最も狭い。
-            if (w.ToeLength > 0m && w.EndWidth >= p.InnerWidth - Tolerance)
-            {
-                decimal toeWidth = w.ToeLength * HikanGeometry.WingWidthFactor(p, w);
-                if (toeWidth >= p.InnerWidth / 2m)
-                {
-                    errors.Add(name + "のつま先版(横断方向の幅 " + toeWidth + " m)が水路中央で左右接触します。"
-                        + "内空幅の半分 " + (p.InnerWidth / 2m) + " m 未満にしてください。");
-                }
+                errors.Add(name + "の端部での天端高は底版上面(敷高 " + floorTop + " m)より高くしてください。");
             }
 
             // 函体端近くの胸壁の底版が函体端より外へ出て翼壁と重なるのは、実務で普通の配置なので許す。

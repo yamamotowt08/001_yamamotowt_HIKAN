@@ -132,9 +132,10 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 翼壁(左右 2 基 × たて壁 + 底版 = 4 部材)。川表側は S = L から +S へ、川裏側は S = 0 から −S へ伸びる。
-        /// 内面は函体端で内空側面(U = ±B/2)、翼壁端部で ±EndWidth/2。
-        /// たて壁は内面から背面側へ厚 t(壁面に直交)、底版は水路側へつま先版長、背面側へ たて壁厚 + かかと版長。
+        /// 翼壁(U 字の 3 面張り水路 = 左右の側壁 2 部材 + 底版 1 部材)。
+        /// 川表側は S = L から +S へ、川裏側は S = 0 から −S へ伸びる。
+        /// 側壁の内面は函体端で内空側面(U = ±B/2)、翼壁端部で ±EndWidth/2。側壁は内面から背面側へ厚 t(壁面に直交)。
+        /// 底版は左右の側壁の外面まで一体で、上面は函体の敷高(V = 函体の底版厚)。側壁は底版の上に立つので重ならない。
         /// </summary>
         public static HikanTaperedPart[] GetWingParts(HikanParameters p)
         {
@@ -166,19 +167,38 @@ namespace Hikan.Core
             decimal top0 = upstream ? w.CrownEnd : w.CrownStart;
             decimal top1 = upstream ? w.CrownStart : w.CrownEnd;
 
+            decimal floorTop = WingFloorTop(p);
+            decimal outer = w.StemThickness * m;   // 側壁の U 方向の幅
+
             string end = upstream ? "川裏側" : "川表側";
             for (int k = 0; k < 2; k++)
             {
                 bool right = k == 1;
-                string name = end + "翼壁" + (right ? "右" : "左");
-
-                // 右側の内面からの距離 [a, b](壁面に直交)を U に直して部材を作り、左側は鏡映する。
-                parts.Add(WingBand(name + "たて壁", upstream, right, s0, s1, in0, in1, 0m, w.StemThickness * m,
-                    w.FootingTop, top0, top1));
-                parts.Add(WingBand(name + "底版", upstream, right, s0, s1, in0, in1,
-                    -w.ToeLength * m, (w.StemThickness + w.HeelLength) * m,
-                    -w.Embedment, w.FootingTop, w.FootingTop));
+                // 右側の内面からの距離 [0, 側壁幅] で部材を作り、左側は鏡映する。側壁は底版の上に立つ。
+                parts.Add(WingBand(end + "翼壁" + (right ? "右" : "左") + "側壁", upstream, right,
+                    s0, s1, in0, in1, 0m, outer, floorTop, top0, top1));
             }
+
+            // 底版は左右の側壁の外面まで一体。U は [−(内面 + 側壁幅), +(内面 + 側壁幅)]。
+            HikanTaperedPart floor = new HikanTaperedPart();
+            floor.Name = end + "翼壁底版";
+            floor.Upstream = upstream;
+            floor.S0 = s0;
+            floor.S1 = s1;
+            floor.UL0 = -(in0 + outer);
+            floor.UR0 = in0 + outer;
+            floor.UL1 = -(in1 + outer);
+            floor.UR1 = in1 + outer;
+            floor.VBottom = floorTop - w.FloorThickness;
+            floor.VTop0 = floorTop;
+            floor.VTop1 = floorTop;
+            parts.Add(floor);
+        }
+
+        /// <summary>翼壁の底版上面の高さ = 函体の敷高(局所座標では函体の底版厚)。水路床が函体の内空底面と段差なくつながる。</summary>
+        public static decimal WingFloorTop(HikanParameters p)
+        {
+            return p.BottomSlabThickness;
         }
 
         private static HikanTaperedPart WingBand(
@@ -211,22 +231,25 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 翼壁 1 端ぶん(左右 2 基)の体積 [m3]。開き角によらず
-        /// たて壁 = 厚 × 壁面長 × (平均天端高 − 底版上面高)、底版 = (つま先 + 厚 + かかと) × 壁面長 × 底版厚。
-        /// 壁面長 = 翼壁長 / cosθ。HikanTaperedPart のシンプソン積分とは別の式で、テストで突き合わせる。
+        /// 翼壁 1 端ぶん(U 字水路)の体積 [m3]。
+        /// 側壁 = 2 × 厚 × 壁面長 × (平均天端高 − 底版上面高)(壁面長 = 翼壁長 / cosθ、開き角によらない形)、
+        /// 底版 = 底版厚 × 翼壁長 × 平均全幅(全幅 = 水路幅 + 2 × 側壁幅、水路幅は B から EndWidth へ直線)。
+        /// HikanTaperedPart のシンプソン積分とは別の式で、テストで突き合わせる。
         /// </summary>
         public static decimal WingWallVolume(HikanParameters p, HikanWingWall w)
         {
             if (!w.Exists) { return 0m; }
-            decimal wallLength = w.Length * WingWidthFactor(p, w);
-            decimal stem = w.StemThickness * wallLength * ((w.CrownStart + w.CrownEnd) / 2m - w.FootingTop);
-            decimal footing = (w.ToeLength + w.StemThickness + w.HeelLength) * wallLength * w.FootingThickness;
-            return 2m * (stem + footing);
+            decimal m = WingWidthFactor(p, w);
+            decimal wallLength = w.Length * m;
+            decimal walls = 2m * w.StemThickness * wallLength * ((w.CrownStart + w.CrownEnd) / 2m - WingFloorTop(p));
+            decimal averageWidth = (p.InnerWidth + w.EndWidth) / 2m + 2m * w.StemThickness * m;
+            decimal floor = w.FloorThickness * w.Length * averageWidth;
+            return walls + floor;
         }
 
         /// <summary>
         /// 直方体部材と翼壁部材の重なり(体積と 1 次モーメント)。
-        /// 函体端近くに置いた胸壁の底版(つま先版)が函体端より外へ出ると、翼壁の底版などと重なる。
+        /// 函体端近くに置いた胸壁の底版(つま先版)が函体端より外へ出ると、翼壁の底版(厚い場合)などと重なる。
         /// 実形状は BoolUnite で一体化するので、解析解ではこの重なりを 1 回だけ差し引く。
         ///
         /// 重なりの S 断面は矩形 [max(UMin, UL), min(UMax, UR)] × [max(VMin, VBottom), min(VMax, VTop)] で、

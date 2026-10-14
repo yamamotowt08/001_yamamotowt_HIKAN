@@ -41,36 +41,35 @@ namespace Hikan.Core.Tests
             p.CutoffProjection = 0.7m;
 
             // 川裏側は八の字(内空幅 2.0 → 端部 3.0、翼壁長 3.0 → tanθ = 1/6)、川表側は平行。
+            // 底版上面は函体の敷高 0.6。川表側は底版を 0.8 にして底版下面を Z = −0.2 まで下げる。
             p.UpstreamWing.StemThickness = 0.5m;
             p.UpstreamWing.Length = 3.0m;
             p.UpstreamWing.EndWidth = 3.0m;
             p.UpstreamWing.CrownStart = 3.5m;
             p.UpstreamWing.CrownEnd = 2.0m;
-            p.UpstreamWing.Embedment = 1.0m;
-            p.UpstreamWing.FootingThickness = 0.5m;
-            p.UpstreamWing.ToeLength = 0.4m;
-            p.UpstreamWing.HeelLength = 1.0m;
+            p.UpstreamWing.FloorThickness = 0.6m;
             p.DownstreamWing.StemThickness = 0.6m;
             p.DownstreamWing.Length = 4.0m;
             p.DownstreamWing.EndWidth = 2.0m;
             p.DownstreamWing.CrownStart = 4.0m;
             p.DownstreamWing.CrownEnd = 2.5m;
-            p.DownstreamWing.Embedment = 1.2m;
-            p.DownstreamWing.FootingThickness = 0.6m;
-            p.DownstreamWing.ToeLength = 0.5m;
-            p.DownstreamWing.HeelLength = 1.2m;
+            p.DownstreamWing.FloorThickness = 0.8m;
             return p;
         }
 
         /// <summary>
-        /// 実機でエラーになった配置の再現: 胸壁を函体端に面一で置き、つま先版が函体端より外へ出て翼壁の底版と重なる。
-        /// 川裏側 たて壁 0.0〜0.5、つま先版で S = −0.8 まで。川表側 たて壁 19.4〜20.0、つま先版で S = 21.0 まで。
+        /// 胸壁を函体端に面一で置き、つま先版が函体端より外へ出て翼壁の底版と重なる配置。
+        /// 川裏側 たて壁 0.0〜0.5、つま先版で S = −0.8 まで(底版 V −1.0〜−0.5)。
+        /// 川表側 たて壁 19.4〜20.0、つま先版で S = 21.0 まで(底版 V −1.2〜−0.6)。
+        /// 翼壁の底版は上面が敷高 0.6 なので、重なるよう厚くする(川裏側 1.6 → 下面 −1.0、川表側 1.8 → 下面 −1.2)。
         /// </summary>
         private static Hikan.Core.HikanParameters WithOverlap()
         {
             Hikan.Core.HikanParameters p = WithWings();
             p.UpstreamBreast.Position = 0.25m;
             p.DownstreamBreast.Position = 19.7m;
+            p.UpstreamWing.FloorThickness = 1.6m;
+            p.DownstreamWing.FloorThickness = 1.8m;
             return p;
         }
 
@@ -188,7 +187,7 @@ namespace Hikan.Core.Tests
                 0.000000001m, "川表側(平行)");
         }
 
-        // テスト2: 平行翼壁(端部水路幅 = 内空幅)は開き 0、体積は 2 × {厚 × 長さ × (平均天端 − 底版上面) + 底版} で厳密。
+        // テスト2: 平行翼壁(端部水路幅 = 内空幅)は開き 0、体積は 側壁 + 底版 で厳密。
         [Xunit.Fact]
         public void ParallelWing_HasNoFlareAndExactVolume()
         {
@@ -197,8 +196,9 @@ namespace Hikan.Core.Tests
             Xunit.Assert.Equal(0m, Hikan.Core.HikanGeometry.WingSlope(p, w));
             Xunit.Assert.Equal(1m, Hikan.Core.HikanGeometry.WingWidthFactor(p, w));
             Xunit.Assert.Equal(0m, Hikan.Core.HikanGeometry.WingFlareAngle(p, w));
-            // 底版上面 = 0.6 − 1.2 = −0.6。たて壁 0.6 × 4.0 × (3.25 + 0.6) = 9.24、底版 2.3 × 4.0 × 0.6 = 5.52
-            Xunit.Assert.Equal(2m * (9.24m + 5.52m), Hikan.Core.HikanGeometry.WingWallVolume(p, w));
+            // 底版上面 = 敷高 0.6。側壁 2 × 0.6 × 4.0 × (3.25 − 0.6) = 12.72、
+            // 底版 0.8 × 4.0 × (水路幅 2.0 + 2 × 0.6) = 10.24
+            Xunit.Assert.Equal(12.72m + 10.24m, Hikan.Core.HikanGeometry.WingWallVolume(p, w));
         }
 
         // テスト3: 開き角は幅の差と翼壁長から決まる。tanθ = (3.0 − 2.0) / (2 × 3.0) = 1/6 → 9.462°
@@ -215,9 +215,10 @@ namespace Hikan.Core.Tests
             Xunit.Assert.True(Hikan.Core.HikanEstimator.Calculate(p).UpstreamWingFlareAngle > 9.462m);
         }
 
-        // テスト4: 翼壁の平面形。内面は函体端で内空側面(±B/2)、翼壁端部で ±端部水路幅/2。左右は鏡映。
+        // テスト4: 翼壁の平面形。側壁の内面は函体端で内空側面(±B/2)、翼壁端部で ±端部水路幅/2。
+        // 底版は左右の側壁の外面まで一体で、上面は函体の敷高、側壁は底版の上に立つ。
         [Xunit.Fact]
-        public void WingPlan_StartsAtInnerSideAndEndsAtEndWidth()
+        public void WingPlan_IsUShapedChannel()
         {
             Hikan.Core.HikanParameters p = WithWings();
             System.Collections.Generic.Dictionary<string, Hikan.Core.HikanTaperedPart> byName =
@@ -226,33 +227,45 @@ namespace Hikan.Core.Tests
             {
                 byName[part.Name] = part;
             }
-            Xunit.Assert.Equal(8, byName.Count);
+            // 1 端あたり 側壁 2 + 底版 1
+            Xunit.Assert.Equal(6, byName.Count);
 
-            // 川表側(平行)右: S = 20 → 24、内面 U = 1.0 のまま
-            Hikan.Core.HikanTaperedPart down = byName["川表側翼壁右たて壁"];
-            Xunit.Assert.Equal(20m, down.S0);
-            Xunit.Assert.Equal(24m, down.S1);
-            Xunit.Assert.Equal(1.0m, down.UL0);
-            Xunit.Assert.Equal(1.0m, down.UL1);
-            Xunit.Assert.Equal(1.6m, down.UR0);
-            Xunit.Assert.Equal(4.0m, down.VTop0);   // 函体端で天端 4.0
-            Xunit.Assert.Equal(2.5m, down.VTop1);   // 端部で天端 2.5
+            // 川表側(平行)右側壁: S = 20 → 24、内面 U = 1.0 のまま、底版上面 0.6 から立ち上がる
+            Hikan.Core.HikanTaperedPart wall = byName["川表側翼壁右側壁"];
+            Xunit.Assert.Equal(20m, wall.S0);
+            Xunit.Assert.Equal(24m, wall.S1);
+            Xunit.Assert.Equal(1.0m, wall.UL0);
+            Xunit.Assert.Equal(1.0m, wall.UL1);
+            Xunit.Assert.Equal(1.6m, wall.UR0);
+            Xunit.Assert.Equal(0.6m, wall.VBottom);
+            Xunit.Assert.Equal(4.0m, wall.VTop0);
+            Xunit.Assert.Equal(2.5m, wall.VTop1);
 
-            // 川裏側(八の字)右: S = −3 → 0。端部(S = −3)で内面 U = 1.5、函体端(S = 0)で 1.0
-            Hikan.Core.HikanTaperedPart up = byName["川裏側翼壁右たて壁"];
+            // 川表側の底版: 左右の側壁の外面(±1.6)まで一体、上面 = 敷高 0.6、下面 = 0.6 − 0.8
+            Hikan.Core.HikanTaperedPart floor = byName["川表側翼壁底版"];
+            Xunit.Assert.Equal(-1.6m, floor.UL0);
+            Xunit.Assert.Equal(1.6m, floor.UR0);
+            Xunit.Assert.Equal(0.6m, floor.VTop0);
+            Xunit.Assert.Equal(0.6m, floor.VTop1);
+            Xunit.Assert.Equal(-0.2m, floor.VBottom);
+
+            // 川裏側(八の字)右側壁: S = −3 → 0。端部(S = −3)で内面 U = 1.5、函体端(S = 0)で 1.0
+            Hikan.Core.HikanTaperedPart up = byName["川裏側翼壁右側壁"];
             Xunit.Assert.Equal(-3m, up.S0);
             Xunit.Assert.Equal(0m, up.S1);
             Xunit.Assert.Equal(1.5m, up.UL0);
             Xunit.Assert.Equal(1.0m, up.UL1);
-            Xunit.Assert.Equal(2.0m, up.VTop0);     // 端部で天端 2.0
-            Xunit.Assert.Equal(3.5m, up.VTop1);     // 函体端で天端 3.5
+            Xunit.Assert.Equal(2.0m, up.VTop0);
+            Xunit.Assert.Equal(3.5m, up.VTop1);
 
-            // 左右は鏡映
-            Hikan.Core.HikanTaperedPart left = byName["川裏側翼壁左底版"];
-            Hikan.Core.HikanTaperedPart right = byName["川裏側翼壁右底版"];
-            Xunit.Assert.Equal(-right.UR0, left.UL0);
-            Xunit.Assert.Equal(-right.UL1, left.UR1);
-            Xunit.Assert.Equal(right.VBottom, left.VBottom);
+            // 左右の側壁は鏡映、底版は中心線について対称
+            Hikan.Core.HikanTaperedPart left = byName["川裏側翼壁左側壁"];
+            Xunit.Assert.Equal(-up.UR0, left.UL0);
+            Xunit.Assert.Equal(-up.UL1, left.UR1);
+            Hikan.Core.HikanTaperedPart upFloor = byName["川裏側翼壁底版"];
+            Xunit.Assert.Equal(-upFloor.UR0, upFloor.UL0);
+            Xunit.Assert.Equal(-upFloor.UR1, upFloor.UL1);
+            Xunit.Assert.Equal(up.UR0, upFloor.UR0);
         }
 
         // テスト5: 独立した柱積分で、全部材の合併体積が ModelVolume と一致し、部材どうしの重なりが
@@ -284,19 +297,19 @@ namespace Hikan.Core.Tests
         }
 
         // テスト5c: 重なり体積の厳密値。
-        // 川表側(平行・天端水平の底版)は 胸壁つま先版 S 20〜21 × U 1.4〜2.8 × V −1.2〜−0.6 = 0.84 / 片側。
-        // 川裏側(八の字)は 胸壁つま先版 S −0.8〜0 × U 1.4〜UR(S) × V −1.0〜−0.5。UR(S) は翼壁底版の背面側の辺で、
-        // 内面 1.0 − S/6 に (たて壁厚 0.5 + かかと 1.0) × √(1 + 1/36) を足したもの。
+        // 川表側(平行・水平)は 胸壁つま先版 S 20〜21 × U 1.4〜1.6(底版の外端)× V −1.2〜−0.6 = 0.12 / 片側。
+        // 川裏側(八の字)は 胸壁つま先版 S −0.8〜0 × U 1.4〜UR(S) × V −1.0〜−0.5。UR(S) は底版の外端
+        // (側壁の外面)で、内面 1.0 − S/6 に 側壁厚 0.5 × √(1 + 1/36) を足したもの。
         [Xunit.Fact]
         public void OverlapVolume_MatchesHandCalculation()
         {
             Hikan.Core.HikanParameters p = WithOverlap();
             // シンプソン則の ÷6 で decimal の最終桁(1e-27 程度)だけずれるので、その幅だけ許す
-            AssertClose(2m * 0.84m, Hikan.Core.HikanGeometry.WingOverlapVolume(p, false), 0.000000001m, "川表側の重なり");
+            AssertClose(2m * 0.12m, Hikan.Core.HikanGeometry.WingOverlapVolume(p, false), 0.000000001m, "川表側の重なり");
 
             decimal m = Hikan.Core.HikanGeometry.Sqrt(1m + 1m / 36m);
-            decimal urAt0 = 1.0m + 1.5m * m;
-            decimal urAtMinus08 = 1.0m + 0.8m / 6m + 1.5m * m;
+            decimal urAt0 = 1.0m + 0.5m * m;
+            decimal urAtMinus08 = 1.0m + 0.8m / 6m + 0.5m * m;
             decimal perSide = 0.5m * 0.8m * ((urAt0 + urAtMinus08) / 2m - 1.4m);
             AssertClose(2m * perSide, Hikan.Core.HikanGeometry.WingOverlapVolume(p, true), 0.000000001m, "川裏側の重なり");
         }
@@ -313,7 +326,7 @@ namespace Hikan.Core.Tests
 
             decimal collar = p.OuterWidth * p.OuterHeight * p.CutoffThickness * p.CutoffCount;
             decimal wing = Hikan.Core.HikanGeometry.WingOverlapVolume(p, null);
-            Xunit.Assert.True(wing > 2m, "重なりが実際に生じている構成であること。実際: " + wing);
+            Xunit.Assert.True(wing > 0.3m, "重なりが実際に生じている構成であること。実際: " + wing);
             // 川裏側の重なりは斜めの辺をセルで近似するので、その誤差ぶんだけ許す
             AssertClose(collar + wing, c.Overlap, 0.01m, "重なり体積");
         }
@@ -330,7 +343,7 @@ namespace Hikan.Core.Tests
 
             // 翼壁の数量は重なりを差し引いた正味
             decimal gross = Hikan.Core.HikanGeometry.WingWallVolume(p, p.DownstreamWing);
-            AssertClose(gross - 1.68m, e.DownstreamWingVolume, 0.0005m, "川表側翼壁の正味");
+            AssertClose(gross - 0.24m, e.DownstreamWingVolume, 0.0005m, "川表側翼壁の正味");
         }
 
         // テスト6: エクステントが翼壁の頂点を含むこと。
@@ -398,44 +411,41 @@ namespace Hikan.Core.Tests
             AssertInvalid(p);
         }
 
-        // テスト10: 左右のつま先版が水路中央で接触しないこと(函体端で つま先版の横断幅 < 内空幅/2)。
+        // テスト10: 側壁は底版上面(= 函体の敷高 0.6)から立ち上がるので、天端はそれより高いこと。
         [Xunit.Theory]
-        [Xunit.InlineData(0.9, true)]
-        [Xunit.InlineData(1.0, false)]
-        public void Toes_MustNotMeetAtChannelCentre(double toe, bool valid)
+        [Xunit.InlineData(0.7, true)]
+        [Xunit.InlineData(0.6, false)]
+        [Xunit.InlineData(0.3, false)]
+        public void Crown_MustBeAboveFloorTop(double crownEnd, bool valid)
         {
             Hikan.Core.HikanParameters p = WithWings();
-            p.DownstreamWing.ToeLength = (decimal)toe;
+            p.DownstreamWing.CrownEnd = (decimal)crownEnd;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
             else { AssertInvalid(p); }
         }
 
-        // テスト12: たて壁厚・底版厚は最小部材厚 0.40 m・0.10 m ピッチ(H13 Ⅴ章)。天端・根入れの条件。
+        // テスト12: 側壁厚・底版厚は最小部材厚 0.40 m・0.10 m ピッチ(H13 Ⅴ章)。翼壁長は正。
         [Xunit.Fact]
-        public void WingDimensions_FollowStandardAndConnect()
+        public void WingDimensions_FollowStandard()
         {
             Hikan.Core.HikanParameters a = WithWings();
             a.UpstreamWing.StemThickness = 0.35m;
             AssertInvalid(a);
 
             Hikan.Core.HikanParameters b = WithWings();
-            b.UpstreamWing.FootingThickness = 0.45m;
+            b.UpstreamWing.FloorThickness = 0.45m;
             AssertInvalid(b);
 
             Hikan.Core.HikanParameters c = WithWings();
-            c.UpstreamWing.CrownStart = 0m;          // 函体端面に接しない
+            c.UpstreamWing.FloorThickness = 0.3m;
             AssertInvalid(c);
-
-            Hikan.Core.HikanParameters d = WithWings();
-            d.UpstreamWing.Embedment = 0.3m;         // 根入れ < 底版厚
-            AssertInvalid(d);
 
             Hikan.Core.HikanParameters f = WithWings();
             f.UpstreamWing.Length = 0m;
             AssertInvalid(f);
         }
 
-        // テスト13: 翼壁を付けない(たて壁厚 0)なら他の寸法は検査しない。
+        // テスト13: 翼壁を付けない(側壁厚 0)なら他の寸法は検査しない。
         [Xunit.Fact]
         public void NoWing_SkipsChecks()
         {

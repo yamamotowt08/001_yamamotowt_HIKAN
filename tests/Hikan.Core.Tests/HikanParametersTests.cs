@@ -117,11 +117,9 @@ namespace Hikan.Core.Tests
                 "downstream_breast_toe_length", "downstream_breast_heel_length",
                 "cutoff_count", "cutoff_thickness", "cutoff_projection",
                 "upstream_wing_stem_thickness", "upstream_wing_length", "upstream_wing_end_width",
-                "upstream_wing_crown_start", "upstream_wing_crown_end", "upstream_wing_embedment",
-                "upstream_wing_footing_thickness", "upstream_wing_toe_length", "upstream_wing_heel_length",
+                "upstream_wing_crown_start", "upstream_wing_crown_end", "upstream_wing_floor_thickness",
                 "downstream_wing_stem_thickness", "downstream_wing_length", "downstream_wing_end_width",
-                "downstream_wing_crown_start", "downstream_wing_crown_end", "downstream_wing_embedment",
-                "downstream_wing_footing_thickness", "downstream_wing_toe_length", "downstream_wing_heel_length"
+                "downstream_wing_crown_start", "downstream_wing_crown_end", "downstream_wing_floor_thickness"
             };
             foreach (string key in added)
             {
