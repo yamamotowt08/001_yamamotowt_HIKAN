@@ -115,12 +115,15 @@ namespace Hikan.AutoCAD
             {
                 // 段階ごとに分けて、どの段階の部材で落ちたかを切り分けられるようにする。
                 // 第1段階(函体のみ)・第2段階(胸壁+しゃ水壁)は退行確認、第3段階(翼壁)が新規分。
-                RunCase(ed, doc, Case(0.00m, false, false), "函体のみ・勾配なし");
-                RunCase(ed, doc, Case(0.02m, false, false), "函体のみ・勾配 0.02");
-                RunCase(ed, doc, Case(0.00m, true, false), "胸壁+しゃ水壁・勾配なし");
-                RunCase(ed, doc, Case(0.02m, true, false), "胸壁+しゃ水壁・勾配 0.02");
-                RunCase(ed, doc, Case(0.00m, true, true), "胸壁+しゃ水壁+翼壁・勾配なし");
-                RunCase(ed, doc, Case(0.02m, true, true), "胸壁+しゃ水壁+翼壁・勾配 0.02");
+                RunCase(ed, doc, Case(0.00m, false, false, false), "函体のみ・勾配なし");
+                RunCase(ed, doc, Case(0.02m, false, false, false), "函体のみ・勾配 0.02");
+                RunCase(ed, doc, Case(0.00m, true, false, false), "胸壁+しゃ水壁・勾配なし");
+                RunCase(ed, doc, Case(0.02m, true, false, false), "胸壁+しゃ水壁・勾配 0.02");
+                RunCase(ed, doc, Case(0.00m, true, true, false), "胸壁+しゃ水壁+翼壁・勾配なし");
+                RunCase(ed, doc, Case(0.02m, true, true, false), "胸壁+しゃ水壁+翼壁・勾配 0.02");
+                // 胸壁を函体端に寄せ、つま先版が翼壁の底版と重なる配置(BoolUnite で一体化した実体を確かめる)。
+                RunCase(ed, doc, Case(0.00m, true, true, true), "胸壁を函体端に寄せて翼壁と重なる・勾配なし");
+                RunCase(ed, doc, Case(0.02m, true, true, true), "胸壁を函体端に寄せて翼壁と重なる・勾配 0.02");
             }
             catch (System.Exception ex)
             {
@@ -137,7 +140,8 @@ namespace Hikan.AutoCAD
         /// 翼壁は川裏側を八の字(内空幅 2.0 → 端部 3.0、翼壁長 3.0)、川表側を平行にして、
         /// 平面が斜めの部材と天端が傾いた部材(BoolIntersect で作る)の両方を確かめる。
         /// </summary>
-        private static Hikan.Core.HikanParameters Case(decimal slope, bool withExtraParts, bool withWings)
+        /// <param name="breastAtEnds">true なら胸壁のたて壁を函体端に面一で置く(つま先版が函体端より外へ出て翼壁と重なる)。</param>
+        private static Hikan.Core.HikanParameters Case(decimal slope, bool withExtraParts, bool withWings, bool breastAtEnds)
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
             p.TopSlabThickness = 0.4m;
@@ -190,6 +194,12 @@ namespace Hikan.AutoCAD
                 p.DownstreamWing.FootingThickness = 0.6m;
                 p.DownstreamWing.ToeLength = 0.5m;
                 p.DownstreamWing.HeelLength = 1.2m;
+            }
+
+            if (breastAtEnds)
+            {
+                p.UpstreamBreast.Position = p.UpstreamBreast.StemThickness / 2m;
+                p.DownstreamBreast.Position = p.BarrelLength - p.DownstreamBreast.StemThickness / 2m;
             }
             return p;
         }

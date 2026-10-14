@@ -15,6 +15,8 @@ namespace Hikan.Core
     public sealed class HikanTaperedPart
     {
         public string Name { get; set; }
+        /// <summary>川裏側(上流端)の翼壁の部材か。数量を端ごとに集計するのに使う。</summary>
+        public bool Upstream { get; set; }
         public decimal S0 { get; set; }
         public decimal S1 { get; set; }
         public decimal UL0 { get; set; }
@@ -96,8 +98,26 @@ namespace Hikan.Core
         /// <summary>天端高 VTop を S の 1 次式で S の任意位置に延長した値(側面プリズムの作図用)。</summary>
         public decimal TopAt(decimal s)
         {
-            if (S1 == S0) { return VTop0; }
-            return VTop0 + (VTop1 - VTop0) * (s - S0) / (S1 - S0);
+            return LinearAt(VTop0, VTop1, s);
+        }
+
+        /// <summary>位置 S での U の下限(左端)。</summary>
+        public decimal ULAt(decimal s)
+        {
+            return LinearAt(UL0, UL1, s);
+        }
+
+        /// <summary>位置 S での U の上限(右端)。</summary>
+        public decimal URAt(decimal s)
+        {
+            return LinearAt(UR0, UR1, s);
+        }
+
+        /// <summary>S0 で f0、S1 で f1 をとる 1 次式の、位置 s での値。</summary>
+        public decimal LinearAt(decimal f0, decimal f1, decimal s)
+        {
+            if (S1 == S0) { return f0; }
+            return f0 + (f1 - f0) * (s - S0) / (S1 - S0);
         }
     }
 }

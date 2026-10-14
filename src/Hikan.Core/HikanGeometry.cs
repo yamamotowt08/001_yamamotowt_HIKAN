@@ -173,20 +173,21 @@ namespace Hikan.Core
                 string name = end + "翼壁" + (right ? "右" : "左");
 
                 // 右側の内面からの距離 [a, b](壁面に直交)を U に直して部材を作り、左側は鏡映する。
-                parts.Add(WingBand(name + "たて壁", right, s0, s1, in0, in1, 0m, w.StemThickness * m,
+                parts.Add(WingBand(name + "たて壁", upstream, right, s0, s1, in0, in1, 0m, w.StemThickness * m,
                     w.FootingTop, top0, top1));
-                parts.Add(WingBand(name + "底版", right, s0, s1, in0, in1,
+                parts.Add(WingBand(name + "底版", upstream, right, s0, s1, in0, in1,
                     -w.ToeLength * m, (w.StemThickness + w.HeelLength) * m,
                     -w.Embedment, w.FootingTop, w.FootingTop));
             }
         }
 
         private static HikanTaperedPart WingBand(
-            string name, bool right, decimal s0, decimal s1, decimal in0, decimal in1,
+            string name, bool upstream, bool right, decimal s0, decimal s1, decimal in0, decimal in1,
             decimal a, decimal b, decimal vBottom, decimal top0, decimal top1)
         {
             HikanTaperedPart part = new HikanTaperedPart();
             part.Name = name;
+            part.Upstream = upstream;
             part.S0 = s0;
             part.S1 = s1;
             if (right)
@@ -221,6 +222,101 @@ namespace Hikan.Core
             decimal stem = w.StemThickness * wallLength * ((w.CrownStart + w.CrownEnd) / 2m - w.FootingTop);
             decimal footing = (w.ToeLength + w.StemThickness + w.HeelLength) * wallLength * w.FootingThickness;
             return 2m * (stem + footing);
+        }
+
+        /// <summary>
+        /// 直方体部材と翼壁部材の重なり(体積と 1 次モーメント)。
+        /// 函体端近くに置いた胸壁の底版(つま先版)が函体端より外へ出ると、翼壁の底版などと重なる。
+        /// 実形状は BoolUnite で一体化するので、解析解ではこの重なりを 1 回だけ差し引く。
+        ///
+        /// 重なりの S 断面は矩形 [max(UMin, UL), min(UMax, UR)] × [max(VMin, VBottom), min(VMax, VTop)] で、
+        /// 各辺は S の折れ線になる。折れ点(翼壁の辺が直方体の面を横切る位置)で S 区間を分割すれば、
+        /// 各小区間では幅も高さも 1 次式なので、シンプソン則で厳密に積分できる。
+        /// </summary>
+        public static (decimal Volume, decimal MomentU, decimal MomentV, decimal MomentS) Overlap(
+            HikanPart box, HikanTaperedPart t)
+        {
+            decimal a = box.SMin > t.S0 ? box.SMin : t.S0;
+            decimal b = box.SMax < t.S1 ? box.SMax : t.S1;
+            if (b <= a) { return (0m, 0m, 0m, 0m); }
+
+            System.Collections.Generic.List<decimal> cuts = new System.Collections.Generic.List<decimal>();
+            cuts.Add(a);
+            cuts.Add(b);
+            AddCrossing(cuts, t, t.UL0, t.UL1, box.UMin, a, b);
+            AddCrossing(cuts, t, t.UL0, t.UL1, box.UMax, a, b);
+            AddCrossing(cuts, t, t.UR0, t.UR1, box.UMin, a, b);
+            AddCrossing(cuts, t, t.UR0, t.UR1, box.UMax, a, b);
+            AddCrossing(cuts, t, t.VTop0, t.VTop1, box.VMin, a, b);
+            AddCrossing(cuts, t, t.VTop0, t.VTop1, box.VMax, a, b);
+            AddCrossing(cuts, t, t.VTop0, t.VTop1, t.VBottom, a, b);
+            cuts.Sort();
+
+            decimal volume = 0m, mu = 0m, mv = 0m, ms = 0m;
+            decimal[] weights = new decimal[] { 1m, 4m, 1m };
+            for (int i = 0; i + 1 < cuts.Count; i++)
+            {
+                decimal c0 = cuts[i];
+                decimal c1 = cuts[i + 1];
+                if (c1 <= c0) { continue; }
+                decimal k = (c1 - c0) / 6m;
+                for (int j = 0; j < 3; j++)
+                {
+                    decimal s = c0 + (c1 - c0) * j / 2m;
+                    decimal ul = t.ULAt(s) > box.UMin ? t.ULAt(s) : box.UMin;
+                    decimal ur = t.URAt(s) < box.UMax ? t.URAt(s) : box.UMax;
+                    decimal vb = t.VBottom > box.VMin ? t.VBottom : box.VMin;
+                    decimal vt = t.TopAt(s) < box.VMax ? t.TopAt(s) : box.VMax;
+                    decimal area = (ur > ul ? ur - ul : 0m) * (vt > vb ? vt - vb : 0m);
+                    volume += k * weights[j] * area;
+                    mu += k * weights[j] * area * (ul + ur) / 2m;
+                    mv += k * weights[j] * area * (vb + vt) / 2m;
+                    ms += k * weights[j] * area * s;
+                }
+            }
+            return (volume, mu, mv, ms);
+        }
+
+        /// <summary>翼壁部材の辺 f(S)(S0 で f0、S1 で f1 の 1 次式)が値 target をとる位置を (a, b) 内なら追加する。</summary>
+        private static void AddCrossing(
+            System.Collections.Generic.List<decimal> cuts, HikanTaperedPart t,
+            decimal f0, decimal f1, decimal target, decimal a, decimal b)
+        {
+            if (f0 == f1 || t.S1 == t.S0) { return; }
+            decimal s = t.S0 + (target - f0) * (t.S1 - t.S0) / (f1 - f0);
+            if (s > a && s < b) { cuts.Add(s); }
+        }
+
+        /// <summary>
+        /// 直方体部材(内空を除く)と翼壁部材の重なりの合計体積 [m3]。
+        /// upstream が null なら両端、true なら川裏側翼壁、false なら川表側翼壁との重なりだけを数える。
+        /// 3 部材以上が重なる点は無い(直方体どうし・翼壁部材どうしの重なりは
+        /// 「しゃ水壁 ∩ 函体」以外に無く、それは函体端より内側にしか無い)ので、対ごとの和で厳密。
+        /// </summary>
+        public static decimal WingOverlapVolume(HikanParameters p, bool? upstream)
+        {
+            decimal v = 0m;
+            HikanPart[] boxes = GetParts(p);
+            foreach (HikanTaperedPart t in GetWingParts(p))
+            {
+                if (upstream.HasValue && t.Upstream != upstream.Value) { continue; }
+                foreach (HikanPart box in boxes)
+                {
+                    if (box.IsVoid) { continue; }
+                    v += Overlap(box, t).Volume;
+                }
+            }
+            return v;
+        }
+
+        /// <summary>
+        /// 翼壁 1 端ぶんの正味体積 [m3]。胸壁などと重なる部分は胸壁側に数え、翼壁からは差し引く。
+        /// 部材別の数量を足すとモデル全体の体積に一致する。
+        /// </summary>
+        public static decimal WingWallNetVolume(HikanParameters p, bool upstream)
+        {
+            HikanWingWall w = upstream ? p.UpstreamWing : p.DownstreamWing;
+            return WingWallVolume(p, w) - WingOverlapVolume(p, upstream);
         }
 
         /// <summary>
@@ -363,8 +459,8 @@ namespace Hikan.Core
         /// モデル全体のコンクリート体積 [m3]。勾配の回転は体積を変えない。
         /// 部材の重なりは「しゃ水壁 ∩ 函体」のみで、CutoffVolume が控除済み。
         /// 胸壁は函体と側面で接するだけ、内空は函体のみを貫通する(BarrelVolume が控除済み)。
-        /// 翼壁は函体端より外(川裏 S ≤ 0 / 川表 S ≥ L)にあり、函体端面と面で接するだけで重ならない
-        /// (同じ端の他部材が函体端より外へ出ていないことを HikanValidator で検査済み)。
+        /// 翼壁は函体端より外(川裏 S ≤ 0 / 川表 S ≥ L)にあり、函体とは端面で接するだけだが、
+        /// 函体端近くの胸壁の底版が函体端より外へ出ていると重なる。その重なりは WingOverlapVolume で 1 回差し引く。
         /// </summary>
         public static decimal ModelVolume(HikanParameters p)
         {
@@ -373,7 +469,8 @@ namespace Hikan.Core
                 + BreastWallVolume(p.DownstreamBreast)
                 + CutoffVolume(p)
                 + WingWallVolume(p, p.UpstreamWing)
-                + WingWallVolume(p, p.DownstreamWing);
+                + WingWallVolume(p, p.DownstreamWing)
+                - WingOverlapVolume(p, null);
         }
 
         /// <summary>内空の全長 [m]。胸壁は開口を塞がないので函体延長に等しい。</summary>
@@ -490,7 +587,8 @@ namespace Hikan.Core
                     0m, p.OuterHeight / 2m, CutoffPosition(p, k));
             }
 
-            // 翼壁は他の部材と重ならないので、シンプソン積分した体積とモーメントをそのまま足す。
+            // 翼壁はシンプソン積分した体積とモーメントを足し、胸壁などとの重なりを 1 回引く。
+            HikanPart[] boxes = GetParts(p);
             foreach (HikanTaperedPart part in GetWingParts(p))
             {
                 (decimal Volume, decimal MomentU, decimal MomentV, decimal MomentS) m = part.Moments();
@@ -498,6 +596,15 @@ namespace Hikan.Core
                 mu += m.MomentU;
                 mv += m.MomentV;
                 ms += m.MomentS;
+                foreach (HikanPart box in boxes)
+                {
+                    if (box.IsVoid) { continue; }
+                    (decimal Volume, decimal MomentU, decimal MomentV, decimal MomentS) o = Overlap(box, part);
+                    mass -= o.Volume;
+                    mu -= o.MomentU;
+                    mv -= o.MomentV;
+                    ms -= o.MomentS;
+                }
             }
 
             return ToWorld(p, mu / mass, mv / mass, ms / mass);

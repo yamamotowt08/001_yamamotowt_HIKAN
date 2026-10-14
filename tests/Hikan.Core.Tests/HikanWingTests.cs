@@ -62,6 +62,18 @@ namespace Hikan.Core.Tests
             return p;
         }
 
+        /// <summary>
+        /// 実機でエラーになった配置の再現: 胸壁を函体端に面一で置き、つま先版が函体端より外へ出て翼壁の底版と重なる。
+        /// 川裏側 たて壁 0.0〜0.5、つま先版で S = −0.8 まで。川表側 たて壁 19.4〜20.0、つま先版で S = 21.0 まで。
+        /// </summary>
+        private static Hikan.Core.HikanParameters WithOverlap()
+        {
+            Hikan.Core.HikanParameters p = WithWings();
+            p.UpstreamBreast.Position = 0.25m;
+            p.DownstreamBreast.Position = 19.7m;
+            return p;
+        }
+
         private static decimal WingPartsVolume(Hikan.Core.HikanParameters p, string end)
         {
             decimal v = 0m;
@@ -257,7 +269,68 @@ namespace Hikan.Core.Tests
 
             // 既知の重なりはしゃ水壁と函体のみ(外形断面 × 厚 × 枚数)。それ以外の重なりは 0。
             decimal knownOverlap = p.OuterWidth * p.OuterHeight * p.CutoffThickness * p.CutoffCount;
+            Xunit.Assert.Equal(0m, Hikan.Core.HikanGeometry.WingOverlapVolume(p, null));
             AssertClose(knownOverlap, c.Overlap, 0.000001m, "重なり体積");
+        }
+
+        // テスト5b: 実機でエラーになった配置(胸壁のつま先版が函体端より外へ出て翼壁と重なる)は、
+        // エラーにせず受け付けること。
+        [Xunit.Fact]
+        public void BreastToeBeyondBarrelEnd_IsAllowedWithWing()
+        {
+            Hikan.Core.HikanParameters p = WithOverlap();
+            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
+            Hikan.Core.HikanEstimator.Calculate(p);
+        }
+
+        // テスト5c: 重なり体積の厳密値。
+        // 川表側(平行・天端水平の底版)は 胸壁つま先版 S 20〜21 × U 1.4〜2.8 × V −1.2〜−0.6 = 0.84 / 片側。
+        // 川裏側(八の字)は 胸壁つま先版 S −0.8〜0 × U 1.4〜UR(S) × V −1.0〜−0.5。UR(S) は翼壁底版の背面側の辺で、
+        // 内面 1.0 − S/6 に (たて壁厚 0.5 + かかと 1.0) × √(1 + 1/36) を足したもの。
+        [Xunit.Fact]
+        public void OverlapVolume_MatchesHandCalculation()
+        {
+            Hikan.Core.HikanParameters p = WithOverlap();
+            // シンプソン則の ÷6 で decimal の最終桁(1e-27 程度)だけずれるので、その幅だけ許す
+            AssertClose(2m * 0.84m, Hikan.Core.HikanGeometry.WingOverlapVolume(p, false), 0.000000001m, "川表側の重なり");
+
+            decimal m = Hikan.Core.HikanGeometry.Sqrt(1m + 1m / 36m);
+            decimal urAt0 = 1.0m + 1.5m * m;
+            decimal urAtMinus08 = 1.0m + 0.8m / 6m + 1.5m * m;
+            decimal perSide = 0.5m * 0.8m * ((urAt0 + urAtMinus08) / 2m - 1.4m);
+            AssertClose(2m * perSide, Hikan.Core.HikanGeometry.WingOverlapVolume(p, true), 0.000000001m, "川裏側の重なり");
+        }
+
+        // テスト5d: 重なりがある配置でも、独立の柱積分で合併体積が ModelVolume と一致し、
+        // 柱積分で測った重なりが「しゃ水壁 ∩ 函体」+ 解析的に求めた翼壁との重なり に一致すること。
+        [Xunit.Fact]
+        public void ColumnIntegral_MatchesModelVolume_WithOverlap()
+        {
+            Hikan.Core.HikanParameters p = WithOverlap();
+            (decimal Union, decimal Overlap) c = ColumnIntegral(p, 0.05m);
+            decimal model = Hikan.Core.HikanGeometry.ModelVolume(p);
+            AssertClose(model, c.Union, model * 0.002m, "合併体積");
+
+            decimal collar = p.OuterWidth * p.OuterHeight * p.CutoffThickness * p.CutoffCount;
+            decimal wing = Hikan.Core.HikanGeometry.WingOverlapVolume(p, null);
+            Xunit.Assert.True(wing > 2m, "重なりが実際に生じている構成であること。実際: " + wing);
+            // 川裏側の重なりは斜めの辺をセルで近似するので、その誤差ぶんだけ許す
+            AssertClose(collar + wing, c.Overlap, 0.01m, "重なり体積");
+        }
+
+        // テスト5e: 重なりがあっても部材別の数量の和が総計に一致すること(重なりは翼壁から差し引く)。
+        [Xunit.Fact]
+        public void Estimate_PartsSumToTotal_WithOverlap()
+        {
+            Hikan.Core.HikanParameters p = WithOverlap();
+            Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
+            decimal parts = e.BarrelConcreteVolume + e.UpstreamBreastVolume + e.DownstreamBreastVolume
+                + e.CutoffTotalVolume + e.UpstreamWingVolume + e.DownstreamWingVolume;
+            AssertClose(parts, e.ConcreteVolume, 0.003m, "部材別の和 = 総計(丸め誤差のみ)");
+
+            // 翼壁の数量は重なりを差し引いた正味
+            decimal gross = Hikan.Core.HikanGeometry.WingWallVolume(p, p.DownstreamWing);
+            AssertClose(gross - 1.68m, e.DownstreamWingVolume, 0.0005m, "川表側翼壁の正味");
         }
 
         // テスト6: エクステントが翼壁の頂点を含むこと。
@@ -335,19 +408,6 @@ namespace Hikan.Core.Tests
             p.DownstreamWing.ToeLength = (decimal)toe;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
             else { AssertInvalid(p); }
-        }
-
-        // テスト11: 翼壁を付ける端で、胸壁の底版が函体端より外へ出ていると重なるのでエラー。
-        [Xunit.Fact]
-        public void BreastBeyondBarrelEnd_ConflictsWithWing()
-        {
-            Hikan.Core.HikanParameters p = WithWings();
-            p.DownstreamBreast.Position = 19.7m;   // たて壁 19.4〜20.0、つま先版で 21.0 まで出る
-            AssertInvalid(p);
-
-            // 翼壁を付けなければ同じ胸壁は可
-            p.DownstreamWing.StemThickness = 0m;
-            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
         }
 
         // テスト12: たて壁厚・底版厚は最小部材厚 0.40 m・0.10 m ピッチ(H13 Ⅴ章)。天端・根入れの条件。

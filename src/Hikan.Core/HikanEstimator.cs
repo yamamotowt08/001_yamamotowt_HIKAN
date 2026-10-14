@@ -96,9 +96,10 @@ namespace Hikan.Core
             e.CutoffTotalVolume = RoundHalfUp(HikanGeometry.CutoffVolume(p), Digits);
             e.CutoffSpacing = p.CutoffCount > 0 ? RoundHalfUp(l / p.CutoffCount, Digits) : 0m;
 
-            // 翼壁は左右 2 基の合計。開き角は幅の差から決まる派生量(度)。
-            e.UpstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallVolume(p, p.UpstreamWing), Digits);
-            e.DownstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallVolume(p, p.DownstreamWing), Digits);
+            // 翼壁は左右 2 基の合計。胸壁などと重なる部分は胸壁側に数え、翼壁からは差し引く
+            // (部材別の数量を足すと総計に一致する)。開き角は幅の差から決まる派生量(度)。
+            e.UpstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallNetVolume(p, true), Digits);
+            e.DownstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallNetVolume(p, false), Digits);
             e.UpstreamWingFlareAngle = RoundHalfUp(HikanGeometry.WingFlareAngle(p, p.UpstreamWing), Digits);
             e.DownstreamWingFlareAngle = RoundHalfUp(HikanGeometry.WingFlareAngle(p, p.DownstreamWing), Digits);
 

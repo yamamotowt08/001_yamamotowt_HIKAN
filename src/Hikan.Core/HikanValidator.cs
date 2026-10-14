@@ -43,8 +43,8 @@ namespace Hikan.Core
             CheckBreastWall(errors, p, p.DownstreamBreast, "川表側胸壁");
             CheckBreastClearance(errors, p);
             CheckCutoff(errors, p);
-            CheckWingWall(errors, p, p.UpstreamWing, true, "川裏側翼壁");
-            CheckWingWall(errors, p, p.DownstreamWing, false, "川表側翼壁");
+            CheckWingWall(errors, p, p.UpstreamWing, "川裏側翼壁");
+            CheckWingWall(errors, p, p.DownstreamWing, "川表側翼壁");
 
             if (p.InnerWidth > MaxInnerDimension + Tolerance)
             {
@@ -171,13 +171,12 @@ namespace Hikan.Core
         /// <summary>
         /// 翼壁(左右それぞれの逆 T 字擁壁)。たて壁厚 0 は「設置しない」なので寸法を検査しない。
         /// たて壁厚・底版厚は H13 マニュアル Ⅴ章の最小部材厚 0.40 m・0.10 m ピッチの対象。
-        /// 体積の解析解(ModelVolume)が成り立つ条件として、翼壁が他の部材と重ならないことも検査する。
+        /// 胸壁などとの重なりは許す(解析解では HikanGeometry.WingOverlapVolume で差し引く)。
         /// </summary>
         private static void CheckWingWall(
             System.Collections.Generic.List<string> errors,
             HikanParameters p,
             HikanWingWall w,
-            bool upstream,
             string name)
         {
             if (w.StemThickness < 0m)
@@ -227,21 +226,8 @@ namespace Hikan.Core
                 }
             }
 
-            // 翼壁は函体端より外を占めるので、同じ端の胸壁などが函体端より外へ出ていると重なる。
-            foreach (HikanPart part in HikanGeometry.GetParts(p))
-            {
-                if (part.IsVoid) { continue; }
-                if (upstream && part.SMin < -Tolerance)
-                {
-                    errors.Add(name + "と " + part.Name + "(S = " + part.SMin
-                        + " m まで川裏へ張り出し)が干渉します。翼壁を付ける端では、他の部材を川裏函体端(S = 0)より外へ出さないでください。");
-                }
-                if (!upstream && part.SMax > p.BarrelLength + Tolerance)
-                {
-                    errors.Add(name + "と " + part.Name + "(S = " + part.SMax
-                        + " m まで川表へ張り出し)が干渉します。翼壁を付ける端では、他の部材を川表函体端(S = L)より外へ出さないでください。");
-                }
-            }
+            // 函体端近くの胸壁の底版が函体端より外へ出て翼壁と重なるのは、実務で普通の配置なので許す。
+            // 重なりは BoolUnite で一体化し、解析解では HikanGeometry.WingOverlapVolume で 1 回差し引く。
         }
 
         private static void CheckBreastAgainstCutoffs(
