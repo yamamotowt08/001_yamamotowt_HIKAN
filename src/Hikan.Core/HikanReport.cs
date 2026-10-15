@@ -40,6 +40,19 @@ namespace Hikan.Core
             Add(list, prefix + "heel_length", F(w.HeelLength), "m", "入力");
         }
 
+        private static void AddGate(System.Collections.Generic.List<HikanItem> list, HikanGateTower g)
+        {
+            Add(list, "gate_exists", g.Exists ? "設置する" : "設置しない", "", "入力");
+            if (!g.Exists) { return; }
+            Add(list, "gate_position", F(g.Position), "m", "入力");
+            Add(list, "gate_column_thickness", F(g.ColumnThickness), "m", "入力");
+            Add(list, "gate_column_width", F(g.ColumnWidth), "m", "入力");
+            Add(list, "gate_crown_height", F(g.CrownHeight), "m", "入力");
+            Add(list, "gate_deck_thickness", F(g.DeckThickness), "m", "入力");
+            Add(list, "gate_deck_side_overhang", F(g.DeckSideOverhang), "m", "入力");
+            Add(list, "gate_deck_axial_overhang", F(g.DeckAxialOverhang), "m", "入力");
+        }
+
         private static void AddWing(System.Collections.Generic.List<HikanItem> list, HikanWingWall w, string prefix)
         {
             Add(list, prefix + "stem_thickness", F(w.StemThickness), "m", "入力");
@@ -81,6 +94,7 @@ namespace Hikan.Core
             Add(r, "cutoff_count", p.CutoffCount.ToString(), "枚", "入力");
             Add(r, "cutoff_thickness", F(p.CutoffThickness), "m", "入力");
             Add(r, "cutoff_projection", F(p.CutoffProjection), "m", "入力");
+            AddGate(r, p.Gate);
 
             Add(r, "outer_width", F(e.OuterWidth), "m", "確定");
             Add(r, "outer_height", F(e.OuterHeight), "m", "確定");
@@ -96,6 +110,8 @@ namespace Hikan.Core
             Add(r, "downstream_breast_volume", F(e.DownstreamBreastVolume), "m3", "確定");
             Add(r, "upstream_wing_volume", F(e.UpstreamWingVolume), "m3", "確定");
             Add(r, "downstream_wing_volume", F(e.DownstreamWingVolume), "m3", "確定");
+            Add(r, "gate_column_volume", F(e.GateColumnVolume), "m3", "確定");
+            Add(r, "gate_deck_volume", F(e.GateDeckVolume), "m3", "確定");
             Add(r, "upstream_protection_volume", F(e.UpstreamProtectionVolume), "m3", "確定");
             Add(r, "downstream_protection_volume", F(e.DownstreamProtectionVolume), "m3", "確定");
             Add(r, "upstream_wing_flare_angle", F(e.UpstreamWingFlareAngle), "度", "確定");
@@ -114,6 +130,7 @@ namespace Hikan.Core
             Add(r, "formwork_breast", F(e.FormworkBreast), "m2", "概算");
             Add(r, "formwork_cutoff", F(e.FormworkCutoff), "m2", "概算");
             Add(r, "formwork_wing", F(e.FormworkWing), "m2", "概算");
+            Add(r, "formwork_gate", F(e.FormworkGate), "m2", "概算");
 
             Add(r, "block_length", F(e.BlockLength), "m", "確定");
             Add(r, "concrete_per_block", F(e.ConcretePerBlock), "m3", "確定");
@@ -132,12 +149,13 @@ namespace Hikan.Core
         /// <summary>数量化できない前提・対象外を注記として出す(金額は算出しない)。</summary>
         public static readonly string[] Notes = new string[]
         {
-            "対象範囲: ボックスカルバート型 1 連の函体(頂版・側壁・底版)+ 胸壁 + しゃ水壁 + 翼壁。門柱・ゲート操作台・水叩き・護床工は対象外。",
+            "対象範囲: ボックスカルバート型 1 連の函体(頂版・側壁・底版)+ 胸壁 + しゃ水壁 + 翼壁(+ 堤防保護部)+ 門柱・ゲート操作台。水叩き・護床工・ゲート設備・管理橋は対象外。",
             "翼壁は左右の側壁と底版(水路床)が一体になった U 字の 3 面張り水路で、函体端から外へ伸びます。側壁の内面は函体端で内空側面に、底版上面は函体の敷高に一致し、水路が函体の内空と段差なくつながります。開き角は翼壁端部の水路幅と内空幅の差と翼壁長(函体軸方向)から決まります(端部水路幅 = 内空幅で平行)。",
             "翼壁の側壁の天端は函体端から翼壁端部まで直線で変わり、壁の厚さ方向には水平です。側壁厚は壁面に直交する方向で測ります。底版は側壁の外面まで(張出しなし)です。始端・終端は函体端と平行な面で切っています。",
             "函体端近くの胸壁の底版が函体端より外へ出て翼壁(厚い底版など)と重なる場合、重なった部分は一体のコンクリートとして 1 回だけ数え、胸壁の数量に含めて翼壁の数量から差し引きます。",
             "胸壁は函体の左右側面にそれぞれ取り付く逆T字擁壁(たて壁 + 底版)としてモデル化しています。左右は同一形状で、入力は片側分です。底版上面は函体の敷高(内空底面)にそろえ、たて壁は敷高から立ち上がります。つま先版長またはかかと版長を 0 にすれば L 字になります。",
             "堤防保護部は翼壁の端部から左右へ張り出す逆T字擁壁(たて壁 + 底版、つま先版は水路床の下で左右つながる)としてモデル化しています。底版は上面 = 敷高、厚さ = 翼壁の底版厚です。翼壁と重なる部分は堤防保護部の数量に含め、翼壁の数量から差し引きます。堤防保護部の型枠は計上していません。",
+            "門柱・ゲート操作台は、函体の左右の側壁の上に立つ矩形の門柱 2 本と、両柱にまたがる操作台の版としてモデル化しています。ゲート溝(戸当り)・頂版の開口・ゲート設備・管理橋は含みません。床掘りの平面範囲には含めず、埋戻しの控除は現地盤(頂版上面 + 土かぶり)より下の部分だけです。",
             "胸壁・翼壁は必ず設置します(たて壁厚・側壁厚 0.40 m 以上)。厚 0 は旧版で作った図面の「設置なし」としてのみ読み込みます。",
             "上流端を川裏とします。胸壁のたて壁は函体方向に垂直で、軸位置(川裏函体端からたて壁厚の中心までの斜距離)を中心に置き、函体延長の内側に収めます。函体の上は跨ぎません。",
             "胸壁のつま先版は近い方の函体端の側(川裏側胸壁は川裏、川表側胸壁は川表)、かかと版は函体中央の側に伸びます。つま先版は函体端より外へ出てもかまいません。",

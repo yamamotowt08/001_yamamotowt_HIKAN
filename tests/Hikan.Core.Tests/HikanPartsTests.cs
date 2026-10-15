@@ -36,7 +36,7 @@ namespace Hikan.Core.Tests
         }
 
         /// <summary>S 方向にスラブ分割し、各スラブで (U,V) をセル分割して被覆判定で面積を出す独立実装。</summary>
-        private static decimal SlabVolume(Hikan.Core.HikanParameters p)
+        internal static decimal SlabVolume(Hikan.Core.HikanParameters p)
         {
             Hikan.Core.HikanPart[] parts = Hikan.Core.HikanGeometry.GetParts(p);
 

@@ -15,6 +15,8 @@ namespace Hikan.Core
         public decimal SMin { get; set; }
         public decimal SMax { get; set; }
         public bool IsVoid { get; set; }
+        /// <summary>頂版より上の上部工(門柱・操作台)。床掘りの平面範囲には含めない。</summary>
+        public bool IsSuperstructure { get; set; }
 
         public decimal Volume
         {
@@ -59,6 +61,7 @@ namespace Hikan.Core
 
             AddProtection(parts, p, p.UpstreamWing, true);
             AddProtection(parts, p, p.DownstreamWing, false);
+            AddGate(parts, p);
 
             // 内空は函体のみを貫通する。胸壁は函体側面より外側にあり開口を塞がないため関与しない。
             parts.Add(Centred("内空", p.InnerWidth, p.BottomSlabThickness, p.BottomSlabThickness + p.InnerHeight,
@@ -247,6 +250,68 @@ namespace Hikan.Core
             }
         }
 
+        /// <summary>
+        /// 門柱・操作台。門柱は函体の左右の側壁の上(頂版上面 V = 外形高)から天端 Hc まで立ち、内面を内空側面(±B/2)にそろえる。
+        /// 操作台は V = Hc から厚 td、U は門柱の外面から左右に ax、S は門柱の範囲から前後に as 張り出す。
+        /// 門柱と頂版、門柱と操作台は面で接するだけで重ならない。他の部材と重ならないことは HikanValidator が保証する。
+        /// </summary>
+        private static void AddGate(System.Collections.Generic.List<HikanPart> parts, HikanParameters p)
+        {
+            HikanGateTower g = p.Gate;
+            if (!g.Exists) { return; }
+            decimal inner = p.InnerWidth / 2m;
+            decimal outer = inner + g.ColumnThickness;
+            (decimal Min, decimal Max) column = g.ColumnRange;
+            (decimal Min, decimal Max) deck = g.DeckRange;
+
+            HikanPart right = Box("門柱右", inner, outer, p.OuterHeight, g.CrownHeight, column.Min, column.Max, false);
+            HikanPart left = Box("門柱左", -outer, -inner, p.OuterHeight, g.CrownHeight, column.Min, column.Max, false);
+            decimal half = outer + g.DeckSideOverhang;
+            HikanPart top = Box("操作台", -half, half, g.CrownHeight, g.CrownHeight + g.DeckThickness, deck.Min, deck.Max, false);
+            foreach (HikanPart part in new HikanPart[] { right, left, top })
+            {
+                part.IsSuperstructure = true;
+                parts.Add(part);
+            }
+        }
+
+        /// <summary>門柱 2 本の体積 [m3] = 2 × Tc × Wc × (Hc − 外形高)。</summary>
+        public static decimal GateColumnVolume(HikanParameters p)
+        {
+            HikanGateTower g = p.Gate;
+            if (!g.Exists) { return 0m; }
+            return 2m * g.ColumnThickness * g.ColumnWidth * (g.CrownHeight - p.OuterHeight);
+        }
+
+        /// <summary>操作台の体積 [m3] = td × (B + 2·Tc + 2·ax) × (Wc + 2·as)。</summary>
+        public static decimal GateDeckVolume(HikanParameters p)
+        {
+            HikanGateTower g = p.Gate;
+            if (!g.Exists) { return 0m; }
+            return g.DeckThickness
+                * (p.InnerWidth + 2m * g.ColumnThickness + 2m * g.DeckSideOverhang)
+                * (g.ColumnWidth + 2m * g.DeckAxialOverhang);
+        }
+
+        /// <summary>
+        /// 門柱・操作台のうち高さ V ≤ ground の部分の体積 [m3]。床掘りの埋戻しから控除する地下占有分に使う
+        /// (現地盤より上に出た部分は埋め戻す空間を占めない)。
+        /// </summary>
+        public static decimal GateVolumeBelow(HikanParameters p, decimal ground)
+        {
+            decimal v = 0m;
+            foreach (HikanPart part in GetParts(p))
+            {
+                if (!part.IsSuperstructure) { continue; }
+                decimal top = part.VMax < ground ? part.VMax : ground;
+                if (top > part.VMin)
+                {
+                    v += (part.UMax - part.UMin) * (top - part.VMin) * (part.SMax - part.SMin);
+                }
+            }
+            return v;
+        }
+
         private static (decimal Min, decimal Max) Span(decimal a, decimal b)
         {
             return a < b ? (a, b) : (b, a);
@@ -421,6 +486,20 @@ namespace Hikan.Core
         /// </summary>
         public static (decimal HalfWidth, decimal VMin, decimal SMin, decimal SMax) SolidRange(HikanParameters p)
         {
+            return Range(p, true);
+        }
+
+        /// <summary>
+        /// 床掘りの平面・深さに使う外接範囲。SolidRange から上部工(門柱・操作台)を除いたもの。
+        /// 操作台は頂版より高い所にあるので、左右に張り出しても床掘りの底幅は広げない。
+        /// </summary>
+        public static (decimal HalfWidth, decimal VMin, decimal SMin, decimal SMax) FootprintRange(HikanParameters p)
+        {
+            return Range(p, false);
+        }
+
+        private static (decimal HalfWidth, decimal VMin, decimal SMin, decimal SMax) Range(HikanParameters p, bool superstructure)
+        {
             decimal half = 0m;
             decimal vMin = 0m;
             decimal sMin = 0m;
@@ -428,6 +507,7 @@ namespace Hikan.Core
             foreach (HikanPart part in GetParts(p))
             {
                 if (part.IsVoid) { continue; }
+                if (part.IsSuperstructure && !superstructure) { continue; }
                 if (part.UMax > half) { half = part.UMax; }
                 if (-part.UMin > half) { half = -part.UMin; }
                 if (part.VMin < vMin) { vMin = part.VMin; }
@@ -570,6 +650,8 @@ namespace Hikan.Core
                 + WingWallVolume(p, p.DownstreamWing)
                 + ProtectionVolume(p.UpstreamWing)
                 + ProtectionVolume(p.DownstreamWing)
+                + GateColumnVolume(p)
+                + GateDeckVolume(p)
                 - WingOverlapVolume(p, null);
         }
 

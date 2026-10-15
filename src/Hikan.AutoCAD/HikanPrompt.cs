@@ -104,6 +104,31 @@ namespace Hikan.AutoCAD
             return true;
         }
 
+        /// <summary>門柱・操作台。設置しないなら残りは聞かない。</summary>
+        private static bool PromptGate(Autodesk.AutoCAD.EditorInput.Editor ed, Hikan.Core.HikanGateTower g)
+        {
+            decimal d;
+            int n;
+            if (!GetInt(ed, "門柱・操作台 (1 = 設置する / 0 = 設置しない)", g.Exists ? 1 : 0, out n)) { return false; }
+            g.Exists = n != 0;
+            if (!g.Exists) { return true; }
+            if (!GetDecimal(ed, "門柱 d 軸位置 [m] (川裏函体端から門柱の中心まで)", g.Position, out d)) { return false; }
+            g.Position = d;
+            if (!GetDecimal(ed, "門柱 Tc 厚 [m] (横断方向、内面 = 内空側面)", g.ColumnThickness, out d)) { return false; }
+            g.ColumnThickness = d;
+            if (!GetDecimal(ed, "門柱 Wc 幅 [m] (函体軸方向)", g.ColumnWidth, out d)) { return false; }
+            g.ColumnWidth = d;
+            if (!GetDecimal(ed, "門柱 Hc 天端高 [m] (= 操作台下面、函体底版下面から)", g.CrownHeight, out d)) { return false; }
+            g.CrownHeight = d;
+            if (!GetDecimal(ed, "操作台 td 厚 [m]", g.DeckThickness, out d)) { return false; }
+            g.DeckThickness = d;
+            if (!GetDecimal(ed, "操作台 ax 左右の張出し [m] (門柱の外面から)", g.DeckSideOverhang, out d)) { return false; }
+            g.DeckSideOverhang = d;
+            if (!GetDecimal(ed, "操作台 as 前後の張出し [m] (門柱の面から)", g.DeckAxialOverhang, out d)) { return false; }
+            g.DeckAxialOverhang = d;
+            return true;
+        }
+
         /// <summary>基準点を入力する。Enter で (0,0,0)、ESC でキャンセル(false)。</summary>
         public static bool PromptBasePoint(Autodesk.AutoCAD.EditorInput.Editor ed, Hikan.Core.HikanParameters p)
         {
@@ -172,6 +197,7 @@ namespace Hikan.AutoCAD
                 if (!GetDecimal(ed, "しゃ水壁 張出し量 [m] (全周一律、下方にも)", p.CutoffProjection, out d)) { return false; }
                 p.CutoffProjection = d;
             }
+            if (!PromptGate(ed, p.Gate)) { return false; }
             if (!GetInt(ed, "ソリッド色 (ACI 0〜256)", p.ColorIndex, out n)) { return false; }
             p.ColorIndex = n;
 

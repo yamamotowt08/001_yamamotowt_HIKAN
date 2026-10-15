@@ -47,6 +47,7 @@ namespace Hikan.Core
             CheckWingWall(errors, p, p.DownstreamWing, "川表側翼壁");
             CheckProtection(errors, p, p.UpstreamWing, true, "川裏側堤防保護部");
             CheckProtection(errors, p, p.DownstreamWing, false, "川表側堤防保護部");
+            CheckGate(errors, p);
 
             if (p.InnerWidth > MaxInnerDimension + Tolerance)
             {
@@ -257,6 +258,83 @@ namespace Hikan.Core
                     errors.Add(name + "のかかと版が" + (upstream ? "川裏側" : "川表側") + "胸壁の底版と重なります。"
                         + "翼壁長を延ばすか、かかと版長・胸壁のつま先版長を短くしてください。");
                 }
+            }
+        }
+
+        /// <summary>
+        /// 門柱・操作台。設置しない場合は検査しない。他の部材と重ならないことをここで保証する
+        /// (体積の解析解は「門柱・操作台は他と重ならない」前提で単純和にしている)。
+        /// - 門柱厚・門柱幅・操作台厚は最小部材厚 0.40 m・0.10 m ピッチ。天端高は頂版上面より高い。張出しは 0 以上。
+        /// - 門柱は函体延長の中に収まる(函体の側壁の上に立つ)。
+        /// - 門柱・操作台の S 範囲は、しゃ水壁・胸壁のたて壁の S 範囲と重ならない(接するのは可)。
+        /// - 操作台が函体端より外へ張り出すなら、その側の翼壁・堤防保護部の天端より高い所にある。
+        /// </summary>
+        private static void CheckGate(System.Collections.Generic.List<string> errors, HikanParameters p)
+        {
+            HikanGateTower g = p.Gate;
+            if (!g.Exists) { return; }
+            const string name = "門柱・操作台";
+
+            CheckThickness(errors, g.ColumnThickness, name + "の門柱厚");
+            CheckThickness(errors, g.ColumnWidth, name + "の門柱幅");
+            CheckThickness(errors, g.DeckThickness, name + "の操作台厚");
+            if (g.CrownHeight <= p.OuterHeight)
+            {
+                errors.Add(name + "の天端高は頂版上面(" + p.OuterHeight + " m)より高くしてください。");
+            }
+            if (g.DeckSideOverhang < 0m) { errors.Add(name + "の左右の張出しは 0 以上にしてください。"); }
+            if (g.DeckAxialOverhang < 0m) { errors.Add(name + "の前後の張出しは 0 以上にしてください。"); }
+
+            (decimal Min, decimal Max) column = g.ColumnRange;
+            (decimal Min, decimal Max) deck = g.DeckRange;
+            if (column.Min < -Tolerance || column.Max > p.BarrelLength + Tolerance)
+            {
+                errors.Add(name + "の軸位置 d = " + g.Position + " m では門柱(" + column.Min + "〜" + column.Max
+                    + " m)が函体延長 0〜" + p.BarrelLength + " m からはみ出します。");
+            }
+            for (int i = 1; i <= p.CutoffCount; i++)
+            {
+                decimal c = HikanGeometry.CutoffPosition(p, i);
+                decimal cMin = c - p.CutoffThickness / 2m;
+                decimal cMax = c + p.CutoffThickness / 2m;
+                if (deck.Min < cMax && cMin < deck.Max)
+                {
+                    errors.Add(name + "の軸位置 d = " + g.Position + " m では門柱・操作台(" + deck.Min + "〜" + deck.Max
+                        + " m)が " + i + " 枚目のしゃ水壁(" + cMin + "〜" + cMax + " m)と重なります。");
+                }
+            }
+            CheckGateAgainstBreast(errors, g, p.UpstreamBreast, "川裏側胸壁");
+            CheckGateAgainstBreast(errors, g, p.DownstreamBreast, "川表側胸壁");
+            if (deck.Min < 0m) { CheckGateAboveWing(errors, p, p.UpstreamWing, "川裏側"); }
+            if (deck.Max > p.BarrelLength) { CheckGateAboveWing(errors, p, p.DownstreamWing, "川表側"); }
+        }
+
+        private static void CheckGateAgainstBreast(
+            System.Collections.Generic.List<string> errors, HikanGateTower g, HikanBreastWall w, string name)
+        {
+            if (!w.Exists) { return; }
+            (decimal Min, decimal Max) deck = g.DeckRange;
+            if (deck.Min < w.StemEnd && w.StemStart < deck.Max)
+            {
+                errors.Add("門柱・操作台の軸位置 d = " + g.Position + " m では門柱・操作台(" + deck.Min + "〜" + deck.Max
+                    + " m)が" + name + "のたて壁(" + w.StemStart + "〜" + w.StemEnd + " m)と重なります。");
+            }
+        }
+
+        /// <summary>函体端より外へ張り出した操作台は、その側の翼壁・堤防保護部より高い所になければならない。</summary>
+        private static void CheckGateAboveWing(
+            System.Collections.Generic.List<string> errors, HikanParameters p, HikanWingWall w, string end)
+        {
+            if (!w.Exists) { return; }
+            decimal top = System.Math.Max(w.CrownStart, w.CrownEnd);
+            if (w.Protection.Exists)
+            {
+                top = System.Math.Max(top, HikanGeometry.WingFloorTop(p) + w.Protection.StemHeight);
+            }
+            if (p.Gate.CrownHeight < top)
+            {
+                errors.Add("門柱・操作台の天端高 " + p.Gate.CrownHeight + " m が" + end + "翼壁(堤防保護部を含む)の天端 " + top
+                    + " m より低く、函体端より外へ張り出した操作台が重なります。");
             }
         }
 

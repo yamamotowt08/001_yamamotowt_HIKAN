@@ -70,6 +70,23 @@ namespace Hikan.Core
             return 2m * (inner + back + endFace + top) + floorEnd;
         }
 
+        /// <summary>
+        /// 門柱・操作台の型枠面積 [m2]。門柱は 4 側面(左右 2 本)。操作台は 4 側面 + 下面(門柱の天端と接する部分を除く)。
+        /// 操作台の上面と、門柱が頂版に接する下面は計上しない。
+        /// </summary>
+        private static decimal GateFormwork(HikanParameters p)
+        {
+            HikanGateTower g = p.Gate;
+            if (!g.Exists) { return 0m; }
+            decimal h = g.CrownHeight - p.OuterHeight;
+            decimal columns = 2m * 2m * (g.ColumnThickness + g.ColumnWidth) * h;
+            decimal width = p.InnerWidth + 2m * g.ColumnThickness + 2m * g.DeckSideOverhang;
+            decimal length = g.ColumnWidth + 2m * g.DeckAxialOverhang;
+            decimal deck = 2m * (width + length) * g.DeckThickness
+                + width * length - 2m * g.ColumnThickness * g.ColumnWidth;
+            return columns + deck;
+        }
+
         public static HikanEstimate Calculate(HikanParameters p)
         {
             HikanValidator.EnsureValid(p);
@@ -106,6 +123,8 @@ namespace Hikan.Core
             e.UpstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallNetVolume(p, true), Digits);
             e.DownstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallNetVolume(p, false), Digits);
             // 堤防保護部は翼壁と重なる部分も含めた総量で数え、その分は翼壁の正味から差し引かれている。
+            e.GateColumnVolume = RoundHalfUp(HikanGeometry.GateColumnVolume(p), Digits);
+            e.GateDeckVolume = RoundHalfUp(HikanGeometry.GateDeckVolume(p), Digits);
             e.UpstreamProtectionVolume = RoundHalfUp(HikanGeometry.ProtectionVolume(p.UpstreamWing), Digits);
             e.DownstreamProtectionVolume = RoundHalfUp(HikanGeometry.ProtectionVolume(p.DownstreamWing), Digits);
             e.UpstreamWingFlareAngle = RoundHalfUp(HikanGeometry.WingFlareAngle(p, p.UpstreamWing), Digits);
@@ -132,6 +151,7 @@ namespace Hikan.Core
             e.FormworkCutoff = RoundHalfUp(CutoffFormwork(p), Digits);
             e.FormworkWing = RoundHalfUp(
                 WingFormwork(p, p.UpstreamWing) + WingFormwork(p, p.DownstreamWing), Digits);
+            e.FormworkGate = RoundHalfUp(GateFormwork(p), Digits);
 
             // ブロック割は函体のみに適用する(胸壁・しゃ水壁は別部材)。
             e.BlockLength = RoundHalfUp(l / p.BlockCount, Digits);
@@ -140,7 +160,7 @@ namespace Hikan.Core
             // 床掘り: 四方に法勾配 1:n を付けた角錐台。∫[0,d] (Wb+2nz)(Lb+2nz) dz の厳密解。
             // 平面と深さは全部材の実際の外接範囲から求める。胸壁の位置は自由なので、
             // つま先版が函体端より外に出るとは限らず、決め打ちの式では過大・過小になる。
-            (decimal HalfWidth, decimal VMin, decimal SMin, decimal SMax) range = HikanGeometry.SolidRange(p);
+            (decimal HalfWidth, decimal VMin, decimal SMin, decimal SMax) range = HikanGeometry.FootprintRange(p);
             decimal planWidth = 2m * range.HalfWidth;
             decimal planLength = range.SMax - range.SMin;
             decimal below = -range.VMin;
@@ -161,7 +181,11 @@ namespace Hikan.Core
             decimal foundation = wb * lb * p.FoundationThickness;
             // 地下占有体積は外形エンベロープ(内空を埋め戻した状態)。
             // 内空は埋戻さないのでコンクリート体積では控除できない。
-            decimal occupied = HikanGeometry.EnvelopeVolume(p);
+            // 門柱・操作台は現地盤(頂版上面 + 土かぶり)より下の部分だけを数える。
+            decimal ground = hOut + p.SoilCover;
+            decimal occupied = HikanGeometry.EnvelopeVolume(p)
+                - HikanGeometry.GateColumnVolume(p) - HikanGeometry.GateDeckVolume(p)
+                + HikanGeometry.GateVolumeBelow(p, ground);
             e.FoundationVolume = RoundHalfUp(foundation, Digits);
             e.OccupiedVolume = RoundHalfUp(occupied, Digits);
             e.BackfillVolume = RoundHalfUp(exc - occupied - foundation, Digits);

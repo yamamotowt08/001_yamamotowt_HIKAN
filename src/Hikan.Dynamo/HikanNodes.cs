@@ -28,6 +28,8 @@ namespace Hikan.Dynamo
             "川表側翼壁_m3",
             "川裏側堤防保護部_m3",
             "川表側堤防保護部_m3",
+            "門柱_m3",
+            "操作台_m3",
             "川裏側翼壁開き角_度",
             "川表側翼壁開き角_度",
             "浸透路長_m",
@@ -41,6 +43,7 @@ namespace Hikan.Dynamo
             "型枠_胸壁_m2",
             "型枠_しゃ水壁_m2",
             "型枠_翼壁_m2",
+            "型枠_門柱操作台_m2",
             "水平投影長_m",
             "落差_m",
             "ブロック長_m",
@@ -100,6 +103,14 @@ namespace Hikan.Dynamo
             double downstreamProtectionStemHeight = 2.0,
             double downstreamProtectionToeLength = 0.5,
             double downstreamProtectionHeelLength = 1.0,
+            bool gate = true,
+            double gatePosition = 17.0,
+            double gateColumnThickness = 0.6,
+            double gateColumnWidth = 1.0,
+            double gateCrownHeight = 7.0,
+            double gateDeckThickness = 0.4,
+            double gateDeckSideOverhang = 0.5,
+            double gateDeckAxialOverhang = 0.5,
             int cutoffCount = 0,
             double cutoffThickness = 0.5,
             double cutoffProjection = 0.5)
@@ -155,6 +166,14 @@ namespace Hikan.Dynamo
             p.DownstreamWing.Protection.StemHeight = (decimal)downstreamProtectionStemHeight;
             p.DownstreamWing.Protection.ToeLength = (decimal)downstreamProtectionToeLength;
             p.DownstreamWing.Protection.HeelLength = (decimal)downstreamProtectionHeelLength;
+            p.Gate.Exists = gate;
+            p.Gate.Position = (decimal)gatePosition;
+            p.Gate.ColumnThickness = (decimal)gateColumnThickness;
+            p.Gate.ColumnWidth = (decimal)gateColumnWidth;
+            p.Gate.CrownHeight = (decimal)gateCrownHeight;
+            p.Gate.DeckThickness = (decimal)gateDeckThickness;
+            p.Gate.DeckSideOverhang = (decimal)gateDeckSideOverhang;
+            p.Gate.DeckAxialOverhang = (decimal)gateDeckAxialOverhang;
             p.CutoffCount = cutoffCount;
             p.CutoffThickness = (decimal)cutoffThickness;
             p.CutoffProjection = (decimal)cutoffProjection;
@@ -177,6 +196,8 @@ namespace Hikan.Dynamo
             r["川表側翼壁_m3"] = (double)e.DownstreamWingVolume;
             r["川裏側堤防保護部_m3"] = (double)e.UpstreamProtectionVolume;
             r["川表側堤防保護部_m3"] = (double)e.DownstreamProtectionVolume;
+            r["門柱_m3"] = (double)e.GateColumnVolume;
+            r["操作台_m3"] = (double)e.GateDeckVolume;
             r["川裏側翼壁開き角_度"] = (double)e.UpstreamWingFlareAngle;
             r["川表側翼壁開き角_度"] = (double)e.DownstreamWingFlareAngle;
             r["浸透路長_m"] = (double)e.SeepagePathLength;
@@ -190,6 +211,7 @@ namespace Hikan.Dynamo
             r["型枠_胸壁_m2"] = (double)e.FormworkBreast;
             r["型枠_しゃ水壁_m2"] = (double)e.FormworkCutoff;
             r["型枠_翼壁_m2"] = (double)e.FormworkWing;
+            r["型枠_門柱操作台_m2"] = (double)e.FormworkGate;
             r["水平投影長_m"] = (double)e.HorizontalProjection;
             r["落差_m"] = (double)e.DropHeight;
             r["ブロック長_m"] = (double)e.BlockLength;

@@ -55,6 +55,8 @@ namespace Hikan.Core
         public decimal CutoffThickness { get; set; } = 0.500m;
         /// <summary>しゃ水壁 張出し量(全周一律。下方にも張り出す)[m]</summary>
         public decimal CutoffProjection { get; set; } = 0.500m;
+        /// <summary>門柱・ゲート操作台(函体の側壁の上に立つ左右の門柱 + 操作台の版)。</summary>
+        public HikanGateTower Gate { get; set; } = new HikanGateTower();
         /// <summary>ソリッド色(ACI 0〜256)</summary>
         public int ColorIndex { get; set; } = 3;
 
@@ -108,6 +110,7 @@ namespace Hikan.Core
             d["cutoff_count"] = CutoffCount.ToString(inv);
             d["cutoff_thickness"] = CutoffThickness.ToString(inv);
             d["cutoff_projection"] = CutoffProjection.ToString(inv);
+            Gate.Write(d, "gate_");
             d["color_index"] = ColorIndex.ToString(inv);
             d["base_x"] = BaseX.ToString(inv);
             d["base_y"] = BaseY.ToString(inv);
@@ -147,6 +150,7 @@ namespace Hikan.Core
             p.CutoffCount = GetIntOrDefault(d, "cutoff_count", p.CutoffCount);
             p.CutoffThickness = GetDecimalOrDefault(d, "cutoff_thickness", p.CutoffThickness);
             p.CutoffProjection = GetDecimalOrDefault(d, "cutoff_projection", p.CutoffProjection);
+            p.Gate.Read(d, "gate_", GetDecimalOrDefault);
 
             p.ColorIndex = GetInt(d, "color_index");
             p.BaseX = GetDecimal(d, "base_x");

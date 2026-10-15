@@ -121,7 +121,8 @@ namespace Hikan.Core.Tests
                 "downstream_wing_stem_thickness", "downstream_wing_length", "downstream_wing_end_width",
                 "downstream_wing_crown_start", "downstream_wing_crown_end", "downstream_wing_floor_thickness",
                 "upstream_wing_protection_exists", "upstream_wing_protection_width", "upstream_wing_protection_stem_thickness", "upstream_wing_protection_stem_height", "upstream_wing_protection_toe_length", "upstream_wing_protection_heel_length",
-                "downstream_wing_protection_exists", "downstream_wing_protection_width", "downstream_wing_protection_stem_thickness", "downstream_wing_protection_stem_height", "downstream_wing_protection_toe_length", "downstream_wing_protection_heel_length"
+                "downstream_wing_protection_exists", "downstream_wing_protection_width", "downstream_wing_protection_stem_thickness", "downstream_wing_protection_stem_height", "downstream_wing_protection_toe_length", "downstream_wing_protection_heel_length",
+                "gate_exists", "gate_position", "gate_column_thickness", "gate_column_width", "gate_crown_height", "gate_deck_thickness", "gate_deck_side_overhang", "gate_deck_axial_overhang"
             };
             foreach (string key in added)
             {

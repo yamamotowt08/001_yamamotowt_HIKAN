@@ -15,6 +15,7 @@ namespace Hikan.Core.Tests
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
             p.BottomSlabThickness = 0.6m;
+            p.Gate.Exists = false;   // 門柱・操作台は HikanGateTests で確かめる
 
             p.UpstreamWing.StemThickness = 0.5m;
             p.UpstreamWing.Length = 3.0m;

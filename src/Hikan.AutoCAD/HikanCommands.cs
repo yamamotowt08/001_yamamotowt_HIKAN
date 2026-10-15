@@ -170,6 +170,9 @@ namespace Hikan.AutoCAD
                 // 翼壁の端部から左右へ張り出す堤防保護部(翼壁の側壁・底版と重なり、BoolUnite で一体化する)。
                 RunCase(ed, doc, WithProtection(Case(0.00m, true, true, false)), "+堤防保護部・勾配なし");
                 RunCase(ed, doc, WithProtection(Case(0.02m, true, true, false)), "+堤防保護部・勾配 0.02");
+                // 門柱・操作台(頂版の上に立つ。操作台は川表側の函体端より外へ張り出し、翼壁の上を通る)。
+                RunCase(ed, doc, WithGate(Case(0.00m, true, true, false)), "+門柱・操作台・勾配なし");
+                RunCase(ed, doc, WithGate(Case(0.02m, true, true, false)), "+門柱・操作台・勾配 0.02");
                 // 胸壁を函体端に寄せ、つま先版が翼壁の底版と重なる配置(BoolUnite で一体化した実体を確かめる)。
                 RunCase(ed, doc, Case(0.00m, true, true, true), "胸壁を函体端に寄せて翼壁と重なる・勾配なし");
                 RunCase(ed, doc, Case(0.02m, true, true, true), "胸壁を函体端に寄せて翼壁と重なる・勾配 0.02");
@@ -201,6 +204,7 @@ namespace Hikan.AutoCAD
             p.DownstreamBreast.StemThickness = 0m;
             p.UpstreamWing.StemThickness = 0m;
             p.DownstreamWing.StemThickness = 0m;
+            p.Gate.Exists = false;
             p.TopSlabThickness = 0.4m;
             p.BottomSlabThickness = 0.6m;
             p.BaseX = 1.5m;
@@ -274,6 +278,25 @@ namespace Hikan.AutoCAD
             down.StemHeight = 2.5m;
             down.ToeLength = 0.6m;
             down.HeelLength = 1.2m;
+            return p;
+        }
+
+        /// <summary>
+        /// 門柱・操作台を付ける。門柱は川表側の函体端に寄せ(軸位置 19.5、幅 1.0 → 19.0〜20.0)、
+        /// 操作台は前後に 0.5 張り出して函体端より外(翼壁の上、天端 7.0 > 翼壁 4.0)へ出す。
+        /// 門柱厚 0.6 を函体の側壁厚 0.4 より厚くして、門柱が函体の外面より外へ出る形も確かめる。
+        /// </summary>
+        private static Hikan.Core.HikanParameters WithGate(Hikan.Core.HikanParameters p)
+        {
+            Hikan.Core.HikanGateTower g = p.Gate;
+            g.Exists = true;
+            g.Position = 19.5m;
+            g.ColumnThickness = 0.6m;
+            g.ColumnWidth = 1.0m;
+            g.CrownHeight = 7.0m;
+            g.DeckThickness = 0.4m;
+            g.DeckSideOverhang = 0.5m;
+            g.DeckAxialOverhang = 0.5m;
             return p;
         }
 

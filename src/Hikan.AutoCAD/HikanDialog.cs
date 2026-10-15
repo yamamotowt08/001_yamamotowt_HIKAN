@@ -2,7 +2,7 @@
 namespace Hikan.AutoCAD
 {
     /// <summary>
-    /// パラメータ入力画面。構造物ごとのタブ(函体 / 胸壁 / 翼壁 / しゃ水壁 / 床掘り・色)で入力する。
+    /// パラメータ入力画面。構造物ごとのタブ(函体 / 胸壁 / 翼壁 / しゃ水壁 / 門柱・操作台 / 床掘り・色)で入力する。
     /// 翼壁のタブは内側に「基本条件 / 形状寸法 / 堤防保護部」のタブを持ち、堤防保護部のタブは
     /// 基本条件で「設置する」を選んだときだけ表示する。
     /// 入力項目と意味はコマンドライン入力(HikanPrompt)と同じ。基準点はここでは扱わない。
@@ -152,6 +152,8 @@ namespace Hikan.AutoCAD
             AddField(c, "tc", "厚", "m", "しゃ水壁厚", q => q.CutoffThickness, (q, v) => q.CutoffThickness = v);
             AddField(c, "a", "張出し量(全周一律)", "m", "しゃ水壁の張出し量", q => q.CutoffProjection, (q, v) => q.CutoffProjection = v);
 
+            AddGatePage();
+
             Page e = AddPage("床掘り・色", null, s => s.Excavation(),
                 "床掘り・埋戻しは水平床掘りとした概算。色は AutoCAD インデックスカラー(ACI 0〜256)。");
             AddField(e, "Hs", "土かぶり(頂版上面〜現地盤)", "m", "土かぶり", q => q.SoilCover, (q, v) => q.SoilCover = v);
@@ -280,6 +282,49 @@ namespace Hikan.AutoCAD
             column.Controls.Add(Group("形式", Choice("逆T型", false), u, Choice("U型張り出し", false), Choice("U型底版傾斜", false), later));
             column.Controls.Add(Group("堤防保護部", install, none));
             basic.Controls.Add(column);
+        }
+
+        /// <summary>門柱・操作台のタブ。入力表の先頭に設置する/しないを置き、「設置しない」なら欄を無効にして値は保持する。</summary>
+        private void AddGatePage()
+        {
+            const string title = "門柱・操作台";
+            Page g = AddPage(title, title, s => s.Gate(),
+                "函体の左右の側壁の上に門柱を 1 本ずつ立て(左右同一、内面 = 函体の内空側面)、両柱にまたがる操作台の版を載せる。"
+                + "d は川裏函体端から門柱の中心まで。Hc は門柱の天端 = 操作台の下面の高さ(函体底版下面 Z = 0 から)。"
+                + "門柱厚・門柱幅・操作台厚は 0.40 m 以上・0.10 m ピッチ。ゲート溝・頂版の開口は作らない。");
+
+            System.Windows.Forms.RadioButton install = Choice("設置する", true);
+            System.Windows.Forms.RadioButton none = Choice("設置しない", true);
+            install.Checked = source.Gate.Exists;
+            none.Checked = !install.Checked;
+            System.Windows.Forms.GroupBox box = Group(title, install, none);
+            box.MinimumSize = System.Drawing.Size.Empty;
+            g.Grid.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            g.Grid.Controls.Add(box, 0, 0);
+            g.Grid.SetColumnSpan(box, 4);
+
+            AddField(g, "d", "門柱の軸位置(川裏函体端から)", "m", title + "の軸位置",
+                q => q.Gate.Position, (q, v) => q.Gate.Position = v);
+            AddField(g, "Tc", "門柱厚(横断方向)", "m", title + "の門柱厚",
+                q => q.Gate.ColumnThickness, (q, v) => q.Gate.ColumnThickness = v);
+            AddField(g, "Wc", "門柱幅(函体軸方向)", "m", title + "の門柱幅",
+                q => q.Gate.ColumnWidth, (q, v) => q.Gate.ColumnWidth = v);
+            AddField(g, "Hc", "門柱天端高(Z = 0 から)", "m", title + "の天端高",
+                q => q.Gate.CrownHeight, (q, v) => q.Gate.CrownHeight = v);
+            AddField(g, "td", "操作台厚", "m", title + "の操作台厚",
+                q => q.Gate.DeckThickness, (q, v) => q.Gate.DeckThickness = v);
+            AddField(g, "ax", "操作台の左右の張出し", "m", title + "の左右の張出し",
+                q => q.Gate.DeckSideOverhang, (q, v) => q.Gate.DeckSideOverhang = v);
+            AddField(g, "as", "操作台の前後の張出し", "m", title + "の前後の張出し",
+                q => q.Gate.DeckAxialOverhang, (q, v) => q.Gate.DeckAxialOverhang = v);
+
+            System.Action show = delegate
+            {
+                foreach (Field f in g.Fields) { f.Box.Enabled = install.Checked; }
+            };
+            install.CheckedChanged += delegate { show(); };
+            show();
+            g.Apply = q => q.Gate.Exists = install.Checked;
         }
 
         private static System.Windows.Forms.RadioButton Choice(string text, bool enabled)
