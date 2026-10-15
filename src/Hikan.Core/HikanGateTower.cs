@@ -66,9 +66,9 @@ namespace Hikan.Core
         public decimal HaunchHeight { get; set; } = 0.200m;
         /// <summary>
         /// WH: 土留壁高さ(頂版上面から)[m]。土留壁は左右の門柱の間(±内空幅/2)をふさぐ壁で、下端は頂版上面、
-        /// 背面は門柱の背面(川裏側の面)、厚さは横方向壁厚 X5。0 で土留壁なし。頂版上面から操作台下面までの高さ以下。
+        /// 背面は門柱の背面(川裏側の面)、厚さは横方向壁厚 X5。0 で土留壁なし。上端は川表側胸壁のたて壁の天端以上、操作台の下面以下。
         /// </summary>
-        public decimal RetainingWallHeight { get; set; } = 0.500m;
+        public decimal RetainingWallHeight { get; set; } = 1.200m;
 
         /// <summary>門柱の函体軸方向の全長 = X4 + X5</summary>
         public decimal ColumnLength

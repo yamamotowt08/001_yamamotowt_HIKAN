@@ -74,7 +74,7 @@ namespace Hikan.Dynamo
             double upstreamBreastFootingThickness = 0.5,
             double upstreamBreastToeLength = 0.8,
             double upstreamBreastHeelLength = 1.2,
-            double upstreamRetainingWallHeight = 0.5,
+            double upstreamRetainingWallHeight = 1.2,
             double upstreamRetainingWallThickness = 0.4,
             double downstreamBreastStemThickness = 0.4,
             double downstreamBreastPosition = 18.0,
@@ -121,7 +121,7 @@ namespace Hikan.Dynamo
             double gateTransverseWallWidth = 0.4,
             double gateColumnHeight = 6.4,
             double gateHaunchHeight = 0.2,
-            double gateRetainingWallHeight = 0.5,
+            double gateRetainingWallHeight = 1.2,
             int cutoffCount = 0,
             double cutoffThickness = 0.5,
             double cutoffProjection = 0.5)

@@ -290,6 +290,27 @@ namespace Hikan.Core.Tests
             Xunit.Assert.StartsWith("門柱・操作台の土留壁高さ WH", FirstError(over));
         }
 
+        // テスト8e: 土留壁の上端(頂版上面 3.0 + WH)は川表側胸壁のたて壁の天端より低くしない。
+        // 天端 4.0 なら WH 1.0(上端 4.0)は可、0.998(上端 3.998、許容 1 mm を超えて低い)はエラー、0(土留壁なし)は検査しない。
+        [Xunit.Theory]
+        [Xunit.InlineData(1.0, true)]
+        [Xunit.InlineData(0.999, true)]
+        [Xunit.InlineData(0.998, false)]
+        [Xunit.InlineData(0.0, true)]
+        public void RetainingWall_TopNotBelowBreastCrown(double height, bool valid)
+        {
+            Hikan.Core.HikanParameters p = WithGate();
+            p.DownstreamBreast.CrownHeight = 4.0m;
+            p.Gate.RetainingWallHeight = (decimal)height;
+            if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
+            else
+            {
+                string m = FirstError(p);
+                Xunit.Assert.StartsWith("門柱・操作台の土留壁高さ WH", m);
+                Xunit.Assert.Contains("川表側胸壁のたて壁の天端", m);
+            }
+        }
+
         // テスト9: 旧 XData(門柱のキーなし)は設置しないとして読む。往復で値が戻る。
         [Xunit.Fact]
         public void Legacy_ReadsAsNone_AndRoundTrips()

@@ -125,7 +125,7 @@ namespace Hikan.AutoCAD
             g.ColumnHeight = d;
             if (!GetDecimal(ed, "門柱 H2 ハンチ高 [m] (川表側の柱の内面と操作台下面の隅の三角 1:1、0 でなし)", g.HaunchHeight, out d)) { return false; }
             g.HaunchHeight = d;
-            if (!GetDecimal(ed, "土留壁 WH 高さ [m] (門柱の間、頂版上面から、厚さ X5。0 でなし)", g.RetainingWallHeight, out d)) { return false; }
+            if (!GetDecimal(ed, "土留壁 WH 高さ [m] (門柱の間、頂版上面から、厚さ X5。上端は川表側胸壁の天端以上。0 でなし)", g.RetainingWallHeight, out d)) { return false; }
             g.RetainingWallHeight = d;
             if (!GetDecimal(ed, "操作台 X1 縦方向幅 [m] (= X4 + X5 + 2 × X3)", g.DeckLength, out d)) { return false; }
             g.DeckLength = d;
@@ -201,7 +201,7 @@ namespace Hikan.AutoCAD
 
             // 胸壁(必ず設置する)。
             if (!PromptBreast(ed, p.UpstreamBreast, "川裏側胸壁")) { return false; }
-            if (!GetDecimal(ed, "川裏側土留壁 高さ [m] (左右のたて壁の間、頂版上面から。0 でなし)", p.UpstreamRetainingWall.Height, out d)) { return false; }
+            if (!GetDecimal(ed, "川裏側土留壁 高さ [m] (左右のたて壁の間、頂版上面から。上端はたて壁の天端以上。0 でなし)", p.UpstreamRetainingWall.Height, out d)) { return false; }
             p.UpstreamRetainingWall.Height = d;
             if (p.UpstreamRetainingWall.Exists)
             {

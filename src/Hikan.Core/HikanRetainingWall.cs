@@ -14,8 +14,8 @@ namespace Hikan.Core
     /// </summary>
     public sealed class HikanRetainingWall
     {
-        /// <summary>高さ(頂版上面から)[m]。0 で設置しない。</summary>
-        public decimal Height { get; set; } = 0.500m;
+        /// <summary>高さ(頂版上面から)[m]。0 で設置しない。上端は川裏側胸壁のたて壁の天端以上(既定 1.2 = 天端 4.0 − 頂版上面 2.8)。</summary>
+        public decimal Height { get; set; } = 1.200m;
         /// <summary>厚さ(函体軸方向、背面から川裏側へ)[m]</summary>
         public decimal Thickness { get; set; } = 0.400m;
 

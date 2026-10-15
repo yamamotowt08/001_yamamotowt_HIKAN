@@ -232,7 +232,7 @@ namespace Hikan.AutoCAD
                 p.CutoffCount = 2;
                 p.CutoffThickness = 0.5m;
                 p.CutoffProjection = 0.7m;
-                // 川裏側の土留壁(たて壁 1.75〜2.25 の背面 2.25 から川裏側へ 0.5、頂版上面から 1.0)
+                // 川裏側の土留壁(たて壁 1.75〜2.25 の背面 2.25 から川裏側へ 0.5、頂版上面 3.0 から 1.0 = たて壁の天端 4.0 まで)
                 p.UpstreamRetainingWall.Height = 1.0m;
                 p.UpstreamRetainingWall.Thickness = 0.5m;
             }
@@ -289,7 +289,7 @@ namespace Hikan.AutoCAD
         /// 門柱の全幅 0.9 は函体の側壁厚 0.4 より厚く、胸壁のたて壁(天端 4.5 > 頂版上面 3.0)と重なる(一体化して 1 回だけ数える)。
         /// X7 ≠ X8・X4 ≠ X5 にして、横方向壁の向き(川裏側)や内外の取り違えを重心で検出できるようにする。
         /// 管理橋ありで、操作台の川裏側の端に受け台(桁受けの切欠き)を作る。ハンチ H2 0.3(三角柱を BoolUnite する経路の確認)、
-        /// 土留壁 WH 1.0(門柱の間をふさぐ)。
+        /// 土留壁 WH 1.5(門柱の間をふさぐ。上端 4.5 = 川表側胸壁のたて壁の天端)。
         /// 内空幅 2.0 なので X1 = 1.4 + 1.4 = 2.8、X2 = 2.0 + 2 × 0.9 + 2 × 1.1 = 6.0。
         /// </summary>
         private static Hikan.Core.HikanParameters WithGate(Hikan.Core.HikanParameters p)
@@ -311,7 +311,7 @@ namespace Hikan.AutoCAD
             g.SeatWidth = 1.4m;
             g.SeatDepth = 0.3m;
             g.HaunchHeight = 0.3m;
-            g.RetainingWallHeight = 1.0m;
+            g.RetainingWallHeight = 1.5m;
             return p;
         }
 

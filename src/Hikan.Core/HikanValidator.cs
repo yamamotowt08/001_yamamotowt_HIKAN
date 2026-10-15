@@ -270,6 +270,7 @@ namespace Hikan.Core
         /// - 管理橋の受け台(切欠き)は操作台の中に収まる(W1 &lt; X1、W2 &lt; X2、H1 &lt; Y1)。
         /// - 門柱は函体延長の中に収まる。門柱・操作台の S 範囲は、しゃ水壁・胸壁のたて壁の S 範囲と重ならない(接するのは可)。
         /// - 操作台が函体端より外へ張り出すなら、その側の翼壁・堤防保護部の天端より高い所にある。
+        /// - 土留壁(WH &gt; 0)の上端は川表側胸壁のたて壁の天端以上、操作台の下面以下。
         /// </summary>
         private static void CheckGate(System.Collections.Generic.List<string> errors, HikanParameters p)
         {
@@ -293,6 +294,10 @@ namespace Hikan.Core
             else if (above > 0m && g.RetainingWallHeight > above + Tolerance)
             {
                 errors.Add(name + "の土留壁高さ WH は 頂版上面から操作台下面まで(" + above + " m)以下にしてください(操作台に食い込みます)。");
+            }
+            if (g.RetainingWallHeight > 0m && p.DownstreamBreast.Exists)
+            {
+                CheckRetainingWallTop(errors, p, g.RetainingWallHeight, p.DownstreamBreast, name + "の土留壁高さ WH", "川表側胸壁");
             }
             if (g.HaunchHeight < 0m) { errors.Add(name + "のハンチ高 H2 は 0 以上にしてください。"); }
             else if (g.HaunchHeight >= p.InnerWidth / 2m + g.TransverseWallWidth)
@@ -368,7 +373,7 @@ namespace Hikan.Core
 
         /// <summary>川裏側胸壁の底版・たて壁と門柱・操作台が函体方向に重なると 3 部材の重なりになり得るので弾く。</summary>
         /// <summary>
-        /// 川裏側の土留壁。高さ 0 は設置しない。厚さは最小部材厚 0.40 m・0.10 m ピッチ。
+        /// 川裏側の土留壁。高さ 0 は設置しない。上端は川裏側胸壁のたて壁の天端以上。厚さは最小部材厚 0.40 m・0.10 m ピッチ。
         /// 函体延長の中に収まり、しゃ水壁・門柱・操作台と函体方向に重ならないこと(重なると体積の解析解が崩れる)。
         /// </summary>
         private static void CheckUpstreamRetainingWall(System.Collections.Generic.List<string> errors, HikanParameters p)
@@ -381,6 +386,7 @@ namespace Hikan.Core
                 return;
             }
             if (!r.Exists || !p.UpstreamBreast.Exists) { return; }
+            CheckRetainingWallTop(errors, p, r.Height, p.UpstreamBreast, name + "の高さ", "川裏側胸壁");
             CheckThickness(errors, r.Thickness, name + "の厚さ");
             decimal back = p.UpstreamBreast.StemEnd;
             decimal front = back - r.Thickness;
@@ -405,6 +411,18 @@ namespace Hikan.Core
                 {
                     errors.Add(name + "(" + front + "〜" + back + " m)が門柱・操作台(" + deck.Min + "〜" + deck.Max + " m)と重なります。");
                 }
+            }
+        }
+
+        /// <summary>土留壁の上端(頂版上面 + 高さ)は、隣り合う胸壁のたて壁の天端より低くしない。</summary>
+        private static void CheckRetainingWallTop(
+            System.Collections.Generic.List<string> errors, HikanParameters p, decimal height, HikanBreastWall w, string label, string breast)
+        {
+            decimal min = w.CrownHeight - p.OuterHeight;
+            if (height < min - Tolerance)
+            {
+                errors.Add(label + " は " + breast + "のたて壁の天端 − 頂版上面 = " + min
+                    + " m 以上にしてください(土留壁の上端がたて壁の天端より低くなります)。");
             }
         }
 

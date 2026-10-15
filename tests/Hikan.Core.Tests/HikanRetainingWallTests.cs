@@ -111,6 +111,27 @@ namespace Hikan.Core.Tests
                 m => m.StartsWith("川裏側土留壁(", System.StringComparison.Ordinal) && m.Contains("しゃ水壁"));
         }
 
+        // テスト3b: 上端(頂版上面 3.0 + 高さ)は川裏側胸壁のたて壁の天端 4.0 より低くしない。高さ 1.0 は天端と同じで可、
+        // 0.998 は許容 1 mm を超えて低いのでエラー。天端を 4.5 に上げると高さ 1.0 はエラー。高さ 0(設置しない)は検査しない。
+        [Xunit.Fact]
+        public void Validation_RejectsTopBelowBreastCrown()
+        {
+            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(WithWall()));
+
+            Hikan.Core.HikanParameters low = WithWall();
+            low.UpstreamRetainingWall.Height = 0.998m;
+            Xunit.Assert.StartsWith("川裏側土留壁の高さ", FirstError(low));
+            Xunit.Assert.Contains("川裏側胸壁のたて壁の天端", FirstError(low));
+
+            Hikan.Core.HikanParameters tall = WithWall();
+            tall.UpstreamBreast.CrownHeight = 4.5m;
+            Xunit.Assert.StartsWith("川裏側土留壁の高さ", FirstError(tall));
+
+            Hikan.Core.HikanParameters none = WithoutWall();
+            none.UpstreamBreast.CrownHeight = 4.5m;
+            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(none));
+        }
+
         // テスト4: 旧 XData(土留壁のキーなし)は設置しない(高さ 0)として読む。往復で値が戻る。
         [Xunit.Fact]
         public void Legacy_ReadsAsNone_AndRoundTrips()
@@ -122,7 +143,7 @@ namespace Hikan.Core.Tests
             Xunit.Assert.False(Hikan.Core.HikanParameters.FromDictionary(d).UpstreamRetainingWall.Exists);
         }
 
-        // テスト5: 既定値では川裏側の土留壁を設置する(高さ 0.5・厚さ 0.4)。
+        // テスト5: 既定値では川裏側の土留壁を設置する(高さ 1.2 = たて壁の天端 4.0 − 頂版上面 2.8、厚さ 0.4)。
         [Xunit.Fact]
         public void Defaults_InstallWall()
         {
