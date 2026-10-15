@@ -10,9 +10,9 @@ namespace Hikan.Core.Tests
         /// <summary>
         /// 函体(内空 2.0 × 2.0、側壁 0.4、頂版 0.4、底版 0.6 → 外形高 3.0、延長 20)に門柱・操作台を付ける。
         /// 門柱の位置は川表側胸壁のたて壁の背面(川裏側の面)で決まる: たて壁厚 0.4・軸位置 9.5 → 背面 S 9.3。
-        /// 門柱は胸壁の底版の上面(敷高 0.6)から立つので、上端(操作台下面)は 0.6 + Y2 6.0 = 6.6。
+        /// 門柱は胸壁の底版の上面(敷高 0.6)から立ち、柱高さ Y2 は頂版上面から測るので、上端(操作台下面)は 3.0 + Y2 3.6 = 6.6。
         /// 門柱は函体の側壁(U 1.0〜1.4、V 0.6〜3.0)と、胸壁のたて壁(U 1.4〜2.4、V 0.6〜2.9、S 9.3〜9.7)と重なる。
-        /// 門柱: d 10.0 / X4 0.9 / X5 0.5 / X7 0.5 / X8 0.4 / Y2 6.0(X7 ≠ X8、X4 ≠ X5 にして向きの取り違えを検出する)。
+        /// 門柱: d 10.0 / X4 0.9 / X5 0.5 / X7 0.5 / X8 0.4 / Y2 3.6(X7 ≠ X8、X4 ≠ X5 にして向きの取り違えを検出する)。
         /// 操作台: X3 0.7 / X6 1.1 / Y1 0.6 → X1 = 1.4 + 1.4 = 2.8、X2 = 2.0 + 2 × 0.9 + 2 × 1.1 = 6.0。
         /// 管理橋あり: W1 0.4 / W2 1.4 / H1 0.3。ハンチ H2 0.2(縦方向壁の区間)。土留壁 WH 1.0。土かぶり 2.0 → 現地盤 V = 5.0。
         /// </summary>
@@ -31,7 +31,7 @@ namespace Hikan.Core.Tests
             g.TransverseWallThickness = 0.5m;
             g.LongitudinalWallThickness = 0.5m;
             g.TransverseWallWidth = 0.4m;
-            g.ColumnHeight = 6.0m;
+            g.ColumnHeight = 3.6m;
             g.DeckAxialOverhang = 0.7m;
             g.DeckSideOverhang = 1.1m;
             g.DeckLength = 2.8m;
@@ -424,6 +424,25 @@ namespace Hikan.Core.Tests
             Xunit.Assert.Equal(without.OccupiedVolume + 6.6m, e.OccupiedVolume);
             Xunit.Assert.Equal(e.BarrelConcreteVolume + e.DownstreamBreastVolume + e.GateColumnVolume + e.GateDeckVolume
                 + e.GateRetainingWallVolume, e.ConcreteVolume);
+        }
+
+        // テスト12b: 柱高さ Y2 は頂版上面から測る。頂版を 0.4 → 0.5 にすると頂版上面 3.1、操作台の下面は 3.1 + 3.6 = 6.7 に上がる。
+        // 門柱そのものは胸壁の底版の上面(敷高 0.6)から立つので、門柱の数量は全高 6.1 × L 字の断面積 0.9 × 2 本 + ハンチ 0.2² × 0.9
+        // = 10.98 + 0.036 = 11.016(函体・胸壁との重なりを含む総量)。
+        [Xunit.Fact]
+        public void ColumnHeight_IsMeasuredFromTopSlab()
+        {
+            Hikan.Core.HikanParameters p = WithGate();
+            p.TopSlabThickness = 0.5m;
+            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
+            Xunit.Assert.Equal(6.7m, Hikan.Core.HikanGeometry.GateColumnTop(p));
+            System.Collections.Generic.Dictionary<string, Hikan.Core.HikanPart> b = ByName(p);
+            Xunit.Assert.Equal(0.6m, b["門柱右横方向壁"].VMin);
+            Xunit.Assert.Equal(6.7m, b["門柱右横方向壁"].VMax);
+            Xunit.Assert.Equal(6.7m, b["操作台"].VMin);
+            Xunit.Assert.Equal(11.016m, Hikan.Core.HikanGeometry.GateColumnVolume(p));
+            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p),
+                HikanPartsTests.SlabVolume(p) + Hikan.Core.HikanGeometry.GateHaunchVolume(p));
         }
 
         // テスト13: 函体端より外へ張り出した操作台は、その側の翼壁(堤防保護部を含む)より高くなければならない。

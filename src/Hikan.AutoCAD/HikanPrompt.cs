@@ -185,7 +185,7 @@ namespace Hikan.AutoCAD
             g.LongitudinalWallThickness = d;
             if (!GetDecimal(ed, "門柱 X8 横方向壁幅 [m] (内側、切欠きの幅)", g.TransverseWallWidth, out d)) { return false; }
             g.TransverseWallWidth = d;
-            if (!GetDecimal(ed, "門柱 Y2 柱高さ [m] (胸壁の底版の上面 = 敷高から操作台下面まで)", g.ColumnHeight, out d)) { return false; }
+            if (!GetDecimal(ed, "門柱 Y2 柱高さ [m] (函体の頂版上面から操作台下面まで。柱は胸壁の底版の上から立つ)", g.ColumnHeight, out d)) { return false; }
             g.ColumnHeight = d;
             if (!GetDecimal(ed, "門柱 H2 ハンチ高 [m] (川表側の柱の内面と操作台下面の隅の三角 1:1、0 でなし)", g.HaunchHeight, out d)) { return false; }
             g.HaunchHeight = d;

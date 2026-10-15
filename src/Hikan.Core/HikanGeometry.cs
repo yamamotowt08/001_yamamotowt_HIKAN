@@ -444,11 +444,11 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 門柱・操作台。門柱は函体の左右の側壁の上(頂版上面 V = 外形高)から柱高さ Y2 まで立つ L 字の柱で、
+        /// 門柱・操作台。門柱は函体の左右の側壁の位置に、胸壁の底版の上面(敷高)から操作台の下面(頂版上面 + 柱高さ Y2)まで立つ L 字の柱で、
         /// 内面(横方向壁の内側の端)を内空側面(±B/2)にそろえる。重ならない直方体に分けて作る:
         ///   横方向壁 … U [B/2, B/2 + X8 + X7] × S [柱の川裏側の面, + X5]
         ///   縦方向壁 … U [B/2 + X8, B/2 + X8 + X7] × S [横方向壁の川表側の面, + X4](内側の X8 × X4 は切欠き)
-        /// 操作台は V = 外形高 + Y2 から厚 Y1、U は ±X2/2、S は門柱の範囲 ± X3。管理橋を設置するなら、
+        /// 操作台は V = 頂版上面 + Y2 から厚 Y1、U は ±X2/2、S は門柱の範囲 ± X3。管理橋を設置するなら、
         /// 川裏側の端の上面を W1 × W2(中央)× 深さ H1 で欠く(切欠きを避けて直方体に分ける)。
         /// 門柱は胸壁の底版の上面(敷高)から立つので、函体の側壁と重なる(函体の幅の内側、敷高〜頂版上面)。
         /// 胸壁のたて壁とも重なり得る。重なりは BoxOverlapVolume で 1 回だけ差し引き、数量では函体・胸壁に含める。
@@ -531,10 +531,10 @@ namespace Hikan.Core
             return SlabTop(p, SectionOver(p, column.Min, column.Max));
         }
 
-        /// <summary>門柱の天端(= 操作台の下面)の高さ = 胸壁の底版上面(敷高)+ 柱高さ Y2。</summary>
+        /// <summary>門柱の天端(= 操作台の下面)の高さ = 門柱が立つ区間の頂版上面 + 柱高さ Y2。</summary>
         public static decimal GateColumnTop(HikanParameters p)
         {
-            return BreastFootingTop(p) + p.Gate.ColumnHeight;
+            return GateSlabTop(p) + p.Gate.ColumnHeight;
         }
 
         /// <summary>
@@ -580,14 +580,16 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 門柱 2 本の体積 [m3] = 2 × Y2 × (X5 × (X7 + X8) + X4 × X7)(L 字の断面積 × 高さ)+ ハンチ。
+        /// 門柱 2 本の体積 [m3] = 2 × 柱の全高 × (X5 × (X7 + X8) + X4 × X7)(L 字の断面積 × 高さ)+ ハンチ。
+        /// 柱の全高 = 敷高から操作台下面まで = (頂版上面 − 敷高)+ Y2(函体・胸壁との重なりを含む総量)。
         /// </summary>
         public static decimal GateColumnVolume(HikanParameters p)
         {
             HikanGateTower g = p.Gate;
             if (!g.Exists) { return 0m; }
             decimal area = g.TransverseWallThickness * g.ColumnBreadth + g.LongitudinalWallWidth * g.LongitudinalWallThickness;
-            return 2m * g.ColumnHeight * area + GateHaunchVolume(p);
+            decimal height = GateColumnTop(p) - BreastFootingTop(p);
+            return 2m * height * area + GateHaunchVolume(p);
         }
 
         /// <summary>門柱のハンチ 2 か所の体積 [m3] = 2 × H2² / 2 × X4 = H2² × X4。</summary>

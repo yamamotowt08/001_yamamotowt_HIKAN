@@ -71,7 +71,7 @@ namespace Hikan.Core
                 { "gate_transverse_wall_thickness", "門柱 X5 横方向壁厚(川裏側)" },
                 { "gate_longitudinal_wall_thickness", "門柱 X7 縦方向壁厚" },
                 { "gate_transverse_wall_width", "門柱 X8 横方向壁幅(内側、切欠きの幅)" },
-                { "gate_column_height", "門柱 Y2 柱高さ(胸壁の底版の上面 = 敷高から操作台下面まで)" },
+                { "gate_column_height", "門柱 Y2 柱高さ(函体の頂版上面から操作台下面まで。柱は胸壁の底版の上面から立つ)" },
                 { "gate_haunch_height", "門柱 H2 ハンチ高(縦方向壁の内面と操作台下面の隅の三角 1:1、縦方向壁の区間)" },
                 { "gate_retaining_wall_height", "門柱 WH 土留壁高さ(頂版上面から、門柱の間、厚さ X5)" },
                 { "cutoff_thickness", "しゃ水壁 厚" },

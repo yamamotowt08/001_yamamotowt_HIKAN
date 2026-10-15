@@ -287,7 +287,7 @@ namespace Hikan.AutoCAD
         }
 
         /// <summary>
-        /// 門柱・操作台を付ける。門柱(L 字、X4 0.9 / X5 0.5 / X7 0.5 / X8 0.4、柱高さ 6.0)の背面は川表側胸壁のたて壁の
+        /// 門柱・操作台を付ける。門柱(L 字、X4 0.9 / X5 0.5 / X7 0.5 / X8 0.4、柱高さ 3.6 = 頂版上面 3.0 から操作台下面 6.6 まで)の背面は川表側胸壁のたて壁の
         /// 背面(S 17.2)にそろうので S 17.2〜18.6、操作台は前後に X3 0.7 張り出して 16.5〜19.3。
         /// 門柱の全幅 0.9 は函体の側壁厚 0.4 より厚く、胸壁のたて壁(天端 4.5 > 頂版上面 3.0)と重なる(一体化して 1 回だけ数える)。
         /// X7 ≠ X8・X4 ≠ X5 にして、横方向壁の向き(川裏側)や内外の取り違えを重心で検出できるようにする。
@@ -303,7 +303,7 @@ namespace Hikan.AutoCAD
             g.TransverseWallThickness = 0.5m;
             g.LongitudinalWallThickness = 0.5m;
             g.TransverseWallWidth = 0.4m;
-            g.ColumnHeight = 6.0m;
+            g.ColumnHeight = 3.6m;
             g.DeckAxialOverhang = 0.7m;
             g.DeckSideOverhang = 1.1m;
             g.DeckLength = 2.8m;

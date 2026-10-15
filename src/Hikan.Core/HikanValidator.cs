@@ -298,13 +298,12 @@ namespace Hikan.Core
             CheckThickness(errors, g.DeckThickness, name + "の操作台高さ Y1");
             if (g.LongitudinalWallWidth < 0m) { errors.Add(name + "の縦方向壁幅 X4 は 0 以上にしてください。"); }
             if (g.TransverseWallWidth < 0m) { errors.Add(name + "の横方向壁幅 X8 は 0 以上にしてください。"); }
-            // 門柱は胸壁の底版の上面(敷高)から立つ。操作台(門柱の天端)は頂版上面より上にあること。
+            // 柱高さ Y2 は頂版上面から操作台下面まで(門柱そのものは胸壁の底版の上面から立つ)。操作台は頂版より上にあること。
             decimal slab = HikanGeometry.GateSlabTop(p);                  // 門柱が立つ区間の頂版上面
-            decimal above = HikanGeometry.GateColumnTop(p) - slab;          // 頂版上面から操作台下面まで
+            decimal above = g.ColumnHeight;                                 // 頂版上面から操作台下面まで
             if (above <= 0m)
             {
-                errors.Add(name + "の柱高さ Y2(胸壁の底版の上面から)は 頂版上面 − 敷高 = " + (slab - HikanGeometry.BreastFootingTop(p))
-                    + " m より大きくしてください(操作台が頂版より下になります)。");
+                errors.Add(name + "の柱高さ Y2(頂版上面から)は正の値にしてください(操作台が頂版より下になります)。");
             }
             if (g.RetainingWallHeight < 0m) { errors.Add(name + "の土留壁高さ WH は 0 以上にしてください(0 で土留壁なし)。"); }
             else if (above > 0m && g.RetainingWallHeight > above + Tolerance)

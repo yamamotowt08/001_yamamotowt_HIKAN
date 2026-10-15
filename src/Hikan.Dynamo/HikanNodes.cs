@@ -157,7 +157,7 @@ namespace Hikan.Dynamo
             double gateTransverseWallThickness = 0.4,
             double gateLongitudinalWallThickness = 0.4,
             double gateTransverseWallWidth = 0.4,
-            double gateColumnHeight = 6.4,
+            double gateColumnHeight = 4.0,
             double gateHaunchHeight = 0.2,
             double gateRetainingWallHeight = 1.2,
             int cutoffCount = 0,
