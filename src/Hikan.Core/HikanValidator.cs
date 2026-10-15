@@ -283,10 +283,16 @@ namespace Hikan.Core
             if (g.LongitudinalWallWidth < 0m) { errors.Add(name + "の縦方向壁幅 X4 は 0 以上にしてください。"); }
             if (g.TransverseWallWidth < 0m) { errors.Add(name + "の横方向壁幅 X8 は 0 以上にしてください。"); }
             if (g.ColumnHeight <= 0m) { errors.Add(name + "の柱高さ Y2 は正の値にしてください。"); }
-            if (g.HaunchHeight < 0m) { errors.Add(name + "のハンチ高 H2 は 0 以上にしてください。"); }
-            else if (2m * g.HaunchHeight >= p.InnerWidth)
+            if (g.RetainingWallHeight < 0m) { errors.Add(name + "の土留壁高さ WH は 0 以上にしてください(0 で土留壁なし)。"); }
+            else if (g.RetainingWallHeight > g.ColumnHeight + Tolerance)
             {
-                errors.Add(name + "のハンチ高 H2 は内空幅の半分(" + p.InnerWidth / 2m + " m)より小さくしてください(左右のハンチが重なります)。");
+                errors.Add(name + "の土留壁高さ WH は柱高さ Y2 以下にしてください(操作台に食い込みます)。");
+            }
+            if (g.HaunchHeight < 0m) { errors.Add(name + "のハンチ高 H2 は 0 以上にしてください。"); }
+            else if (g.HaunchHeight >= p.InnerWidth / 2m + g.TransverseWallWidth)
+            {
+                errors.Add(name + "のハンチ高 H2 は 内空幅の半分 + X8(" + (p.InnerWidth / 2m + g.TransverseWallWidth)
+                    + " m)より小さくしてください(左右のハンチが重なります)。");
             }
             else if (g.HaunchHeight > g.ColumnHeight)
             {

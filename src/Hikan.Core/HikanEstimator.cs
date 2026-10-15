@@ -77,6 +77,7 @@ namespace Hikan.Core
         /// 門柱・操作台の型枠面積 [m2]。門柱は L 字断面の周囲(= 外接矩形の周長 2·(X4 + X5 + X7 + X8))× 柱高さ × 2 本。
         /// 操作台は 4 側面 + 下面(門柱の天端と接する部分を除く)。管理橋の受け台(切欠き)は 3 つの立ち上がり面を加える。
         /// 操作台の上面と、門柱が頂版に接する下面は計上しない。ハンチは斜面を加え、覆われる面を除く。
+        /// 土留壁は前後の面と天端を加え、覆われる門柱の内面(と、届けば操作台の下面)を除く。
         /// </summary>
         private static decimal GateFormwork(HikanParameters p)
         {
@@ -87,14 +88,24 @@ namespace Hikan.Core
             decimal deck = 2m * (g.DeckLength + g.DeckWidth) * g.DeckThickness
                 + g.DeckLength * g.DeckWidth - 2m * columnTop;
             if (g.Bridge) { deck += (2m * g.SeatLength + g.SeatWidth) * g.SeatDepth; }
-            // ハンチは斜面(√2 × H2 × X5)を加え、覆われる門柱の内面と操作台の下面(各 H2 × X5)を除く。左右 2 か所。
+            // ハンチは斜面(√2 × H2 × X4)を加え、覆われる縦方向壁の内面と操作台の下面(各 H2 × X4)を除く。左右 2 か所。
             decimal haunch = 0m;
             if (g.HaunchHeight > 0m)
             {
                 decimal h = g.HaunchHeight;
-                haunch = 2m * (HikanGeometry.Sqrt(2m) * h - 2m * h) * g.TransverseWallThickness;
+                haunch = 2m * (HikanGeometry.Sqrt(2m) * h - 2m * h) * g.LongitudinalWallWidth;
             }
-            return columns + deck + haunch;
+            // 土留壁は前後の面 + 天端(操作台の下面に届けば天端は無く、覆われる操作台の下面を除く)。
+            // 左右の端は門柱の横方向壁に接するので、覆われる横方向壁の内面(X5 × WH、左右)を門柱から除く。
+            decimal wall = 0m;
+            decimal wh = g.RetainingWallHeight;
+            if (wh > 0m)
+            {
+                decimal b = p.InnerWidth;
+                wall = 2m * b * wh - 2m * g.TransverseWallThickness * wh;
+                wall += wh < g.ColumnHeight ? b * g.TransverseWallThickness : -b * g.TransverseWallThickness;
+            }
+            return columns + deck + haunch + wall;
         }
 
         public static HikanEstimate Calculate(HikanParameters p)
@@ -139,6 +150,7 @@ namespace Hikan.Core
                 - HikanGeometry.OverlapBetween(p, m => m == "門柱", breast), Digits);
             e.GateDeckVolume = RoundHalfUp(HikanGeometry.GateDeckVolume(p)
                 - HikanGeometry.OverlapBetween(p, m => m == "操作台", breast), Digits);
+            e.GateRetainingWallVolume = RoundHalfUp(HikanGeometry.GateRetainingWallVolume(p), Digits);
             e.UpstreamProtectionVolume = RoundHalfUp(HikanGeometry.ProtectionVolume(p.UpstreamWing), Digits);
             e.DownstreamProtectionVolume = RoundHalfUp(HikanGeometry.ProtectionVolume(p.DownstreamWing), Digits);
             e.UpstreamWingFlareAngle = RoundHalfUp(HikanGeometry.WingFlareAngle(p, p.UpstreamWing), Digits);
@@ -195,11 +207,9 @@ namespace Hikan.Core
             decimal foundation = wb * lb * p.FoundationThickness;
             // 地下占有体積は外形エンベロープ(内空を埋め戻した状態)。
             // 内空は埋戻さないのでコンクリート体積では控除できない。
-            // 門柱・操作台は現地盤(頂版上面 + 土かぶり)より下の部分だけを数える。
+            // 門柱・操作台・土留壁は現地盤(頂版上面 + 土かぶり)より下の部分だけを数える(上に出た部分を引く)。
             decimal ground = hOut + p.SoilCover;
-            decimal occupied = HikanGeometry.EnvelopeVolume(p)
-                - HikanGeometry.GateColumnVolume(p) - HikanGeometry.GateDeckVolume(p)
-                + HikanGeometry.GateVolumeBelow(p, ground);
+            decimal occupied = HikanGeometry.EnvelopeVolume(p) - HikanGeometry.GateVolumeAbove(p, ground);
             e.FoundationVolume = RoundHalfUp(foundation, Digits);
             e.OccupiedVolume = RoundHalfUp(occupied, Digits);
             e.BackfillVolume = RoundHalfUp(exc - occupied - foundation, Digits);

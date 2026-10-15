@@ -19,7 +19,8 @@ namespace Hikan.Core
     ///                                       ├──┼──┤
     ///                                       │▓▓│▓▓│ X5  ← 横方向壁(厚 X5、川裏側)
     ///   内面(X8 の内側の端)= 函体の内空側面。切欠き(X8 × X4)はゲートの通る溝。
-    ///   ハンチ(H2)は門柱の内面と操作台下面の隅の三角(1:1)で、横方向壁の区間(X5)に付く。
+    ///   ハンチ(H2)は縦方向壁の内面(切欠き側)と操作台下面の隅の三角(1:1)で、縦方向壁の区間(X4、川表側)に付く。
+    ///   土留壁は左右の門柱の間(±B/2)をふさぐ壁で、頂版上面から高さ WH。背面は門柱の背面、厚さは X5(横方向壁と同じ)。
     ///   門柱の位置は入力しない。門柱の川裏側の面(背面)を川表側胸壁のたて壁の川裏側の面(背面)にそろえる
     ///   (HikanGeometry.GateColumnRange)。
     /// </summary>
@@ -59,10 +60,15 @@ namespace Hikan.Core
         /// <summary>Y2: 柱高さ(頂版上面から操作台下面まで)[m]</summary>
         public decimal ColumnHeight { get; set; } = 6.400m;
         /// <summary>
-        /// H2: ハンチ高 [m]。門柱の内面(= 内空側面)と操作台下面の隅に付く、高さ・幅とも H2 の三角(1:1)で、
-        /// 横方向壁の区間(X5)に付ける。0 でハンチなし。
+        /// H2: ハンチ高 [m]。縦方向壁の内面(切欠き側)と操作台下面の隅に付く、高さ・幅とも H2 の三角(1:1)で、
+        /// 縦方向壁の区間(X4、川表側の柱)に付ける。0 でハンチなし。
         /// </summary>
         public decimal HaunchHeight { get; set; } = 0.200m;
+        /// <summary>
+        /// WH: 土留壁高さ(頂版上面から)[m]。土留壁は左右の門柱の間(±内空幅/2)をふさぐ壁で、下端は頂版上面、
+        /// 背面は門柱の背面(川裏側の面)、厚さは横方向壁厚 X5。0 で土留壁なし。柱高さ Y2 以下。
+        /// </summary>
+        public decimal RetainingWallHeight { get; set; } = 0.500m;
 
         /// <summary>門柱の函体軸方向の全長 = X4 + X5</summary>
         public decimal ColumnLength
@@ -95,6 +101,7 @@ namespace Hikan.Core
             d[prefix + "transverse_wall_width"] = TransverseWallWidth.ToString(inv);
             d[prefix + "column_height"] = ColumnHeight.ToString(inv);
             d[prefix + "haunch_height"] = HaunchHeight.ToString(inv);
+            d[prefix + "retaining_wall_height"] = RetainingWallHeight.ToString(inv);
         }
 
         /// <summary>
@@ -123,6 +130,7 @@ namespace Hikan.Core
             TransverseWallWidth = get(d, prefix + "transverse_wall_width", TransverseWallWidth);
             ColumnHeight = get(d, prefix + "column_height", ColumnHeight);
             HaunchHeight = get(d, prefix + "haunch_height", HaunchHeight);
+            RetainingWallHeight = get(d, prefix + "retaining_wall_height", RetainingWallHeight);
         }
     }
 }

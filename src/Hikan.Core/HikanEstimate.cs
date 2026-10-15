@@ -31,6 +31,8 @@ namespace Hikan.Core
         public decimal GateColumnVolume { get; set; }
         /// <summary>操作台のコンクリート [m3]</summary>
         public decimal GateDeckVolume { get; set; }
+        /// <summary>土留壁(門柱の間)のコンクリート [m3]</summary>
+        public decimal GateRetainingWallVolume { get; set; }
         /// <summary>川裏側堤防保護部のコンクリート [m3](翼壁との重なりを含む)</summary>
         public decimal UpstreamProtectionVolume { get; set; }
         /// <summary>川表側堤防保護部のコンクリート [m3](翼壁との重なりを含む)</summary>

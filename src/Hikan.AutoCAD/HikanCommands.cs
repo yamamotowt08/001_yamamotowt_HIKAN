@@ -286,7 +286,8 @@ namespace Hikan.AutoCAD
         /// 背面(S 17.2)にそろうので S 17.2〜18.6、操作台は前後に X3 0.7 張り出して 16.5〜19.3。
         /// 門柱の全幅 0.9 は函体の側壁厚 0.4 より厚く、胸壁のたて壁(天端 4.5 > 頂版上面 3.0)と重なる(一体化して 1 回だけ数える)。
         /// X7 ≠ X8・X4 ≠ X5 にして、横方向壁の向き(川裏側)や内外の取り違えを重心で検出できるようにする。
-        /// 管理橋ありで、操作台の川裏側の端に受け台(桁受けの切欠き)を作る。ハンチ H2 0.3(三角柱を BoolUnite する経路の確認)。
+        /// 管理橋ありで、操作台の川裏側の端に受け台(桁受けの切欠き)を作る。ハンチ H2 0.3(三角柱を BoolUnite する経路の確認)、
+        /// 土留壁 WH 1.0(門柱の間をふさぐ)。
         /// 内空幅 2.0 なので X1 = 1.4 + 1.4 = 2.8、X2 = 2.0 + 2 × 0.9 + 2 × 1.1 = 6.0。
         /// </summary>
         private static Hikan.Core.HikanParameters WithGate(Hikan.Core.HikanParameters p)
@@ -308,6 +309,7 @@ namespace Hikan.AutoCAD
             g.SeatWidth = 1.4m;
             g.SeatDepth = 0.3m;
             g.HaunchHeight = 0.3m;
+            g.RetainingWallHeight = 1.0m;
             return p;
         }
 

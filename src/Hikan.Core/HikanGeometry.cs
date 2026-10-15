@@ -337,6 +337,8 @@ namespace Hikan.Core
                 gate.Add(Mirrored(side + "縦方向壁", right, inner + g.TransverseWallWidth, inner + g.ColumnBreadth,
                     bottom, top, split, column.Max));
             }
+            // 土留壁: 左右の門柱(横方向壁)の間をふさぐ。下端 = 頂版上面、背面 = 門柱の背面、厚さ = X5。
+            gate.Add(Box("土留壁", -inner, inner, bottom, bottom + g.RetainingWallHeight, column.Min, split, false));
 
             (decimal Min, decimal Max) deck = GateDeckRange(p);
             decimal half = g.DeckWidth / 2m;
@@ -362,7 +364,8 @@ namespace Hikan.Core
                 // 縦方向壁幅 X4 や横方向壁幅 X8 が 0 の場合など、厚さ 0 の直方体は作らない(矩形の柱になる)。
                 if (part.UMax <= part.UMin || part.VMax <= part.VMin || part.SMax <= part.SMin) { continue; }
                 part.IsSuperstructure = true;
-                part.Member = part.Name.StartsWith("門柱", System.StringComparison.Ordinal) ? "門柱" : "操作台";
+                part.Member = part.Name.StartsWith("門柱", System.StringComparison.Ordinal) ? "門柱"
+                    : part.Name == "土留壁" ? "土留壁" : "操作台";
                 parts.Add(part);
             }
         }
@@ -404,39 +407,47 @@ namespace Hikan.Core
             return 2m * g.ColumnHeight * area + GateHaunchVolume(p);
         }
 
-        /// <summary>門柱のハンチ 2 か所の体積 [m3] = 2 × H2² / 2 × X5 = H2² × X5。</summary>
+        /// <summary>門柱のハンチ 2 か所の体積 [m3] = 2 × H2² / 2 × X4 = H2² × X4。</summary>
         public static decimal GateHaunchVolume(HikanParameters p)
         {
             HikanGateTower g = p.Gate;
             if (!g.Exists || g.HaunchHeight <= 0m) { return 0m; }
-            return g.HaunchHeight * g.HaunchHeight * g.TransverseWallThickness;
+            return g.HaunchHeight * g.HaunchHeight * g.LongitudinalWallWidth;
+        }
+
+        /// <summary>土留壁の体積 [m3] = 内空幅 B × X5 × WH。</summary>
+        public static decimal GateRetainingWallVolume(HikanParameters p)
+        {
+            HikanGateTower g = p.Gate;
+            if (!g.Exists || g.RetainingWallHeight <= 0m) { return 0m; }
+            return p.InnerWidth * g.TransverseWallThickness * g.RetainingWallHeight;
         }
 
         /// <summary>
-        /// 門柱のハンチ(左右 2 か所)。門柱の内面(= 内空側面 ±B/2)と操作台下面の隅に付く、高さ・幅とも H2 の三角(1:1)で、
-        /// 横方向壁の区間(S = 門柱の川裏側の面 〜 + X5)に付ける。切欠き(ゲートの溝)は塞がない。
-        /// 門柱の内面・操作台の下面と面で接するだけで、他の部材とは重ならない(HikanValidator が H2 &lt; B/2 を保証)。
+        /// 門柱のハンチ(左右 2 か所)。縦方向壁の内面(切欠き側、U = ±(B/2 + X8))と操作台下面の隅に付く、
+        /// 高さ・幅とも H2 の三角(1:1)で、縦方向壁の区間(S = 横方向壁の川表側の面 〜 門柱の川表側の面、X4)に付ける。
+        /// 縦方向壁の内面・操作台の下面と面で接するだけで、他の部材とは重ならない(HikanValidator が H2 &lt; B/2 + X8 を保証)。
         /// </summary>
         public static HikanPrismPart[] GetHaunchParts(HikanParameters p)
         {
             HikanGateTower g = p.Gate;
             if (!g.Exists || g.HaunchHeight <= 0m) { return new HikanPrismPart[0]; }
-            decimal inner = p.InnerWidth / 2m;
+            decimal inner = p.InnerWidth / 2m + g.TransverseWallWidth;   // 縦方向壁の内面
             decimal top = p.OuterHeight + g.ColumnHeight;
             decimal h = g.HaunchHeight;
             (decimal Min, decimal Max) column = GateColumnRange(p);
-            decimal end = column.Min + g.TransverseWallThickness;
+            decimal start = column.Min + g.TransverseWallThickness;
 
             HikanPrismPart right = new HikanPrismPart();
             right.Name = "門柱右ハンチ";
             right.Section = new (decimal U, decimal V)[] { (inner - h, top), (inner, top - h), (inner, top) };
-            right.SMin = column.Min;
-            right.SMax = end;
+            right.SMin = start;
+            right.SMax = column.Max;
             HikanPrismPart left = new HikanPrismPart();
             left.Name = "門柱左ハンチ";
             left.Section = new (decimal U, decimal V)[] { (-inner, top - h), (-inner + h, top), (-inner, top) };
-            left.SMin = column.Min;
-            left.SMax = end;
+            left.SMin = start;
+            left.SMax = column.Max;
             return new HikanPrismPart[] { right, left };
         }
 
@@ -476,6 +487,49 @@ namespace Hikan.Core
                 v += h * h / 2m * (part.SMax - part.SMin);
             }
             return v;
+        }
+
+        /// <summary>
+        /// 門柱・操作台・土留壁(上部工)のうち高さ V ≥ ground の部分の体積 [m3](他の部材との重なりは除く)。
+        /// 床掘りの地下占有体積は、外形エンベロープからこれを引いて求める(現地盤より上の上部工は埋め戻す空間を占めない)。
+        /// 上部工が胸壁のたて壁と重なる部分は胸壁に数えるので、ここには含めない。
+        /// </summary>
+        public static decimal GateVolumeAbove(HikanParameters p, decimal ground)
+        {
+            HikanPart[] parts = GetParts(p);
+            decimal v = 0m;
+            foreach (HikanPart part in parts)
+            {
+                if (!part.IsSuperstructure) { continue; }
+                HikanPart above = ClipAbove(part, ground);
+                if (above == null) { continue; }
+                v += above.Volume;
+                foreach (HikanPart other in parts)
+                {
+                    if (other.IsVoid || other.IsSuperstructure) { continue; }
+                    v -= BoxOverlap(above, other).Volume;
+                }
+            }
+            v += GateHaunchVolume(p);
+            HikanGateTower g = p.Gate;
+            foreach (HikanPrismPart part in GetHaunchParts(p))
+            {
+                decimal h = ground - (p.OuterHeight + g.ColumnHeight - g.HaunchHeight);
+                if (h <= 0m) { continue; }
+                if (h > g.HaunchHeight) { h = g.HaunchHeight; }
+                v -= h * h / 2m * (part.SMax - part.SMin);
+            }
+            return v;
+        }
+
+        /// <summary>直方体の V ≥ ground の部分(無ければ null)。</summary>
+        private static HikanPart ClipAbove(HikanPart part, decimal ground)
+        {
+            if (part.VMax <= ground) { return null; }
+            HikanPart c = Box(part.Name, part.UMin, part.UMax, part.VMin > ground ? part.VMin : ground, part.VMax,
+                part.SMin, part.SMax, false);
+            c.Member = part.Member;
+            return c;
         }
 
         private static (decimal Min, decimal Max) Span(decimal a, decimal b)
