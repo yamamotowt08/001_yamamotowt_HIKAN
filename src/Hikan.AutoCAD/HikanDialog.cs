@@ -3,6 +3,7 @@ namespace Hikan.AutoCAD
 {
     /// <summary>
     /// パラメータ入力画面。構造物ごとのタブ(函体 / 胸壁 / 翼壁 / しゃ水壁 / 門柱・操作台 / 床掘り・色)で入力する。
+    /// 函体のタブは手本の画面に合わせ、縦断面・平断面・断面寸法(標準部 / 川表側端部 / 川裏側端部)・各スパン長で構成する。
     /// 翼壁のタブは内側に「基本条件 / 形状寸法 / 堤防保護部」のタブを持ち、堤防保護部のタブは
     /// 基本条件で「設置する」を選んだときだけ表示する。
     /// 入力項目と意味はコマンドライン入力(HikanPrompt)と同じ。基準点はここでは扱わない。
@@ -47,6 +48,7 @@ namespace Hikan.AutoCAD
         private readonly System.Windows.Forms.TabControl tabs = new System.Windows.Forms.TabControl();
         private readonly System.Windows.Forms.ListBox errorList = new System.Windows.Forms.ListBox();
         private readonly System.Windows.Forms.ErrorProvider marker = new System.Windows.Forms.ErrorProvider();
+        private readonly System.Windows.Forms.ToolTip tips = new System.Windows.Forms.ToolTip();
 
         /// <summary>確定したパラメータ(基準点は元の値のまま)。取消時は null。</summary>
         public Hikan.Core.HikanParameters Result { get; private set; }
@@ -68,7 +70,7 @@ namespace Hikan.AutoCAD
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
             Font = new System.Drawing.Font("Meiryo UI", 9f);
             Text = title;
-            ClientSize = new System.Drawing.Size(1000, 640);
+            ClientSize = new System.Drawing.Size(1080, 680);
             MinimumSize = new System.Drawing.Size(820, 560);
             MinimizeBox = false;
             ShowInTaskbar = false;
@@ -128,17 +130,7 @@ namespace Hikan.AutoCAD
 
         private void BuildPages()
         {
-            Page b = AddPage("函体", null, s => s.Barrel(),
-                "部材厚は 0.40 m 以上・0.10 m ピッチ(基準)。内空幅・内空高は 3.0 m 程度以下(適用範囲)。"
-                + "勾配は押出し後の回転で表すので、両端面はわずかに傾く。ブロック数は数量の按分表示のみ。");
-            AddField(b, "B", "内空幅", "m", "内空幅 B", q => q.InnerWidth, (q, v) => q.InnerWidth = v);
-            AddField(b, "H", "内空高", "m", "内空高 H", q => q.InnerHeight, (q, v) => q.InnerHeight = v);
-            AddField(b, "tw", "側壁厚", "m", "側壁厚", q => q.WallThickness, (q, v) => q.WallThickness = v);
-            AddField(b, "tt", "頂版厚", "m", "頂版厚", q => q.TopSlabThickness, (q, v) => q.TopSlabThickness = v);
-            AddField(b, "tb", "底版厚", "m", "底版厚", q => q.BottomSlabThickness, (q, v) => q.BottomSlabThickness = v);
-            AddField(b, "L", "函体延長(斜距離)", "m", "函体延長 L", q => q.BarrelLength, (q, v) => q.BarrelLength = v);
-            AddField(b, "i", "底版勾配(下流下がり)", "―", "底版勾配 i", q => q.BottomSlope, (q, v) => q.BottomSlope = v);
-            AddIntField(b, "―", "ブロック数", "", "ブロック数", q => q.BlockCount, (q, v) => q.BlockCount = v);
+            AddBarrelPage();
 
             AddBreastPage("川裏側胸壁", true, q => q.UpstreamBreast);
             AddBreastPage("川表側胸壁", false, q => q.DownstreamBreast);
@@ -161,6 +153,269 @@ namespace Hikan.AutoCAD
             AddField(e, "n", "床掘り法勾配 1:n の n", "―", "床掘り法勾配", q => q.ExcavationSlope, (q, v) => q.ExcavationSlope = v);
             AddField(e, "f", "基礎材厚(均しコン等)", "m", "基礎材厚", q => q.FoundationThickness, (q, v) => q.FoundationThickness = v);
             AddIntField(e, "―", "ソリッド色(ACI)", "", "色番号", q => q.ColorIndex, (q, v) => q.ColorIndex = v);
+        }
+
+        /// <summary>
+        /// 函体のタブ。手本の樋門設計ソフトの「函体」画面に合わせ、上に縦断面・平断面、左下に断面寸法
+        /// (標準部 / 川表側端部 / 川裏側端部 の内側のタブ。部材厚とハンチ LT・LB・RT・RB の H・W)、右下に各スパン長。
+        /// 側壁厚は左右共通(WL = WR)。内空 SW・SH は標準部のタブだけで入力し、全長で共通。
+        /// 端部の長さが 0 なら、その端部のタブの欄は無効にする(値は保持)。
+        /// </summary>
+        private void AddBarrelPage()
+        {
+            Page b = new Page();
+            b.Title = "函体";
+            b.Tab = new System.Windows.Forms.TabPage("函体");
+            pages.Add(b);
+
+            // 断面寸法: 区間ごとの内側のタブ。
+            System.Windows.Forms.TabControl zones = new System.Windows.Forms.TabControl();
+            zones.Dock = System.Windows.Forms.DockStyle.Fill;
+            System.Windows.Forms.TabPage standard = new System.Windows.Forms.TabPage("標準部");
+            System.Windows.Forms.TabPage downstream = new System.Windows.Forms.TabPage("川表側端部");
+            System.Windows.Forms.TabPage upstream = new System.Windows.Forms.TabPage("川裏側端部");
+            zones.TabPages.Add(standard);
+            zones.TabPages.Add(downstream);
+            zones.TabPages.Add(upstream);
+
+            System.Windows.Forms.TableLayoutPanel thick = SectionGrid(standard, b);
+            AddCell(thick, b, "WL・WR", "側壁厚", "側壁厚", q => q.WallThickness, (q, v) => q.WallThickness = v);
+            AddCell(thick, b, "SW", "内空幅", "内空幅 B", q => q.InnerWidth, (q, v) => q.InnerWidth = v);
+            AddCell(thick, b, "WT", "頂版厚", "頂版厚", q => q.TopSlabThickness, (q, v) => q.TopSlabThickness = v);
+            AddCell(thick, b, "SH", "内空高", "内空高 H", q => q.InnerHeight, (q, v) => q.InnerHeight = v);
+            AddCell(thick, b, "WB", "底版厚", "底版厚", q => q.BottomSlabThickness, (q, v) => q.BottomSlabThickness = v);
+            AddHaunchTable(standard, b, "標準部", q => q.Standard);
+
+            System.Collections.Generic.List<Field> downstreamFields = AddEndTab(downstream, b, "川表側端部", q => q.DownstreamEnd);
+            System.Collections.Generic.List<Field> upstreamFields = AddEndTab(upstream, b, "川裏側端部", q => q.UpstreamEnd);
+
+            System.Windows.Forms.PictureBox section = Sketch(s => s.BarrelSection());
+            System.Windows.Forms.TableLayoutPanel sectionBody = new System.Windows.Forms.TableLayoutPanel();
+            sectionBody.Dock = System.Windows.Forms.DockStyle.Fill;
+            sectionBody.ColumnCount = 2;
+            sectionBody.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 42f));
+            sectionBody.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 58f));
+            sectionBody.Controls.Add(section, 0, 0);
+            sectionBody.Controls.Add(zones, 1, 0);
+
+            // 各スパン長: 端部の長さ + スパン 1〜5(合計が函体延長 L)+ 底版勾配。内側のタブには属さない。
+            b.InnerTab = null;
+            System.Windows.Forms.TableLayoutPanel spans = new System.Windows.Forms.TableLayoutPanel();
+            spans.Dock = System.Windows.Forms.DockStyle.Fill;
+            spans.AutoScroll = true;
+            spans.ColumnCount = 5;
+            for (int i = 0; i < 5; i++)
+            {
+                spans.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
+            }
+            Field downstreamLength = NewField(b, "川表側端部の長さ", "川表側端部の長さ",
+                q => q.DownstreamEndLength, (q, v) => q.DownstreamEndLength = v);
+            Field upstreamLength = NewField(b, "川裏側端部の長さ", "川裏側端部の長さ",
+                q => q.UpstreamEndLength, (q, v) => q.UpstreamEndLength = v);
+            spans.Controls.Add(GridLabel("川表側端部", System.Drawing.Color.Black), 0, 0);
+            spans.Controls.Add(downstreamLength.Box, 1, 0);
+            spans.Controls.Add(GridLabel("川裏側端部", System.Drawing.Color.Black), 0, 1);
+            spans.Controls.Add(upstreamLength.Box, 1, 1);
+            System.Collections.Generic.List<Field> spanFields = new System.Collections.Generic.List<Field>();
+            for (int i = 0; i < Hikan.Core.HikanParameters.MaxSpans; i++)
+            {
+                int k = i;
+                Field f = NewField(b, "スパン" + (k + 1), "スパン" + (k + 1),
+                    q => k < q.Spans.Length ? q.Spans[k] : 0m, (q, v) => q.Spans = SetSpan(q.Spans, k, v));
+                f.Box.Width = 64;
+                spans.Controls.Add(GridLabel("スパン" + (k + 1), System.Drawing.Color.FromArgb(30, 60, 200)), k, 2);
+                spans.Controls.Add(f.Box, k, 3);
+                spanFields.Add(f);
+            }
+            System.Windows.Forms.Label total = GridLabel("", System.Drawing.Color.DimGray);
+            spans.Controls.Add(total, 0, 4);
+            spans.SetColumnSpan(total, 5);
+            System.Action showTotal = delegate
+            {
+                decimal sum = 0m;
+                bool ok = true;
+                foreach (Field f in spanFields)
+                {
+                    decimal v;
+                    if (TryRead(f, out v)) { sum += v; } else { ok = false; }
+                }
+                total.Text = "函体延長 L = スパン長の合計 = "
+                    + (ok ? sum.ToString("0.000###", System.Globalization.CultureInfo.InvariantCulture) + " m" : "―")
+                    + "(使わないスパンは後ろを 0 に)";
+            };
+            foreach (Field f in spanFields) { f.Box.TextChanged += delegate { showTotal(); }; }
+            showTotal();
+            Field slope = NewField(b, "底版勾配", "底版勾配 i", q => q.BottomSlope, (q, v) => q.BottomSlope = v);
+            System.Windows.Forms.Label slopeLabel = GridLabel("底版勾配 i(下流下がり)", System.Drawing.Color.Black);
+            spans.Controls.Add(slopeLabel, 0, 5);
+            spans.SetColumnSpan(slopeLabel, 2);
+            spans.Controls.Add(slope.Box, 2, 5);
+
+            // 端部の長さが 0 なら、その端部の欄を無効にする(読めない値の間は有効のまま)。
+            System.Action<Field, System.Collections.Generic.List<Field>> link = (length, fields) =>
+            {
+                System.Action update = delegate
+                {
+                    decimal v;
+                    bool on = !TryRead(length, out v) || v > 0m;
+                    foreach (Field f in fields) { f.Box.Enabled = on; }
+                };
+                length.Box.TextChanged += delegate { update(); };
+                update();
+            };
+            link(downstreamLength, downstreamFields);
+            link(upstreamLength, upstreamFields);
+
+            System.Windows.Forms.Label note = new System.Windows.Forms.Label();
+            note.Text = "部材厚は 0.40 m 以上・0.10 m ピッチ(基準)。内空幅・内空高は 3.0 m 程度以下(適用範囲)。"
+                + "端部の長さは函体端から測り、0 で端部なし。端部は部材厚とハンチを標準部と変えられる(内空は共通、敷高は標準部の底版厚で決まる)。"
+                + "胸壁のたて壁・しゃ水壁・門柱・土留壁は部材厚が変わる境目をまたげない。"
+                + "ハンチは H・W とも 0 でなし。勾配は押出し後の回転で表すので、両端面はわずかに傾く。";
+            note.Dock = System.Windows.Forms.DockStyle.Fill;
+            note.ForeColor = System.Drawing.Color.DimGray;
+            note.Padding = new System.Windows.Forms.Padding(4, 6, 4, 4);
+
+            System.Windows.Forms.TableLayoutPanel right = new System.Windows.Forms.TableLayoutPanel();
+            right.Dock = System.Windows.Forms.DockStyle.Fill;
+            right.RowCount = 2;
+            right.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 60f));
+            right.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 40f));
+            right.Controls.Add(Frame("各スパン長(m)", spans), 0, 0);
+            right.Controls.Add(note, 0, 1);
+
+            System.Windows.Forms.TableLayoutPanel layout = new System.Windows.Forms.TableLayoutPanel();
+            layout.Dock = System.Windows.Forms.DockStyle.Fill;
+            layout.ColumnCount = 2;
+            layout.RowCount = 2;
+            layout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 58f));
+            layout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 42f));
+            layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 36f));
+            layout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 64f));
+            layout.Controls.Add(Frame("縦断面", Sketch(s => s.BarrelProfile())), 0, 0);
+            layout.Controls.Add(Frame("平断面", Sketch(s => s.BarrelPlan())), 1, 0);
+            layout.Controls.Add(Frame("断面寸法(m)", sectionBody), 0, 1);
+            layout.Controls.Add(right, 1, 1);
+            b.Tab.Controls.Add(layout);
+        }
+
+        /// <summary>端部のタブ(部材厚 + ハンチ)。追加した欄を返す(端部の長さ 0 のとき無効にするため)。</summary>
+        private System.Collections.Generic.List<Field> AddEndTab(
+            System.Windows.Forms.TabPage tab, Page b, string name,
+            System.Func<Hikan.Core.HikanParameters, Hikan.Core.HikanBarrelSection> zone)
+        {
+            int first = b.Fields.Count;
+            System.Windows.Forms.TableLayoutPanel grid = SectionGrid(tab, b);
+            AddCell(grid, b, "WL・WR", name + "の側壁厚", name + "の側壁厚",
+                q => zone(q).WallThickness, (q, v) => zone(q).WallThickness = v);
+            AddCell(grid, b, "WT", name + "の頂版厚", name + "の頂版厚",
+                q => zone(q).TopSlabThickness, (q, v) => zone(q).TopSlabThickness = v);
+            AddCell(grid, b, "WB", name + "の底版厚", name + "の底版厚",
+                q => zone(q).BottomSlabThickness, (q, v) => zone(q).BottomSlabThickness = v);
+            System.Windows.Forms.Label shared = GridLabel("SW・SH は標準部と共通", System.Drawing.Color.DimGray);
+            grid.Controls.Add(shared, 0, grid.RowCount);
+            grid.SetColumnSpan(shared, 2);
+            grid.RowCount++;
+            AddHaunchTable(tab, b, name, zone);
+            return b.Fields.GetRange(first, b.Fields.Count - first);
+        }
+
+        /// <summary>区間のタブの左に置く部材厚の表(記号 / 値)。右にはハンチの表を置く。</summary>
+        private static System.Windows.Forms.TableLayoutPanel SectionGrid(System.Windows.Forms.TabPage tab, Page b)
+        {
+            b.InnerTab = tab;
+            System.Windows.Forms.TableLayoutPanel grid = new System.Windows.Forms.TableLayoutPanel();
+            grid.Dock = System.Windows.Forms.DockStyle.Left;
+            grid.AutoSize = true;
+            grid.ColumnCount = 2;
+            grid.Padding = new System.Windows.Forms.Padding(4, 6, 12, 4);
+            tab.Controls.Add(grid);
+            return grid;
+        }
+
+        /// <summary>部材厚の表に 1 行(記号 / 値)を足す。名称は欄の注釈に出す。</summary>
+        private void AddCell(
+            System.Windows.Forms.TableLayoutPanel grid, Page b, string symbol, string name, string key,
+            System.Func<Hikan.Core.HikanParameters, decimal> get,
+            System.Action<Hikan.Core.HikanParameters, decimal> set)
+        {
+            Field f = NewField(b, name, key, get, set);
+            f.Box.Width = 72;
+            int row = grid.RowCount;
+            grid.RowCount = row + 1;
+            grid.Controls.Add(GridLabel(symbol, System.Drawing.Color.FromArgb(30, 60, 200)), 0, row);
+            grid.Controls.Add(f.Box, 1, row);
+            tips.SetToolTip(f.Box, name + " [m]");
+        }
+
+        /// <summary>ハンチの表(行 LT・LB・RT・RB、列 H・W)。</summary>
+        private void AddHaunchTable(
+            System.Windows.Forms.TabPage tab, Page b, string name,
+            System.Func<Hikan.Core.HikanParameters, Hikan.Core.HikanBarrelSection> zone)
+        {
+            System.Windows.Forms.TableLayoutPanel grid = new System.Windows.Forms.TableLayoutPanel();
+            grid.Dock = System.Windows.Forms.DockStyle.Fill;
+            grid.AutoScroll = true;
+            grid.ColumnCount = 3;
+            grid.Padding = new System.Windows.Forms.Padding(4, 6, 4, 4);
+            grid.Controls.Add(GridLabel("ハンチ", System.Drawing.Color.Black), 0, 0);
+            grid.Controls.Add(GridLabel("H(鉛直)", System.Drawing.Color.Black), 1, 0);
+            grid.Controls.Add(GridLabel("W(水平)", System.Drawing.Color.Black), 2, 0);
+            AddHaunchRow(grid, b, name, "LT", q => zone(q).LeftTop, 1);
+            AddHaunchRow(grid, b, name, "LB", q => zone(q).LeftBottom, 2);
+            AddHaunchRow(grid, b, name, "RT", q => zone(q).RightTop, 3);
+            AddHaunchRow(grid, b, name, "RB", q => zone(q).RightBottom, 4);
+            tab.Controls.Add(grid);
+            grid.BringToFront();
+        }
+
+        private void AddHaunchRow(
+            System.Windows.Forms.TableLayoutPanel grid, Page b, string name, string corner,
+            System.Func<Hikan.Core.HikanParameters, Hikan.Core.HikanHaunch> haunch, int row)
+        {
+            string label = name + "のハンチ " + corner;
+            Field h = NewField(b, label + " の H", label + " の H", q => haunch(q).Height, (q, v) => haunch(q).Height = v);
+            Field w = NewField(b, label + " の W", label + " の W", q => haunch(q).Width, (q, v) => haunch(q).Width = v);
+            h.Box.Width = 64;
+            w.Box.Width = 64;
+            grid.Controls.Add(GridLabel(corner, System.Drawing.Color.FromArgb(200, 40, 40)), 0, row);
+            grid.Controls.Add(h.Box, 1, row);
+            grid.Controls.Add(w.Box, 2, row);
+        }
+
+        /// <summary>スパン k 番目を v にした配列(後ろの 0 は「使わないスパン」として除く)。</summary>
+        private static decimal[] SetSpan(decimal[] spans, int k, decimal v)
+        {
+            decimal[] s = new decimal[Hikan.Core.HikanParameters.MaxSpans];
+            for (int i = 0; i < spans.Length && i < s.Length; i++) { s[i] = spans[i]; }
+            s[k] = v;
+            int n = s.Length;
+            while (n > 0 && s[n - 1] == 0m) { n--; }
+            decimal[] r = new decimal[n];
+            System.Array.Copy(s, r, n);
+            return r;
+        }
+
+        /// <summary>枠付きの区画(手本の画面の「断面寸法」「各スパン長」のような囲み)。</summary>
+        private static System.Windows.Forms.GroupBox Frame(string text, System.Windows.Forms.Control body)
+        {
+            System.Windows.Forms.GroupBox box = new System.Windows.Forms.GroupBox();
+            box.Text = text;
+            box.Dock = System.Windows.Forms.DockStyle.Fill;
+            box.Padding = new System.Windows.Forms.Padding(6, 4, 6, 6);
+            body.Dock = System.Windows.Forms.DockStyle.Fill;
+            box.Controls.Add(body);
+            return box;
+        }
+
+        /// <summary>模式図の表示欄。</summary>
+        private System.Windows.Forms.PictureBox Sketch(System.Action<HikanSketch> figure)
+        {
+            System.Windows.Forms.PictureBox picture = new System.Windows.Forms.PictureBox();
+            picture.Dock = System.Windows.Forms.DockStyle.Fill;
+            picture.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            picture.Paint += (s, e) => HikanSketch.Draw(e.Graphics, picture.ClientRectangle, Font, figure);
+            picture.Resize += delegate { picture.Invalidate(); };
+            return picture;
         }
 
         private void AddBreastPage(
@@ -496,11 +751,7 @@ namespace Hikan.AutoCAD
         private System.Windows.Forms.Control BuildSheet(
             System.Action<HikanSketch> figure, string note, out System.Windows.Forms.TableLayoutPanel grid)
         {
-            System.Windows.Forms.PictureBox picture = new System.Windows.Forms.PictureBox();
-            picture.Dock = System.Windows.Forms.DockStyle.Fill;
-            picture.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            picture.Paint += (s, e) => HikanSketch.Draw(e.Graphics, picture.ClientRectangle, Font, figure);
-            picture.Resize += delegate { picture.Invalidate(); };
+            System.Windows.Forms.PictureBox picture = Sketch(figure);
 
             grid = new System.Windows.Forms.TableLayoutPanel();
             grid.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -547,8 +798,9 @@ namespace Hikan.AutoCAD
             page.Fields[page.Fields.Count - 1].Box.Text = get(source).ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        private void AddField(
-            Page page, string symbol, string name, string unit, string key,
+        /// <summary>入力欄を作ってタブに登録する(配置は呼び出し側)。内側のタブは page.InnerTab。</summary>
+        private Field NewField(
+            Page page, string name, string key,
             System.Func<Hikan.Core.HikanParameters, decimal> get,
             System.Action<Hikan.Core.HikanParameters, decimal> set)
         {
@@ -564,6 +816,16 @@ namespace Hikan.AutoCAD
             f.Box.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             f.Box.Text = get(source).ToString("0.000###", System.Globalization.CultureInfo.InvariantCulture);
             f.Box.TextChanged += delegate { UpdateEnabled(page); };
+            page.Fields.Add(f);
+            return f;
+        }
+
+        private void AddField(
+            Page page, string symbol, string name, string unit, string key,
+            System.Func<Hikan.Core.HikanParameters, decimal> get,
+            System.Action<Hikan.Core.HikanParameters, decimal> set)
+        {
+            Field f = NewField(page, name, key, get, set);
 
             int row = page.Grid.RowStyles.Count;
             page.Grid.RowCount = row + 2;
@@ -572,7 +834,6 @@ namespace Hikan.AutoCAD
             page.Grid.Controls.Add(GridLabel(name, System.Drawing.Color.Black), 1, row);
             page.Grid.Controls.Add(f.Box, 2, row);
             page.Grid.Controls.Add(GridLabel(unit, System.Drawing.Color.Black), 3, row);
-            page.Fields.Add(f);
         }
 
         private static System.Windows.Forms.Label GridLabel(string text, System.Drawing.Color color)

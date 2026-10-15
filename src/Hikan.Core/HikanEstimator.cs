@@ -29,26 +29,98 @@ namespace Hikan.Core
             decimal stem = 2m * w.Length * stemHeight
                 + w.StemThickness * stemHeight
                 + w.Length * w.StemThickness;
-            decimal width = p.OuterWidth + 2m * w.Length;
+            decimal outer = 2m * HikanGeometry.OuterHalfWidth(p, HikanGeometry.SectionOver(p, w.StemStart, w.StemEnd));
+            decimal width = outer + 2m * w.Length;
             (decimal Min, decimal Max) foot = HikanGeometry.BreastFootingRange(w, upstream);
-            decimal hidden = p.OuterWidth * System.Math.Min(w.FootingThickness, top);
             decimal ends = 2m * width * w.FootingThickness;
-            if (foot.Min > 0m && foot.Min < p.BarrelLength) { ends -= hidden; }
-            if (foot.Max > 0m && foot.Max < p.BarrelLength) { ends -= hidden; }
+            if (foot.Min > 0m && foot.Min < p.BarrelLength) { ends -= Hidden(p, foot.Min, outer + 2m * w.Length, w.FootingThickness); }
+            if (foot.Max > 0m && foot.Max < p.BarrelLength) { ends -= Hidden(p, foot.Max, outer + 2m * w.Length, w.FootingThickness); }
             decimal footing = 2m * w.FootingLength * w.FootingThickness
                 + ends
                 + 2m * w.Length * (w.ToeLength + w.HeelLength);
             return 2m * stem + footing;
         }
 
-        /// <summary>しゃ水壁の型枠面積 [m2]。外周面 + 前後の環状面。</summary>
+        /// <summary>
+        /// 胸壁の底版の端面のうち、位置 s の函体の底版の中に入る部分の面積 = min(函体の外形幅, 底版幅) × min(底版厚, 函体の底版厚)。
+        /// </summary>
+        private static decimal Hidden(HikanParameters p, decimal s, decimal footingWidth, decimal footingThickness)
+        {
+            HikanBarrelSection z = HikanGeometry.SectionAt(p, s);
+            decimal width = System.Math.Min(2m * HikanGeometry.OuterHalfWidth(p, z), footingWidth);
+            return width * System.Math.Min(footingThickness, z.BottomSlabThickness);
+        }
+
+        /// <summary>しゃ水壁の型枠面積 [m2]。外周面 + 前後の環状面(取り付く区間の外形の周り)。</summary>
         private static decimal CutoffFormwork(HikanParameters p)
         {
-            if (p.CutoffCount <= 0) { return 0m; }
-            decimal w = p.OuterWidth + 2m * p.CutoffProjection;
-            decimal h = p.OuterHeight + 2m * p.CutoffProjection;
-            decimal ring = w * h - p.OuterWidth * p.OuterHeight;
-            return p.CutoffCount * (2m * (w + h) * p.CutoffThickness + 2m * ring);
+            decimal total = 0m;
+            decimal a = p.CutoffProjection;
+            decimal tc = p.CutoffThickness;
+            for (int i = 1; i <= p.CutoffCount; i++)
+            {
+                decimal s = HikanGeometry.CutoffPosition(p, i);
+                HikanBarrelSection z = HikanGeometry.SectionOver(p, s - tc / 2m, s + tc / 2m);
+                decimal bo = 2m * HikanGeometry.OuterHalfWidth(p, z);
+                decimal ho = HikanGeometry.SlabTop(p, z) - HikanGeometry.BarrelBottom(p, z);
+                decimal w = bo + 2m * a;
+                decimal h = ho + 2m * a;
+                total += 2m * (w + h) * tc + 2m * (w * h - bo * ho);
+            }
+            return total;
+        }
+
+        /// <summary>
+        /// 函体の内空面の型枠 [m2] = Σ 区間長 × 内空の周長。ハンチのある隅は 2 辺(H + W)の代わりに斜辺 √(H² + W²)。
+        /// </summary>
+        private static decimal BarrelInnerFormwork(HikanParameters p)
+        {
+            decimal total = 0m;
+            foreach ((string Name, decimal SMin, decimal SMax, HikanBarrelSection Section) z in HikanGeometry.BarrelZones(p))
+            {
+                decimal perimeter = 2m * (p.InnerWidth + p.InnerHeight);
+                foreach (HikanHaunch h in Corners(z.Section))
+                {
+                    if (!h.Exists) { continue; }
+                    perimeter += HikanGeometry.Sqrt(h.Height * h.Height + h.Width * h.Width) - h.Height - h.Width;
+                }
+                total += perimeter * (z.SMax - z.SMin);
+            }
+            return total;
+        }
+
+        private static HikanHaunch[] Corners(HikanBarrelSection z)
+        {
+            return new HikanHaunch[] { z.LeftTop, z.LeftBottom, z.RightTop, z.RightBottom };
+        }
+
+        /// <summary>
+        /// 函体の端面・段差面の型枠 [m2]。両端の端面(その区間の断面積)+ 区間の境目で断面が変わる所の段差面。
+        /// 段差面は 外形の差(2 つの外形の矩形の対称差)+ 各隅のハンチの断面積の差。
+        /// ハンチの差は片方の三角形が他方を含む場合に厳密(そうでなければ概算)。
+        /// </summary>
+        private static decimal BarrelEndFormwork(HikanParameters p)
+        {
+            (string Name, decimal SMin, decimal SMax, HikanBarrelSection Section)[] zones = HikanGeometry.BarrelZones(p);
+            if (zones.Length == 0) { return 0m; }
+            decimal total = HikanGeometry.SectionArea(p, zones[0].Section)
+                + HikanGeometry.SectionArea(p, zones[zones.Length - 1].Section);
+            for (int i = 1; i < zones.Length; i++)
+            {
+                HikanBarrelSection a = zones[i - 1].Section;
+                HikanBarrelSection b = zones[i].Section;
+                decimal ua = HikanGeometry.OuterHalfWidth(p, a), ub = HikanGeometry.OuterHalfWidth(p, b);
+                decimal ta = HikanGeometry.SlabTop(p, a), tb = HikanGeometry.SlabTop(p, b);
+                decimal ba = HikanGeometry.BarrelBottom(p, a), bb = HikanGeometry.BarrelBottom(p, b);
+                decimal areaA = 2m * ua * (ta - ba);
+                decimal areaB = 2m * ub * (tb - bb);
+                decimal common = 2m * System.Math.Min(ua, ub) * (System.Math.Min(ta, tb) - System.Math.Max(ba, bb));
+                total += areaA + areaB - 2m * common;
+                HikanHaunch[] ca = Corners(a);
+                HikanHaunch[] cb = Corners(b);
+                for (int k = 0; k < 4; k++) { total += System.Math.Abs(ca[k].Area - cb[k].Area); }
+            }
+            return total;
         }
 
         /// <summary>
@@ -86,9 +158,11 @@ namespace Hikan.Core
             // 門柱は胸壁の底版の上面(敷高)から立つ。頂版上面より上は L 字の周長(= 外接矩形の周長)の全面。
             // 頂版上面より下は函体の外へ出た部分(全幅 X7 + X8 − 側壁厚 = e)だけが見え、函体の側面に接する面を除いた
             // 2e + (X4 + X5)。胸壁のたて壁と重なる部分の面は控除しない(概算)。
-            decimal above = HikanGeometry.GateColumnTop(p) - p.OuterHeight;
-            decimal below = p.OuterHeight - HikanGeometry.BreastFootingTop(p);
-            decimal outside = g.ColumnBreadth - p.WallThickness;
+            (decimal Min, decimal Max) range = HikanGeometry.GateColumnRange(p);
+            decimal slab = HikanGeometry.GateSlabTop(p);
+            decimal above = HikanGeometry.GateColumnTop(p) - slab;
+            decimal below = slab - HikanGeometry.BreastFootingTop(p);
+            decimal outside = g.ColumnBreadth - HikanGeometry.SectionOver(p, range.Min, range.Max).WallThickness;
             decimal columns = 2m * 2m * (g.ColumnLength + g.ColumnBreadth) * above;
             if (outside > 0m) { columns += 2m * (2m * outside + g.ColumnLength) * below; }
             decimal columnTop = g.TransverseWallThickness * g.ColumnBreadth + g.LongitudinalWallWidth * g.LongitudinalWallThickness;
@@ -116,14 +190,15 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 川裏側の土留壁の型枠面積 [m2] = 前後の面 2 × 外形幅 × 高さ + 天端 外形幅 × 厚さ。
+        /// 川裏側の土留壁の型枠面積 [m2] = 前後の面 2 × 外形幅 × 高さ + 天端 外形幅 × 厚さ(外形幅は載る区間の函体)。
         /// 左右の端は胸壁のたて壁の内側の端面(もともと計上しない面)に接する。胸壁の型枠(formwork_breast)に含める。
         /// </summary>
         private static decimal UpstreamRetainingWallFormwork(HikanParameters p)
         {
             HikanRetainingWall r = p.UpstreamRetainingWall;
             if (!r.Exists || !p.UpstreamBreast.Exists) { return 0m; }
-            return 2m * p.OuterWidth * r.Height + p.OuterWidth * r.Thickness;
+            decimal width = 2m * HikanGeometry.OuterHalfWidth(p, HikanGeometry.UpstreamRetainingWallSection(p));
+            return 2m * width * r.Height + width * r.Thickness;
         }
 
         public static HikanEstimate Calculate(HikanParameters p)
@@ -136,6 +211,7 @@ namespace Hikan.Core
             decimal hOut = p.OuterHeight;
             decimal l = p.BarrelLength;
 
+            // 外形・断面積は標準部の値。
             e.OuterWidth = RoundHalfUp(bOut, Digits);
             e.OuterHeight = RoundHalfUp(hOut, Digits);
             e.InvertLevel = RoundHalfUp(p.InvertLevel, Digits);
@@ -144,10 +220,22 @@ namespace Hikan.Core
             e.InnerSectionArea = RoundHalfUp(HikanGeometry.InnerSectionArea(p), Digits);
             e.ConcreteSectionArea = RoundHalfUp(HikanGeometry.SectionArea(p), Digits);
 
-            // 部位別コンクリート。和は断面積×延長に恒等的に一致する(HikanValidator で検査済み)。
-            e.TopSlabVolume = RoundHalfUp(bOut * p.TopSlabThickness * l, Digits);
-            e.BottomSlabVolume = RoundHalfUp(bOut * p.BottomSlabThickness * l, Digits);
-            e.WallVolume = RoundHalfUp(2m * p.WallThickness * p.InnerHeight * l, Digits);
+            // 部位別コンクリート(区間ごとの和)。和は Σ 区間の断面積 × 区間長に恒等的に一致する(HikanValidator で検査済み)。
+            decimal topSlab = 0m, bottomSlab = 0m, walls = 0m, outerSide = 0m, top = 0m;
+            foreach ((string Name, decimal SMin, decimal SMax, HikanBarrelSection Section) z in HikanGeometry.BarrelZones(p))
+            {
+                decimal zl = z.SMax - z.SMin;
+                decimal zw = 2m * HikanGeometry.OuterHalfWidth(p, z.Section);
+                topSlab += zw * z.Section.TopSlabThickness * zl;
+                bottomSlab += zw * z.Section.BottomSlabThickness * zl;
+                walls += 2m * z.Section.WallThickness * p.InnerHeight * zl;
+                outerSide += 2m * (HikanGeometry.SlabTop(p, z.Section) - HikanGeometry.BarrelBottom(p, z.Section)) * zl;
+                top += zw * zl;
+            }
+            e.TopSlabVolume = RoundHalfUp(topSlab, Digits);
+            e.BottomSlabVolume = RoundHalfUp(bottomSlab, Digits);
+            e.WallVolume = RoundHalfUp(walls, Digits);
+            e.BarrelHaunchVolume = RoundHalfUp(HikanGeometry.BarrelHaunchVolume(p), Digits);
             e.BarrelConcreteVolume = RoundHalfUp(HikanGeometry.BarrelVolume(p), Digits);
             e.ConcreteVolume = RoundHalfUp(HikanGeometry.ModelVolume(p), Digits);
 
@@ -187,10 +275,10 @@ namespace Hikan.Core
             e.DropHeight = RoundHalfUp(l * p.BottomSlope * c, Digits);
 
             // 型枠。面積自体は幾何的に確定だが、どの面を計上するかは実務判断(HikanReport.Notes 参照)。
-            e.FormworkInner = RoundHalfUp(2m * (p.InnerWidth + p.InnerHeight) * l, Digits);
-            e.FormworkOuterSide = RoundHalfUp(2m * hOut * l, Digits);
-            e.FormworkTop = RoundHalfUp(bOut * l, Digits);
-            e.FormworkEnd = RoundHalfUp(2m * HikanGeometry.SectionArea(p), Digits);
+            e.FormworkInner = RoundHalfUp(BarrelInnerFormwork(p), Digits);
+            e.FormworkOuterSide = RoundHalfUp(outerSide, Digits);
+            e.FormworkTop = RoundHalfUp(top, Digits);
+            e.FormworkEnd = RoundHalfUp(BarrelEndFormwork(p), Digits);
             e.FormworkBreast = RoundHalfUp(
                 BreastFormwork(p, p.UpstreamBreast, true) + BreastFormwork(p, p.DownstreamBreast, false)
                 + UpstreamRetainingWallFormwork(p), Digits);
@@ -200,7 +288,7 @@ namespace Hikan.Core
                 WingFormwork(p, p.UpstreamWing) + WingFormwork(p, p.DownstreamWing), Digits);
             e.FormworkGate = RoundHalfUp(GateFormwork(p), Digits);
 
-            // ブロック割は函体のみに適用する(胸壁・しゃ水壁は別部材)。
+            // ブロック割は函体のみに適用する(胸壁・しゃ水壁は別部材)。ブロック = スパンで長さが違い得るので平均を出す。
             e.BlockLength = RoundHalfUp(l / p.BlockCount, Digits);
             e.ConcretePerBlock = RoundHalfUp(HikanGeometry.BarrelVolume(p) / p.BlockCount, Digits);
 

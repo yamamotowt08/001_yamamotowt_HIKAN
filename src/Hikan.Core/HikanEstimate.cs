@@ -14,6 +14,8 @@ namespace Hikan.Core
         public decimal TopSlabVolume { get; set; }
         public decimal BottomSlabVolume { get; set; }
         public decimal WallVolume { get; set; }
+        /// <summary>函体の内空のハンチのコンクリート [m3]</summary>
+        public decimal BarrelHaunchVolume { get; set; }
         /// <summary>函体のみのコンクリート [m3]</summary>
         public decimal BarrelConcreteVolume { get; set; }
         /// <summary>全部材のコンクリート [m3](函体 + 胸壁 + しゃ水壁 + 翼壁 + 堤防保護部)</summary>

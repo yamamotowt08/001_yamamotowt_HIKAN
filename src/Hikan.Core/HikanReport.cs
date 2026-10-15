@@ -40,6 +40,25 @@ namespace Hikan.Core
             Add(list, prefix + "heel_length", F(w.HeelLength), "m", "入力");
         }
 
+        /// <summary>函体の断面(部材厚とハンチ)。ハンチは有るものだけ出す。</summary>
+        private static void AddSection(System.Collections.Generic.List<HikanItem> list, HikanBarrelSection z, string prefix)
+        {
+            Add(list, prefix + "wall_thickness", F(z.WallThickness), "m", "入力");
+            Add(list, prefix + "top_slab_thickness", F(z.TopSlabThickness), "m", "入力");
+            Add(list, prefix + "bottom_slab_thickness", F(z.BottomSlabThickness), "m", "入力");
+            AddHaunch(list, z.LeftTop, prefix + "haunch_lt_");
+            AddHaunch(list, z.LeftBottom, prefix + "haunch_lb_");
+            AddHaunch(list, z.RightTop, prefix + "haunch_rt_");
+            AddHaunch(list, z.RightBottom, prefix + "haunch_rb_");
+        }
+
+        private static void AddHaunch(System.Collections.Generic.List<HikanItem> list, HikanHaunch h, string prefix)
+        {
+            if (!h.Exists) { return; }
+            Add(list, prefix + "height", F(h.Height), "m", "入力");
+            Add(list, prefix + "width", F(h.Width), "m", "入力");
+        }
+
         private static void AddGate(System.Collections.Generic.List<HikanItem> list, HikanGateTower g)
         {
             Add(list, "gate_exists", g.Exists ? "設置する" : "設置しない", "", "入力");
@@ -88,13 +107,19 @@ namespace Hikan.Core
 
             Add(r, "inner_width", F(p.InnerWidth), "m", "入力");
             Add(r, "inner_height", F(p.InnerHeight), "m", "入力");
-            Add(r, "wall_thickness", F(p.WallThickness), "m", "入力");
-            Add(r, "top_slab_thickness", F(p.TopSlabThickness), "m", "入力");
-            Add(r, "bottom_slab_thickness", F(p.BottomSlabThickness), "m", "入力");
-            Add(r, "barrel_length", F(p.BarrelLength), "m", "入力");
+            AddSection(r, p.Standard, "");
+            for (int i = 0; i < p.Spans.Length; i++)
+            {
+                Add(r, "span_" + (i + 1), F(p.Spans[i]), "m", "入力");
+            }
+            Add(r, "barrel_length", F(p.BarrelLength), "m", "確定");
+            Add(r, "block_count", p.BlockCount.ToString(), "ブロック", "確定");
+            Add(r, "upstream_end_length", F(p.UpstreamEndLength), "m", "入力");
+            if (p.UpstreamEndLength > 0m) { AddSection(r, p.UpstreamEnd, "upstream_end_"); }
+            Add(r, "downstream_end_length", F(p.DownstreamEndLength), "m", "入力");
+            if (p.DownstreamEndLength > 0m) { AddSection(r, p.DownstreamEnd, "downstream_end_"); }
             Add(r, "bottom_slope", F(p.BottomSlope), "", "入力");
             Add(r, "soil_cover", F(p.SoilCover), "m", "入力");
-            Add(r, "block_count", p.BlockCount.ToString(), "ブロック", "入力");
             Add(r, "excavation_margin", F(p.ExcavationMargin), "m", "入力");
             Add(r, "excavation_slope", F(p.ExcavationSlope), "", "入力");
             Add(r, "foundation_thickness", F(p.FoundationThickness), "m", "入力");
@@ -118,6 +143,7 @@ namespace Hikan.Core
             Add(r, "top_slab_volume", F(e.TopSlabVolume), "m3", "確定");
             Add(r, "bottom_slab_volume", F(e.BottomSlabVolume), "m3", "確定");
             Add(r, "wall_volume", F(e.WallVolume), "m3", "確定");
+            Add(r, "barrel_haunch_volume", F(e.BarrelHaunchVolume), "m3", "確定");
             Add(r, "barrel_concrete_volume", F(e.BarrelConcreteVolume), "m3", "確定");
             Add(r, "upstream_breast_volume", F(e.UpstreamBreastVolume), "m3", "確定");
             Add(r, "downstream_breast_volume", F(e.DownstreamBreastVolume), "m3", "確定");
@@ -177,9 +203,11 @@ namespace Hikan.Core
             "しゃ水壁は函体外周に全周一律(下方にも)張り出すカラーとしてモデル化し、函体延長を枚数で等分した各区間の中央に配置します。",
             "胸壁・しゃ水壁の寸法・張出し量・設置位置は参照文書に規定がないため、全て入力値です。形状は『全部材が等厚矩形』(基準の形状単純化方針)のみを根拠にしています。",
             "浸透路長は函体外周に沿う経路長(延長 + 張出し量 × 2 × 枚数)です。レーン則等による必要浸透路長の照査は行いません(照査式が参照文書にないため)。",
-            "基準点は上流端・底版下面・函体中心線上。敷高(内空底面高)は invert_level を参照(底版厚ぶん上)。",
+            "基準点は上流端・標準部の底版下面・函体中心線上。敷高(内空底面高)は invert_level を参照(標準部の底版厚ぶん上)。",
+            "函体は川裏側端部・標準部・川表側端部の 3 区間で、区間ごとに部材厚(側壁・頂版・底版)と内空の 4 隅のハンチを変えられます。内空(幅・高さ・敷高)は全長で共通なので、端部の部材厚が違うと外形が区間の境目で段違いになります(底版下面も段違い)。外形・断面積の欄は標準部の値です。胸壁のたて壁・しゃ水壁・門柱・土留壁は、部材厚が変わる境目をまたいで置けません。",
+            "ハンチは内空の隅の直角三角形(H = 鉛直の辺、W = 水平の辺)で、函体のコンクリートに含めます(barrel_haunch_volume)。内空断面積・内空の型枠はハンチの分を差し引き・斜面に置き換えています。",
             "底版勾配は押出し後の回転で表現するため、上下流の端面が鉛直になりません。コンクリート体積は回転で変わりません。",
-            "ブロック数は形状に反映せず数量の按分表示のみです。継手の目地幅は控除していません(目地材・止水板も対象外)。",
+            "函体延長はスパン長の合計、ブロック数はスパン数です。スパンの境目(継手)は形状に反映せず、ブロック長・ブロック当りコンクリートは平均値です。継手の目地幅は控除していません(目地材・止水板も対象外)。",
             "型枠は面積の内訳のみを出し合計は出しません。頂版上面と底版下面は計上せず、端面は両端に型枠が立つ前提です。支保工は算定しません。",
             "床掘りは勾配 0 の水平床掘りとして四方に法勾配 1:n を付けた角錐台で概算します。土留め工を用いる場合この式は成立しません。",
             "埋戻は床掘りから外形プリズムの地下占有分と基礎材を控除した値です。土量換算係数(ほぐし・締固め)、流用土/購入土の区分、裏込め材の区分は未対応。",

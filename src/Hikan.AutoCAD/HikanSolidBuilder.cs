@@ -14,7 +14,7 @@ namespace Hikan.AutoCAD
     ///
     /// 生成手順: 部材ごとに 断面ポリライン → Region → Extrude で中実プリズムを作り、
     /// BoolUnite で合成 → 翼壁(平面プリズムと側面プリズムの共通部分)を BoolUnite
-    /// → 最後に内空プリズムを BoolSubtract → X 軸まわり +90 度回転
+    /// → 内空プリズムを BoolSubtract → 内空の隅のハンチ(三角柱)を BoolUnite → X 軸まわり +90 度回転
     /// → 基準点へ平行移動 → 底版勾配の回転。
     /// 薄いシェル同士を同一平面でブーリアンしないため、部材を増やしても退化しにくい。
     /// 合成は ModelSpace に追加したあと DB 常駐のまま行う(非常駐 Solid3d のブーリアンは
@@ -114,7 +114,7 @@ namespace Hikan.AutoCAD
             Hikan.Core.HikanPart[] parts = Hikan.Core.HikanGeometry.GetParts(p);
             decimal k = Hikan.Core.HikanGeometry.GlobalSMax(p);
 
-            // 先頭は必ず函体。これを DB に載せてから、以降の部材を DB 常駐のまま合成する。
+            // 先頭は必ず函体(区間が複数なら最初の区間)。これを DB に載せてから、以降の部材を DB 常駐のまま合成する。
             Autodesk.AutoCAD.DatabaseServices.Solid3d solid = BuildPrism(parts[0], k);
             try
             {
@@ -136,6 +136,7 @@ namespace Hikan.AutoCAD
             CombineHaunches(solid, p, k);
             CombineWings(solid, p, k);
             Combine(solid, parts, k, true, Autodesk.AutoCAD.DatabaseServices.BooleanOperationType.BoolSubtract);
+            UnitePrisms(solid, Hikan.Core.HikanGeometry.GetBarrelHaunchParts(p), k);
 
             solid.TransformBy(BuildPlacement(p));
 
@@ -193,7 +194,19 @@ namespace Hikan.AutoCAD
             Hikan.Core.HikanParameters p,
             decimal k)
         {
-            foreach (Hikan.Core.HikanPrismPart part in Hikan.Core.HikanGeometry.GetHaunchParts(p))
+            UnitePrisms(solid, Hikan.Core.HikanGeometry.GetHaunchParts(p), k);
+        }
+
+        /// <summary>
+        /// 断面が多角形の柱(ハンチ)を 1 個ずつ BoolUnite する。函体の内空の隅のハンチは内空の中にあるので、
+        /// 内空を BoolSubtract したあとに呼ぶ(先に足すと内空と一緒に抜けてしまう)。
+        /// </summary>
+        private static void UnitePrisms(
+            Autodesk.AutoCAD.DatabaseServices.Solid3d solid,
+            Hikan.Core.HikanPrismPart[] parts,
+            decimal k)
+        {
+            foreach (Hikan.Core.HikanPrismPart part in parts)
             {
                 Autodesk.AutoCAD.DatabaseServices.Solid3d other = ExtrudePolygon(
                     part.Section, part.Name, (double)(k - part.SMax), (double)(part.SMax - part.SMin), (double)part.Area);

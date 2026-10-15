@@ -14,20 +14,68 @@ namespace Hikan.Core
         public decimal InnerWidth { get; set; } = 2.000m;
         /// <summary>内空高 H [m]</summary>
         public decimal InnerHeight { get; set; } = 2.000m;
-        /// <summary>側壁厚 [m]</summary>
-        public decimal WallThickness { get; set; } = 0.400m;
-        /// <summary>頂版厚 [m]</summary>
-        public decimal TopSlabThickness { get; set; } = 0.400m;
-        /// <summary>底版厚 [m]</summary>
-        public decimal BottomSlabThickness { get; set; } = 0.400m;
-        /// <summary>函体延長 L [m]。底版下面に沿う斜距離(勾配がある場合、水平投影長とは異なる)。</summary>
-        public decimal BarrelLength { get; set; } = 20.000m;
+        /// <summary>スパン数の上限(手本の画面のスパン 1〜5)。</summary>
+        public const int MaxSpans = 5;
+
+        /// <summary>標準部の断面(部材厚・ハンチ)。端部の長さを除いた函体中央の区間。</summary>
+        public HikanBarrelSection Standard { get; set; } = new HikanBarrelSection();
+        /// <summary>川裏側端部の断面。川裏函体端(S = 0)から UpstreamEndLength の区間。</summary>
+        public HikanBarrelSection UpstreamEnd { get; set; } = new HikanBarrelSection();
+        /// <summary>川表側端部の断面。川表函体端(S = L)から DownstreamEndLength の区間。</summary>
+        public HikanBarrelSection DownstreamEnd { get; set; } = new HikanBarrelSection();
+        /// <summary>川裏側端部の長さ [m]。0 で端部なし(全長が標準部の断面)。</summary>
+        public decimal UpstreamEndLength { get; set; } = 0.000m;
+        /// <summary>川表側端部の長さ [m]。0 で端部なし。</summary>
+        public decimal DownstreamEndLength { get; set; } = 0.000m;
+        /// <summary>
+        /// 各スパン長 [m](川裏側から順に、1〜5 個)。合計が函体延長 L、個数がブロック数、境目が継手の位置。
+        /// 形状は継手で切らず 1 つのソリッドにする。
+        /// </summary>
+        public decimal[] Spans { get; set; } = new decimal[] { 5.000m, 5.000m, 5.000m, 5.000m };
+
+        /// <summary>標準部の側壁厚 [m]</summary>
+        public decimal WallThickness
+        {
+            get { return Standard.WallThickness; }
+            set { Standard.WallThickness = value; }
+        }
+
+        /// <summary>標準部の頂版厚 [m]</summary>
+        public decimal TopSlabThickness
+        {
+            get { return Standard.TopSlabThickness; }
+            set { Standard.TopSlabThickness = value; }
+        }
+
+        /// <summary>
+        /// 標準部の底版厚 [m]。Z = 0 は標準部の底版下面の高さなので、敷高(内空底面、函体全長で一定)は Z = この値。
+        /// 端部の底版厚が違うと、端部の底版下面は Z = 0 から段違いになる。
+        /// </summary>
+        public decimal BottomSlabThickness
+        {
+            get { return Standard.BottomSlabThickness; }
+            set { Standard.BottomSlabThickness = value; }
+        }
+
+        /// <summary>函体延長 L = スパン長の合計 [m]。底版下面に沿う斜距離(勾配がある場合、水平投影長とは異なる)。</summary>
+        public decimal BarrelLength
+        {
+            get
+            {
+                decimal l = 0m;
+                foreach (decimal s in Spans) { l += s; }
+                return l;
+            }
+        }
         /// <summary>底版勾配 i(下流下がりを正)。押出し後の X 軸まわり回転で表現する。</summary>
         public decimal BottomSlope { get; set; } = 0.000m;
         /// <summary>土かぶり(頂版上面〜現地盤)[m]。床掘り数量の算定に使う。</summary>
         public decimal SoilCover { get; set; } = 2.000m;
-        /// <summary>ブロック数。形状には反映せず、数量の按分表示にのみ使う。</summary>
-        public int BlockCount { get; set; } = 4;
+        /// <summary>ブロック数 = スパン数。形状には反映せず、数量の按分表示にのみ使う。</summary>
+        public int BlockCount
+        {
+            get { return Spans.Length; }
+        }
         /// <summary>床掘り余裕幅(片側)[m]</summary>
         public decimal ExcavationMargin { get; set; } = 0.500m;
         /// <summary>床掘り法勾配 1:n の n</summary>
@@ -66,16 +114,16 @@ namespace Hikan.Core
         public decimal BaseX { get; set; } = 0.000m;
         /// <summary>配置基準点 Y [m]。上流端の位置。</summary>
         public decimal BaseY { get; set; } = 0.000m;
-        /// <summary>配置基準点 Z [m]。上流端における底版下面の高さ。</summary>
+        /// <summary>配置基準点 Z [m]。上流端における標準部の底版下面の高さ(端部の底版厚が違っても動かない)。</summary>
         public decimal BaseZ { get; set; } = 0.000m;
 
-        /// <summary>外形幅 B_out = B + 2 × 側壁厚 [m]</summary>
+        /// <summary>標準部の外形幅 B_out = B + 2 × 側壁厚 [m]</summary>
         public decimal OuterWidth
         {
             get { return InnerWidth + 2m * WallThickness; }
         }
 
-        /// <summary>外形高 H_out = H + 頂版厚 + 底版厚 [m]</summary>
+        /// <summary>標準部の外形高 H_out = H + 頂版厚 + 底版厚 [m](= 標準部の頂版上面の Z)</summary>
         public decimal OuterHeight
         {
             get { return InnerHeight + TopSlabThickness + BottomSlabThickness; }
@@ -95,13 +143,18 @@ namespace Hikan.Core
             d["schema_version"] = SchemaVersion;
             d["inner_width"] = InnerWidth.ToString(inv);
             d["inner_height"] = InnerHeight.ToString(inv);
-            d["wall_thickness"] = WallThickness.ToString(inv);
-            d["top_slab_thickness"] = TopSlabThickness.ToString(inv);
-            d["bottom_slab_thickness"] = BottomSlabThickness.ToString(inv);
-            d["barrel_length"] = BarrelLength.ToString(inv);
+            Standard.Write(d, "");
+            UpstreamEnd.Write(d, "upstream_end_");
+            DownstreamEnd.Write(d, "downstream_end_");
+            d["upstream_end_length"] = UpstreamEndLength.ToString(inv);
+            d["downstream_end_length"] = DownstreamEndLength.ToString(inv);
+            d["span_count"] = Spans.Length.ToString(inv);
+            for (int i = 0; i < Spans.Length; i++)
+            {
+                d["span_" + (i + 1)] = Spans[i].ToString(inv);
+            }
             d["bottom_slope"] = BottomSlope.ToString(inv);
             d["soil_cover"] = SoilCover.ToString(inv);
-            d["block_count"] = BlockCount.ToString(inv);
             d["excavation_margin"] = ExcavationMargin.ToString(inv);
             d["excavation_slope"] = ExcavationSlope.ToString(inv);
             d["foundation_thickness"] = FoundationThickness.ToString(inv);
@@ -135,10 +188,15 @@ namespace Hikan.Core
             p.WallThickness = GetDecimal(d, "wall_thickness");
             p.TopSlabThickness = GetDecimal(d, "top_slab_thickness");
             p.BottomSlabThickness = GetDecimal(d, "bottom_slab_thickness");
-            p.BarrelLength = GetDecimal(d, "barrel_length");
+            p.Standard.ReadHaunches(d, "", GetDecimalOrDefault, new HikanBarrelSection());
+            // 端部の断面・長さとハンチは後から追加したキー。無ければ端部なし(長さ 0)、断面は標準部と同じとして読む。
+            p.UpstreamEnd.Read(d, "upstream_end_", GetDecimalOrDefault, p.Standard);
+            p.DownstreamEnd.Read(d, "downstream_end_", GetDecimalOrDefault, p.Standard);
+            p.UpstreamEndLength = GetDecimalOrDefault(d, "upstream_end_length", 0m);
+            p.DownstreamEndLength = GetDecimalOrDefault(d, "downstream_end_length", 0m);
+            p.Spans = ReadSpans(d);
             p.BottomSlope = GetDecimal(d, "bottom_slope");
             p.SoilCover = GetDecimal(d, "soil_cover");
-            p.BlockCount = GetInt(d, "block_count");
             p.ExcavationMargin = GetDecimal(d, "excavation_margin");
             p.ExcavationSlope = GetDecimal(d, "excavation_slope");
             p.FoundationThickness = GetDecimal(d, "foundation_thickness");
@@ -161,6 +219,38 @@ namespace Hikan.Core
             p.BaseY = GetDecimal(d, "base_y");
             p.BaseZ = GetDecimal(d, "base_z");
             return p;
+        }
+
+        /// <summary>
+        /// スパン長を読む。スパンを持たない旧 XData は 函体延長 L とブロック数 n から作る:
+        /// L / n が 1 mm 単位で割り切れて n が上限以下なら n 等分、そうでなければ 1 スパン(= L)。
+        /// </summary>
+        private static decimal[] ReadSpans(System.Collections.Generic.IDictionary<string, string> d)
+        {
+            if (d.ContainsKey("span_count"))
+            {
+                int count = GetInt(d, "span_count");
+                if (count < 0)
+                {
+                    throw new HikanValidationException("パラメータ span_count が負です: " + count);
+                }
+                decimal[] spans = new decimal[count];
+                for (int i = 0; i < count; i++)
+                {
+                    spans[i] = GetDecimal(d, "span_" + (i + 1));
+                }
+                return spans;
+            }
+            decimal l = GetDecimal(d, "barrel_length");
+            int n = GetInt(d, "block_count");
+            // 等分の長さが 1 mm 単位で割り切れるときだけ等分する(20 / 3 などは 1 スパン)。
+            if (n >= 1 && n <= MaxSpans && System.Math.Round(l / n, 3) * n == l)
+            {
+                decimal[] equal = new decimal[n];
+                for (int i = 0; i < n; i++) { equal[i] = l / n; }
+                return equal;
+            }
+            return new decimal[] { l };
         }
 
         private static string Get(System.Collections.Generic.IDictionary<string, string> d, string key)

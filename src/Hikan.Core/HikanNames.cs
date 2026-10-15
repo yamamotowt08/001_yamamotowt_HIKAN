@@ -8,13 +8,13 @@ namespace Hikan.Core
             {
                 { "inner_width", "内空幅 B" },
                 { "inner_height", "内空高 H" },
-                { "wall_thickness", "側壁厚" },
-                { "top_slab_thickness", "頂版厚" },
-                { "bottom_slab_thickness", "底版厚" },
-                { "barrel_length", "函体延長 L(斜距離)" },
+                { "barrel_length", "函体延長 L(斜距離、スパン長の合計)" },
+                { "span_count", "スパン数(= ブロック数)" },
+                { "upstream_end_length", "川裏側端部の長さ(0 で端部なし)" },
+                { "downstream_end_length", "川表側端部の長さ(0 で端部なし)" },
                 { "bottom_slope", "底版勾配 i(下流下がり)" },
                 { "soil_cover", "土かぶり" },
-                { "block_count", "ブロック数" },
+                { "block_count", "ブロック数(= スパン数)" },
                 { "excavation_margin", "床掘り余裕幅(片側)" },
                 { "excavation_slope", "床掘り法勾配 1:n の n" },
                 { "foundation_thickness", "基礎材厚(均しコン等)" },
@@ -79,17 +79,18 @@ namespace Hikan.Core
                 { "color_index", "ソリッド色(ACI)" },
                 { "base_x", "基準点 X(函体中心線)" },
                 { "base_y", "基準点 Y(上流端)" },
-                { "base_z", "基準点 Z(底版下面)" },
+                { "base_z", "基準点 Z(標準部の底版下面)" },
 
-                { "outer_width", "外形幅 B_out" },
-                { "outer_height", "外形高 H_out" },
+                { "outer_width", "外形幅 B_out(標準部)" },
+                { "outer_height", "外形高 H_out(標準部)" },
                 { "invert_level", "敷高(内空底面高)" },
-                { "outer_section_area", "外形断面積" },
-                { "inner_section_area", "内空断面積" },
-                { "concrete_section_area", "コンクリート断面積" },
+                { "outer_section_area", "外形断面積(標準部)" },
+                { "inner_section_area", "内空断面積(標準部、ハンチを控除)" },
+                { "concrete_section_area", "コンクリート断面積(標準部、ハンチを含む)" },
                 { "top_slab_volume", "頂版コンクリート" },
                 { "bottom_slab_volume", "底版コンクリート" },
                 { "wall_volume", "側壁コンクリート" },
+                { "barrel_haunch_volume", "函体ハンチコンクリート(内空の隅)" },
                 { "barrel_concrete_volume", "函体コンクリート計" },
                 { "upstream_breast_volume", "川裏側胸壁コンクリート(左右計、函体との重なりを控除)" },
                 { "downstream_breast_volume", "川表側胸壁コンクリート(左右計、函体との重なりを控除)" },
@@ -109,16 +110,16 @@ namespace Hikan.Core
                 { "concrete_volume", "コンクリート総計(函体+胸壁+しゃ水壁)" },
                 { "horizontal_projection", "水平投影長" },
                 { "drop_height", "上下流端の落差" },
-                { "formwork_inner", "型枠(内空面)" },
+                { "formwork_inner", "型枠(内空面、ハンチの斜面を含む)" },
                 { "formwork_outer_side", "型枠(外側面)" },
                 { "formwork_top", "型枠(頂版上面)" },
-                { "formwork_end", "型枠(端面)" },
+                { "formwork_end", "型枠(函体の両端面 + 端部と標準部の境目の段差面)" },
                 { "formwork_breast", "型枠(胸壁)" },
                 { "formwork_cutoff", "型枠(しゃ水壁)" },
                 { "formwork_wing", "型枠(翼壁)" },
                 { "formwork_gate", "型枠(門柱・操作台)" },
-                { "block_length", "ブロック長" },
-                { "concrete_per_block", "ブロック当りコンクリート" },
+                { "block_length", "平均ブロック長(函体延長 / スパン数)" },
+                { "concrete_per_block", "ブロック当りコンクリート(平均)" },
                 { "excavation_bottom_width", "床掘り底面幅" },
                 { "excavation_bottom_length", "床掘り底面長" },
                 { "excavation_depth", "床掘り深さ" },
@@ -128,5 +129,30 @@ namespace Hikan.Core
                 { "backfill_volume", "埋戻体積" },
                 { "surplus_volume", "残土(地山換算)" }
             };
+
+        /// <summary>函体の断面(標準部・両端部)の部材厚とハンチ、スパン長の名前を足す(区間ごとに同じ並びなので式で作る)。</summary>
+        static HikanNames()
+        {
+            AddSection("", "標準部");
+            AddSection("upstream_end_", "川裏側端部");
+            AddSection("downstream_end_", "川表側端部");
+            for (int i = 1; i <= HikanParameters.MaxSpans; i++)
+            {
+                Japanese["span_" + i] = "スパン" + i + " の長さ";
+            }
+        }
+
+        private static void AddSection(string prefix, string name)
+        {
+            Japanese[prefix + "wall_thickness"] = name + " 側壁厚(WL = WR)";
+            Japanese[prefix + "top_slab_thickness"] = name + " 頂版厚 WT";
+            Japanese[prefix + "bottom_slab_thickness"] = name + " 底版厚 WB";
+            foreach (string corner in new string[] { "lt", "lb", "rt", "rb" })
+            {
+                string label = corner.ToUpperInvariant();
+                Japanese[prefix + "haunch_" + corner + "_height"] = name + " ハンチ " + label + " の H(鉛直)";
+                Japanese[prefix + "haunch_" + corner + "_width"] = name + " ハンチ " + label + " の W(水平)";
+            }
+        }
     }
 }

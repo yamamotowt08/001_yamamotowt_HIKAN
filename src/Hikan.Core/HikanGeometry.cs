@@ -2,7 +2,7 @@ namespace Hikan.Core
 {
     /// <summary>
     /// 部材 1 個分の直方体。局所座標で持つ。
-    /// U = 函体中心線からの横断オフセット、V = 底版下面からの高さ、S = 上流端からの下流向き距離。
+    /// U = 函体中心線からの横断オフセット、V = 標準部の底版下面からの高さ、S = 上流端からの下流向き距離。
     /// IsVoid = true のものは内空で、合成の最後に BoolSubtract する。
     /// </summary>
     public sealed class HikanPart
@@ -87,16 +87,24 @@ namespace Hikan.Core
     /// </summary>
     public static class HikanGeometry
     {
-        /// <summary>構成部材の一覧。加算部材が先、内空が最後。BuildSolid と期待値計算が共有する。</summary>
+        /// <summary>
+        /// 構成部材の一覧。加算部材が先、内空が最後。BuildSolid と期待値計算が共有する。
+        /// 函体は区間(川裏側端部 / 標準部 / 川表側端部)ごとの外形の直方体で、先頭に並ぶ(区間が 1 つなら名前は「函体」)。
+        /// 内空は全長で 1 個の直方体で、内空の隅のハンチは GetBarrelHaunchParts が別に返す。
+        /// </summary>
         public static HikanPart[] GetParts(HikanParameters p)
         {
             System.Collections.Generic.List<HikanPart> parts = new System.Collections.Generic.List<HikanPart>();
 
-            decimal bo = p.OuterWidth;
-            decimal ho = p.OuterHeight;
             decimal l = p.BarrelLength;
 
-            parts.Add(Tag(Centred("函体", bo, 0m, ho, 0m, l, false), "函体"));
+            (string Name, decimal SMin, decimal SMax, HikanBarrelSection Section)[] zones = BarrelZones(p);
+            foreach ((string Name, decimal SMin, decimal SMax, HikanBarrelSection Section) z in zones)
+            {
+                decimal half = OuterHalfWidth(p, z.Section);
+                string name = zones.Length > 1 ? "函体(" + z.Name + ")" : "函体";
+                parts.Add(Tag(Box(name, -half, half, BarrelBottom(p, z.Section), SlabTop(p, z.Section), z.SMin, z.SMax, false), "函体"));
+            }
 
             AddBreast(parts, p, p.UpstreamBreast, true);
             AddBreast(parts, p, p.DownstreamBreast, false);
@@ -106,7 +114,10 @@ namespace Hikan.Core
             for (int i = 1; i <= p.CutoffCount; i++)
             {
                 decimal s = CutoffPosition(p, i);
-                parts.Add(Tag(Centred("しゃ水壁" + i, bo + 2m * a, -a, ho + a, s - tc / 2m, s + tc / 2m, false), "しゃ水壁"));
+                HikanBarrelSection z = SectionOver(p, s - tc / 2m, s + tc / 2m);
+                decimal half = OuterHalfWidth(p, z) + a;
+                parts.Add(Tag(Box("しゃ水壁" + i, -half, half, BarrelBottom(p, z) - a, SlabTop(p, z) + a,
+                    s - tc / 2m, s + tc / 2m, false), "しゃ水壁"));
             }
 
             AddProtection(parts, p, p.UpstreamWing, true);
@@ -119,6 +130,128 @@ namespace Hikan.Core
                 0m, l, true), "内空"));
 
             return parts.ToArray();
+        }
+
+        /// <summary>
+        /// 函体の区間。川裏側端部 [0, 川裏側端部長]、標準部、川表側端部 [L − 川表側端部長, L] の順。長さ 0 の区間は含めない。
+        /// 内空(幅・高さ・敷高)は全区間で共通で、部材厚とハンチが区間ごとに変わる。
+        /// </summary>
+        public static (string Name, decimal SMin, decimal SMax, HikanBarrelSection Section)[] BarrelZones(HikanParameters p)
+        {
+            System.Collections.Generic.List<(string Name, decimal SMin, decimal SMax, HikanBarrelSection Section)> zones =
+                new System.Collections.Generic.List<(string Name, decimal SMin, decimal SMax, HikanBarrelSection Section)>();
+            decimal l = p.BarrelLength;
+            decimal a = p.UpstreamEndLength > 0m ? p.UpstreamEndLength : 0m;
+            decimal b = p.DownstreamEndLength > 0m ? l - p.DownstreamEndLength : l;
+            if (a > 0m) { zones.Add(("川裏側端部", 0m, a, p.UpstreamEnd)); }
+            if (b > a) { zones.Add(("標準部", a, b, p.Standard)); }
+            if (b < l) { zones.Add(("川表側端部", b, l, p.DownstreamEnd)); }
+            return zones.ToArray();
+        }
+
+        /// <summary>位置 S の函体の断面。区間の境目は川裏側の区間とする。函体の外は近い方の端の区間。</summary>
+        public static HikanBarrelSection SectionAt(HikanParameters p, decimal s)
+        {
+            (string Name, decimal SMin, decimal SMax, HikanBarrelSection Section)[] zones = BarrelZones(p);
+            if (zones.Length == 0) { return p.Standard; }
+            if (s <= zones[0].SMin) { return zones[0].Section; }
+            foreach ((string Name, decimal SMin, decimal SMax, HikanBarrelSection Section) z in zones)
+            {
+                if (s <= z.SMax) { return z.Section; }
+            }
+            return zones[zones.Length - 1].Section;
+        }
+
+        /// <summary>
+        /// 函体方向の範囲 [a, b] に置く部材(胸壁のたて壁・しゃ水壁・門柱・土留壁)が取り付く函体の断面(範囲の中央の区間)。
+        /// 範囲の中で外形が変わらないことは HikanValidator が保証する(OuterStep)。
+        /// </summary>
+        public static HikanBarrelSection SectionOver(HikanParameters p, decimal a, decimal b)
+        {
+            return SectionAt(p, (a + b) / 2m);
+        }
+
+        /// <summary>範囲 (a, b) の中で函体の外形(部材厚)が変わる境目の S。無ければ null。ハンチの違いは問わない。</summary>
+        public static decimal? OuterStep(HikanParameters p, decimal a, decimal b)
+        {
+            (string Name, decimal SMin, decimal SMax, HikanBarrelSection Section)[] zones = BarrelZones(p);
+            for (int i = 1; i < zones.Length; i++)
+            {
+                decimal s = zones[i].SMin;
+                if (s > a && s < b && !zones[i].Section.SameOuter(zones[i - 1].Section)) { return s; }
+            }
+            return null;
+        }
+
+        /// <summary>断面 z の外形の半幅 = B/2 + 側壁厚 [m]</summary>
+        public static decimal OuterHalfWidth(HikanParameters p, HikanBarrelSection z)
+        {
+            return p.InnerWidth / 2m + z.WallThickness;
+        }
+
+        /// <summary>断面 z の頂版上面の高さ V = 敷高 + H + 頂版厚 [m]</summary>
+        public static decimal SlabTop(HikanParameters p, HikanBarrelSection z)
+        {
+            return p.BottomSlabThickness + p.InnerHeight + z.TopSlabThickness;
+        }
+
+        /// <summary>断面 z の底版下面の高さ V = 敷高 − 底版厚 [m](標準部では 0)</summary>
+        public static decimal BarrelBottom(HikanParameters p, HikanBarrelSection z)
+        {
+            return p.BottomSlabThickness - z.BottomSlabThickness;
+        }
+
+        /// <summary>
+        /// 函体の内空の隅のハンチ(区間ごと・4 隅)。高さ H(側壁に沿う)× 幅 W(頂版・底版に沿う)の直角三角形の柱で、
+        /// 内空の中にあって側壁・頂版・底版の内面と面で接するだけ。他の部材は内空に入らないので重ならない。
+        /// 生成では内空を抜いたあとに BoolUnite する。
+        /// </summary>
+        public static HikanPrismPart[] GetBarrelHaunchParts(HikanParameters p)
+        {
+            System.Collections.Generic.List<HikanPrismPart> parts = new System.Collections.Generic.List<HikanPrismPart>();
+            decimal u = p.InnerWidth / 2m;
+            decimal bottom = p.BottomSlabThickness;
+            decimal top = bottom + p.InnerHeight;
+            (string Name, decimal SMin, decimal SMax, HikanBarrelSection Section)[] zones = BarrelZones(p);
+            foreach ((string Name, decimal SMin, decimal SMax, HikanBarrelSection Section) z in zones)
+            {
+                string name = "函体ハンチ" + (zones.Length > 1 ? "(" + z.Name + ")" : "");
+                HikanBarrelSection c = z.Section;
+                // 頂点は反時計回り(断面積が正)。
+                AddBarrelHaunch(parts, name + "LT", c.LeftTop, z.SMin, z.SMax,
+                    (-u, top - c.LeftTop.Height), (-u + c.LeftTop.Width, top), (-u, top));
+                AddBarrelHaunch(parts, name + "RT", c.RightTop, z.SMin, z.SMax,
+                    (u - c.RightTop.Width, top), (u, top - c.RightTop.Height), (u, top));
+                AddBarrelHaunch(parts, name + "LB", c.LeftBottom, z.SMin, z.SMax,
+                    (-u, bottom), (-u + c.LeftBottom.Width, bottom), (-u, bottom + c.LeftBottom.Height));
+                AddBarrelHaunch(parts, name + "RB", c.RightBottom, z.SMin, z.SMax,
+                    (u - c.RightBottom.Width, bottom), (u, bottom), (u, bottom + c.RightBottom.Height));
+            }
+            return parts.ToArray();
+        }
+
+        private static void AddBarrelHaunch(
+            System.Collections.Generic.List<HikanPrismPart> parts, string name, HikanHaunch h, decimal sMin, decimal sMax,
+            (decimal U, decimal V) a, (decimal U, decimal V) b, (decimal U, decimal V) c)
+        {
+            if (!h.Exists) { return; }
+            HikanPrismPart part = new HikanPrismPart();
+            part.Name = name;
+            part.Section = new (decimal U, decimal V)[] { a, b, c };
+            part.SMin = sMin;
+            part.SMax = sMax;
+            parts.Add(part);
+        }
+
+        /// <summary>函体の内空のハンチの体積の合計 [m3] = Σ 区間長 × その区間のハンチ断面積。</summary>
+        public static decimal BarrelHaunchVolume(HikanParameters p)
+        {
+            decimal v = 0m;
+            foreach ((string Name, decimal SMin, decimal SMax, HikanBarrelSection Section) z in BarrelZones(p))
+            {
+                v += z.Section.HaunchArea * (z.SMax - z.SMin);
+            }
+            return v;
         }
 
         private static HikanPart Tag(HikanPart part, string member)
@@ -144,7 +277,8 @@ namespace Hikan.Core
         {
             if (!w.Exists) { return; }
 
-            decimal half = p.OuterWidth / 2m;
+            // たて壁は取り付く区間の函体の側面に接する。底版の左右の幅も同じ外形幅から決める。
+            decimal half = OuterHalfWidth(p, SectionOver(p, w.StemStart, w.StemEnd));
             decimal top = BreastFootingTop(p);
             (decimal Min, decimal Max) foot = BreastFootingRange(w, upstream);
 
@@ -326,8 +460,8 @@ namespace Hikan.Core
             decimal inner = p.InnerWidth / 2m;
             decimal bottom = BreastFootingTop(p);   // 門柱は胸壁の底版の上面(敷高)から立つ
             decimal top = GateColumnTop(p);
-            decimal slab = p.OuterHeight;           // 土留壁の下端 = 頂版上面
             (decimal Min, decimal Max) column = GateColumnRange(p);
+            decimal slab = GateSlabTop(p);          // 土留壁の下端 = 頂版上面
             decimal split = column.Min + g.TransverseWallThickness;
 
             System.Collections.Generic.List<HikanPart> gate = new System.Collections.Generic.List<HikanPart>();
@@ -390,6 +524,13 @@ namespace Hikan.Core
             return (c.Min - p.Gate.DeckAxialOverhang, c.Max + p.Gate.DeckAxialOverhang);
         }
 
+        /// <summary>門柱が立つ区間の函体の頂版上面の高さ(土留壁の下端)。</summary>
+        public static decimal GateSlabTop(HikanParameters p)
+        {
+            (decimal Min, decimal Max) column = GateColumnRange(p);
+            return SlabTop(p, SectionOver(p, column.Min, column.Max));
+        }
+
         /// <summary>門柱の天端(= 操作台の下面)の高さ = 胸壁の底版上面(敷高)+ 柱高さ Y2。</summary>
         public static decimal GateColumnTop(HikanParameters p)
         {
@@ -405,19 +546,28 @@ namespace Hikan.Core
             HikanRetainingWall r = p.UpstreamRetainingWall;
             if (!r.Exists || !p.UpstreamBreast.Exists) { return; }
             decimal back = p.UpstreamBreast.StemEnd;
-            HikanPart wall = Centred("川裏側土留壁", p.OuterWidth, p.OuterHeight, p.OuterHeight + r.Height,
+            HikanBarrelSection z = SectionOver(p, back - r.Thickness, back);
+            decimal top = SlabTop(p, z);
+            HikanPart wall = Centred("川裏側土留壁", 2m * OuterHalfWidth(p, z), top, top + r.Height,
                 back - r.Thickness, back, false);
             wall.Member = "川裏側土留壁";
             wall.IsSuperstructure = true;
             parts.Add(wall);
         }
 
-        /// <summary>川裏側の土留壁の体積 [m3] = 外形幅 × 厚さ × 高さ。</summary>
+        /// <summary>川裏側の土留壁の体積 [m3] = 外形幅(取り付く区間)× 厚さ × 高さ。</summary>
         public static decimal UpstreamRetainingWallVolume(HikanParameters p)
         {
             HikanRetainingWall r = p.UpstreamRetainingWall;
             if (!r.Exists || !p.UpstreamBreast.Exists) { return 0m; }
-            return p.OuterWidth * r.Thickness * r.Height;
+            return 2m * OuterHalfWidth(p, UpstreamRetainingWallSection(p)) * r.Thickness * r.Height;
+        }
+
+        /// <summary>川裏側の土留壁が載る区間の函体の断面。</summary>
+        public static HikanBarrelSection UpstreamRetainingWallSection(HikanParameters p)
+        {
+            decimal back = p.UpstreamBreast.StemEnd;
+            return SectionOver(p, back - p.UpstreamRetainingWall.Thickness, back);
         }
 
         /// <summary>右側(U ≥ 0)の範囲 [a, b] で直方体を作り、左側なら中心線について鏡映する。</summary>
@@ -820,26 +970,40 @@ namespace Hikan.Core
                 p.BottomSlabThickness + p.InnerHeight, 0m, p.BarrelLength, true));
         }
 
+        /// <summary>標準部の外形断面積 [m2]</summary>
         public static decimal OuterSectionArea(HikanParameters p)
         {
             return p.OuterWidth * p.OuterHeight;
         }
 
+        /// <summary>標準部の内空断面積 = B × H − ハンチ [m2]</summary>
         public static decimal InnerSectionArea(HikanParameters p)
         {
-            return p.InnerWidth * p.InnerHeight;
+            return p.InnerWidth * p.InnerHeight - p.Standard.HaunchArea;
         }
 
-        /// <summary>函体のコンクリート断面積 = 外形 − 内空 [m2]</summary>
+        /// <summary>標準部のコンクリート断面積 = 外形 − 内空 [m2]</summary>
         public static decimal SectionArea(HikanParameters p)
         {
             return OuterSectionArea(p) - InnerSectionArea(p);
         }
 
-        /// <summary>函体のみのコンクリート体積 [m3](胸壁・しゃ水壁を含まない)。</summary>
+        /// <summary>断面 z のコンクリート断面積 = 外形 − (B × H − ハンチ) [m2]</summary>
+        public static decimal SectionArea(HikanParameters p, HikanBarrelSection z)
+        {
+            decimal outer = 2m * OuterHalfWidth(p, z) * (SlabTop(p, z) - BarrelBottom(p, z));
+            return outer - (p.InnerWidth * p.InnerHeight - z.HaunchArea);
+        }
+
+        /// <summary>函体のみのコンクリート体積 [m3](胸壁・しゃ水壁を含まない)= Σ 区間長 × 区間の断面積(ハンチを含む)。</summary>
         public static decimal BarrelVolume(HikanParameters p)
         {
-            return SectionArea(p) * p.BarrelLength;
+            decimal v = 0m;
+            foreach ((string Name, decimal SMin, decimal SMax, HikanBarrelSection Section) z in BarrelZones(p))
+            {
+                v += SectionArea(p, z.Section) * (z.SMax - z.SMin);
+            }
+            return v;
         }
 
         /// <summary>
@@ -852,11 +1016,19 @@ namespace Hikan.Core
         {
             if (!w.Exists) { return 0m; }
             decimal top = BreastFootingTop(p);
+            decimal width = 2m * OuterHalfWidth(p, SectionOver(p, w.StemStart, w.StemEnd));
             decimal stems = 2m * w.Length * (w.CrownHeight - top) * w.StemThickness;
-            decimal footing = (p.OuterWidth + 2m * w.Length) * w.FootingThickness * w.FootingLength;
+            decimal footing = (width + 2m * w.Length) * w.FootingThickness * w.FootingLength;
+            // 函体の底版との重なり(区間ごとに外形幅 × min(底版厚, 胸壁の底版厚) × 区間内の長さ)を差し引く。
             (decimal Min, decimal Max) foot = BreastFootingRange(w, upstream);
-            decimal inside = System.Math.Max(0m, System.Math.Min(foot.Max, p.BarrelLength) - System.Math.Max(foot.Min, 0m));
-            decimal overlap = p.OuterWidth * System.Math.Min(w.FootingThickness, top) * inside;
+            decimal overlap = 0m;
+            foreach ((string Name, decimal SMin, decimal SMax, HikanBarrelSection Section) z in BarrelZones(p))
+            {
+                decimal inside = System.Math.Min(foot.Max, z.SMax) - System.Math.Max(foot.Min, z.SMin);
+                if (inside <= 0m) { continue; }
+                decimal u = System.Math.Min(OuterHalfWidth(p, z.Section), width / 2m + w.Length);
+                overlap += 2m * u * System.Math.Min(w.FootingThickness, z.Section.BottomSlabThickness) * inside;
+            }
             return stems + footing - overlap;
         }
 
@@ -899,18 +1071,27 @@ namespace Hikan.Core
             return v;
         }
 
-        /// <summary>しゃ水壁の合計体積 [m3]。函体と重なる部分を控除した正味。</summary>
+        /// <summary>しゃ水壁の合計体積 [m3]。函体と重なる部分を控除した正味(取り付く区間の外形の周りの環)。</summary>
         public static decimal CutoffVolume(HikanParameters p)
         {
-            if (p.CutoffCount <= 0) { return 0m; }
+            decimal v = 0m;
             decimal a = p.CutoffProjection;
-            decimal outerArea = (p.OuterWidth + 2m * a) * (p.OuterHeight + 2m * a);
-            return p.CutoffCount * (outerArea - OuterSectionArea(p)) * p.CutoffThickness;
+            decimal tc = p.CutoffThickness;
+            for (int i = 1; i <= p.CutoffCount; i++)
+            {
+                decimal s = CutoffPosition(p, i);
+                HikanBarrelSection z = SectionOver(p, s - tc / 2m, s + tc / 2m);
+                decimal w = 2m * OuterHalfWidth(p, z);
+                decimal h = SlabTop(p, z) - BarrelBottom(p, z);
+                v += ((w + 2m * a) * (h + 2m * a) - w * h) * tc;
+            }
+            return v;
         }
 
         /// <summary>
         /// モデル全体のコンクリート体積 [m3]。勾配の回転は体積を変えない。
-        /// 直方体部材の和 − 内空 − 直方体どうしの重なり(BoxOverlapVolume)+ 翼壁 − 翼壁と直方体の重なり + ハンチ。
+        /// 直方体部材の和 − 内空 − 直方体どうしの重なり(BoxOverlapVolume)+ 翼壁 − 翼壁と直方体の重なり
+        /// + 門柱のハンチ + 函体の内空のハンチ(内空の中にあるので、内空を引いたあとに足す)。
         /// 3 個以上が重なる点は無い(HikanValidator が保証)ので、重なりは対ごとに 1 回引けば厳密。
         /// </summary>
         public static decimal ModelVolume(HikanParameters p)
@@ -927,6 +1108,7 @@ namespace Hikan.Core
             {
                 v += part.Volume;
             }
+            v += BarrelHaunchVolume(p);
             return v;
         }
 
@@ -936,13 +1118,19 @@ namespace Hikan.Core
             return p.BarrelLength;
         }
 
+        /// <summary>内空の体積 [m3] = B × H × L − 函体のハンチ。</summary>
+        public static decimal VoidVolume(HikanParameters p)
+        {
+            return p.InnerWidth * p.InnerHeight * VoidLength(p) - BarrelHaunchVolume(p);
+        }
+
         /// <summary>
         /// 外形エンベロープ体積 [m3] = コンクリート + 内空。
         /// 内空は埋戻せないので、床掘りからの控除(地下占有体積)にはこちらを使う。
         /// </summary>
         public static decimal EnvelopeVolume(HikanParameters p)
         {
-            return ModelVolume(p) + InnerSectionArea(p) * VoidLength(p);
+            return ModelVolume(p) + VoidVolume(p);
         }
 
         /// <summary>勾配 i の回転における cos = 1 / √(1 + i²)。i = 0 のとき厳密に 1。</summary>
@@ -985,8 +1173,8 @@ namespace Hikan.Core
                     Extend(ref first, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ, ToWorld(p, u, v, s));
                 }
             }
-            // ハンチは門柱と操作台の内側にあるので実際には範囲を広げないが、頂点で確かめておく。
-            foreach (HikanPrismPart part in GetHaunchParts(p))
+            // ハンチは門柱と操作台の内側・函体の内空にあるので実際には範囲を広げないが、頂点で確かめておく。
+            foreach (HikanPrismPart part in AllHaunchParts(p))
             {
                 foreach ((decimal U, decimal V) c in part.Section)
                 {
@@ -1060,8 +1248,8 @@ namespace Hikan.Core
                 }
             }
 
-            // 門柱のハンチ(三角柱)。他の部材と重ならない。
-            foreach (HikanPrismPart part in GetHaunchParts(p))
+            // 門柱のハンチと函体の内空のハンチ(三角柱)。他の部材と重ならない。
+            foreach (HikanPrismPart part in AllHaunchParts(p))
             {
                 (decimal U, decimal V) c = part.Centroid;
                 Accumulate(ref mass, ref mu, ref mv, ref ms, part.Volume, c.U, c.V, (part.SMin + part.SMax) / 2m);
@@ -1088,6 +1276,13 @@ namespace Hikan.Core
             }
 
             return ToWorld(p, mu / mass, mv / mass, ms / mass);
+        }
+
+        /// <summary>門柱のハンチと函体の内空のハンチ。</summary>
+        private static System.Collections.Generic.IEnumerable<HikanPrismPart> AllHaunchParts(HikanParameters p)
+        {
+            foreach (HikanPrismPart part in GetHaunchParts(p)) { yield return part; }
+            foreach (HikanPrismPart part in GetBarrelHaunchParts(p)) { yield return part; }
         }
 
         private static void Accumulate(

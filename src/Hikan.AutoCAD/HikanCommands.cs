@@ -176,6 +176,9 @@ namespace Hikan.AutoCAD
                 // 胸壁を函体端に寄せ、つま先版が翼壁の底版と重なる配置(BoolUnite で一体化した実体を確かめる)。
                 RunCase(ed, doc, Case(0.00m, true, true, true), "胸壁を函体端に寄せて翼壁と重なる・勾配なし");
                 RunCase(ed, doc, Case(0.02m, true, true, true), "胸壁を函体端に寄せて翼壁と重なる・勾配 0.02");
+                // 函体の両端部の部材厚を変え(外形が段違い)、内空の隅にハンチを付ける。ハンチは内空を抜いたあとに BoolUnite する。
+                RunCase(ed, doc, WithZones(WithGate(Case(0.00m, true, true, false))), "+端部函体・ハンチ・勾配なし");
+                RunCase(ed, doc, WithZones(WithGate(Case(0.02m, true, true, false))), "+端部函体・ハンチ・勾配 0.02");
             }
             catch (System.Exception ex)
             {
@@ -313,6 +316,42 @@ namespace Hikan.AutoCAD
             g.HaunchHeight = 0.3m;
             g.RetainingWallHeight = 1.5m;
             return p;
+        }
+
+        /// <summary>
+        /// 函体を 川裏側端部 3.0 / 標準部 / 川表側端部 4.0 に分け、区間ごとに部材厚とハンチを変える(スパンも 3 / 13 / 4)。
+        /// 川裏側端部: 側壁 0.5 / 頂版 0.5 / 底版 0.7(底版下面が Z = 0 より 0.1 下がる)、ハンチ LT・RT 0.3 × 0.3。
+        /// 標準部: ハンチ LT・RT 0.2 × 0.2。川表側端部: 側壁 0.6 / 頂版 0.6 / 底版 0.6、ハンチ LT・RT H 0.2 × W 0.4、LB・RB 0.2 × 0.2。
+        /// 川裏側胸壁のたて壁・川裏側の土留壁は川裏側端部、門柱・川表側胸壁のたて壁は川表側端部、しゃ水壁は標準部にあり、
+        /// それぞれ取り付く区間の外形に付く。川裏側胸壁の底版(0.95〜3.45)は区間の境目 3.0 をまたぐ。
+        /// 土留壁の上端は、川裏側 3.1 + 1.0 = 4.1、川表側 3.2 + 1.5 = 4.7 で、どちらも胸壁の天端以上。
+        /// </summary>
+        private static Hikan.Core.HikanParameters WithZones(Hikan.Core.HikanParameters p)
+        {
+            p.Spans = new decimal[] { 3.0m, 13.0m, 4.0m };
+            p.UpstreamEndLength = 3.0m;
+            p.UpstreamEnd.WallThickness = 0.5m;
+            p.UpstreamEnd.TopSlabThickness = 0.5m;
+            p.UpstreamEnd.BottomSlabThickness = 0.7m;
+            Haunch(p.UpstreamEnd.LeftTop, 0.3m, 0.3m);
+            Haunch(p.UpstreamEnd.RightTop, 0.3m, 0.3m);
+            Haunch(p.Standard.LeftTop, 0.2m, 0.2m);
+            Haunch(p.Standard.RightTop, 0.2m, 0.2m);
+            p.DownstreamEndLength = 4.0m;
+            p.DownstreamEnd.WallThickness = 0.6m;
+            p.DownstreamEnd.TopSlabThickness = 0.6m;
+            p.DownstreamEnd.BottomSlabThickness = 0.6m;
+            Haunch(p.DownstreamEnd.LeftTop, 0.2m, 0.4m);
+            Haunch(p.DownstreamEnd.RightTop, 0.2m, 0.4m);
+            Haunch(p.DownstreamEnd.LeftBottom, 0.2m, 0.2m);
+            Haunch(p.DownstreamEnd.RightBottom, 0.2m, 0.2m);
+            return p;
+        }
+
+        private static void Haunch(Hikan.Core.HikanHaunch h, decimal height, decimal width)
+        {
+            h.Height = height;
+            h.Width = width;
         }
 
         private static void RunCase(

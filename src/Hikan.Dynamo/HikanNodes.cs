@@ -9,7 +9,9 @@ namespace Hikan.Dynamo
     /// <summary>
     /// 樋管函体の数量を返す Zero Touch Node。モデルは作らず数値のみ返すため
     /// ProtoGeometry.dll / DSCoreNodes.dll は参照しない。
-    /// 列挙型は Dynamo から扱いにくいため公開せず、引数は double / int の素の型に限る。
+    /// 列挙型は Dynamo から扱いにくいため公開せず、引数は double / int / bool の素の型に限る。
+    /// 函体延長はスパン 1〜5 の長さの合計(後ろの 0 は使わないスパン)、ブロック数はスパン数。
+    /// ハンチ(Haunch LT/LB/RT/RB の Height・Width)と端部(upstreamEnd* / downstreamEnd*、長さ 0 で端部なし)は入力画面と同じ。
     /// HikanValidationException はそのまま伝播させ、ノードを警告状態にする。
     /// </summary>
     public static class HikanNodes
@@ -38,6 +40,7 @@ namespace Hikan.Dynamo
             "頂版_m3",
             "底版_m3",
             "側壁_m3",
+            "函体ハンチ_m3",
             "型枠_内空_m2",
             "型枠_外側面_m2",
             "型枠_頂版上面_m2",
@@ -60,10 +63,45 @@ namespace Hikan.Dynamo
             double wallThickness = 0.4,
             double topSlabThickness = 0.4,
             double bottomSlabThickness = 0.4,
-            double barrelLength = 20.0,
+            double standardHaunchLTHeight = 0.0,
+            double standardHaunchLTWidth = 0.0,
+            double standardHaunchLBHeight = 0.0,
+            double standardHaunchLBWidth = 0.0,
+            double standardHaunchRTHeight = 0.0,
+            double standardHaunchRTWidth = 0.0,
+            double standardHaunchRBHeight = 0.0,
+            double standardHaunchRBWidth = 0.0,
+            double span1 = 5.0,
+            double span2 = 5.0,
+            double span3 = 5.0,
+            double span4 = 5.0,
+            double span5 = 0.0,
+            double upstreamEndLength = 0.0,
+            double upstreamEndWallThickness = 0.4,
+            double upstreamEndTopSlabThickness = 0.4,
+            double upstreamEndBottomSlabThickness = 0.4,
+            double upstreamEndHaunchLTHeight = 0.0,
+            double upstreamEndHaunchLTWidth = 0.0,
+            double upstreamEndHaunchLBHeight = 0.0,
+            double upstreamEndHaunchLBWidth = 0.0,
+            double upstreamEndHaunchRTHeight = 0.0,
+            double upstreamEndHaunchRTWidth = 0.0,
+            double upstreamEndHaunchRBHeight = 0.0,
+            double upstreamEndHaunchRBWidth = 0.0,
+            double downstreamEndLength = 0.0,
+            double downstreamEndWallThickness = 0.4,
+            double downstreamEndTopSlabThickness = 0.4,
+            double downstreamEndBottomSlabThickness = 0.4,
+            double downstreamEndHaunchLTHeight = 0.0,
+            double downstreamEndHaunchLTWidth = 0.0,
+            double downstreamEndHaunchLBHeight = 0.0,
+            double downstreamEndHaunchLBWidth = 0.0,
+            double downstreamEndHaunchRTHeight = 0.0,
+            double downstreamEndHaunchRTWidth = 0.0,
+            double downstreamEndHaunchRBHeight = 0.0,
+            double downstreamEndHaunchRBWidth = 0.0,
             double bottomSlope = 0.0,
             double soilCover = 2.0,
-            int blockCount = 4,
             double excavationMargin = 0.5,
             double excavationSlope = 0.5,
             double foundationThickness = 0.1,
@@ -132,10 +170,41 @@ namespace Hikan.Dynamo
             p.WallThickness = (decimal)wallThickness;
             p.TopSlabThickness = (decimal)topSlabThickness;
             p.BottomSlabThickness = (decimal)bottomSlabThickness;
-            p.BarrelLength = (decimal)barrelLength;
+            p.Standard.LeftTop.Height = (decimal)standardHaunchLTHeight;
+            p.Standard.LeftTop.Width = (decimal)standardHaunchLTWidth;
+            p.Standard.LeftBottom.Height = (decimal)standardHaunchLBHeight;
+            p.Standard.LeftBottom.Width = (decimal)standardHaunchLBWidth;
+            p.Standard.RightTop.Height = (decimal)standardHaunchRTHeight;
+            p.Standard.RightTop.Width = (decimal)standardHaunchRTWidth;
+            p.Standard.RightBottom.Height = (decimal)standardHaunchRBHeight;
+            p.Standard.RightBottom.Width = (decimal)standardHaunchRBWidth;
+            p.Spans = Spans(span1, span2, span3, span4, span5);
+            p.UpstreamEndLength = (decimal)upstreamEndLength;
+            p.UpstreamEnd.WallThickness = (decimal)upstreamEndWallThickness;
+            p.UpstreamEnd.TopSlabThickness = (decimal)upstreamEndTopSlabThickness;
+            p.UpstreamEnd.BottomSlabThickness = (decimal)upstreamEndBottomSlabThickness;
+            p.UpstreamEnd.LeftTop.Height = (decimal)upstreamEndHaunchLTHeight;
+            p.UpstreamEnd.LeftTop.Width = (decimal)upstreamEndHaunchLTWidth;
+            p.UpstreamEnd.LeftBottom.Height = (decimal)upstreamEndHaunchLBHeight;
+            p.UpstreamEnd.LeftBottom.Width = (decimal)upstreamEndHaunchLBWidth;
+            p.UpstreamEnd.RightTop.Height = (decimal)upstreamEndHaunchRTHeight;
+            p.UpstreamEnd.RightTop.Width = (decimal)upstreamEndHaunchRTWidth;
+            p.UpstreamEnd.RightBottom.Height = (decimal)upstreamEndHaunchRBHeight;
+            p.UpstreamEnd.RightBottom.Width = (decimal)upstreamEndHaunchRBWidth;
+            p.DownstreamEndLength = (decimal)downstreamEndLength;
+            p.DownstreamEnd.WallThickness = (decimal)downstreamEndWallThickness;
+            p.DownstreamEnd.TopSlabThickness = (decimal)downstreamEndTopSlabThickness;
+            p.DownstreamEnd.BottomSlabThickness = (decimal)downstreamEndBottomSlabThickness;
+            p.DownstreamEnd.LeftTop.Height = (decimal)downstreamEndHaunchLTHeight;
+            p.DownstreamEnd.LeftTop.Width = (decimal)downstreamEndHaunchLTWidth;
+            p.DownstreamEnd.LeftBottom.Height = (decimal)downstreamEndHaunchLBHeight;
+            p.DownstreamEnd.LeftBottom.Width = (decimal)downstreamEndHaunchLBWidth;
+            p.DownstreamEnd.RightTop.Height = (decimal)downstreamEndHaunchRTHeight;
+            p.DownstreamEnd.RightTop.Width = (decimal)downstreamEndHaunchRTWidth;
+            p.DownstreamEnd.RightBottom.Height = (decimal)downstreamEndHaunchRBHeight;
+            p.DownstreamEnd.RightBottom.Width = (decimal)downstreamEndHaunchRBWidth;
             p.BottomSlope = (decimal)bottomSlope;
             p.SoilCover = (decimal)soilCover;
-            p.BlockCount = blockCount;
             p.ExcavationMargin = (decimal)excavationMargin;
             p.ExcavationSlope = (decimal)excavationSlope;
             p.FoundationThickness = (decimal)foundationThickness;
@@ -226,6 +295,7 @@ namespace Hikan.Dynamo
             r["頂版_m3"] = (double)e.TopSlabVolume;
             r["底版_m3"] = (double)e.BottomSlabVolume;
             r["側壁_m3"] = (double)e.WallVolume;
+            r["函体ハンチ_m3"] = (double)e.BarrelHaunchVolume;
             r["型枠_内空_m2"] = (double)e.FormworkInner;
             r["型枠_外側面_m2"] = (double)e.FormworkOuterSide;
             r["型枠_頂版上面_m2"] = (double)e.FormworkTop;
@@ -241,6 +311,16 @@ namespace Hikan.Dynamo
             r["床掘り_m3"] = (double)e.ExcavationVolume;
             r["埋戻_m3"] = (double)e.BackfillVolume;
             r["残土_m3"] = (double)e.SurplusVolume;
+            return r;
+        }
+
+        /// <summary>スパン 1〜5 の長さ。後ろの 0 は「使わないスパン」として除く(途中の 0 は検査でエラーになる)。</summary>
+        private static decimal[] Spans(params double[] spans)
+        {
+            int n = spans.Length;
+            while (n > 0 && spans[n - 1] == 0.0) { n--; }
+            decimal[] r = new decimal[n];
+            for (int i = 0; i < n; i++) { r[i] = (decimal)spans[i]; }
             return r;
         }
     }

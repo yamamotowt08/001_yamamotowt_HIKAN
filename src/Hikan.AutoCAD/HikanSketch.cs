@@ -19,6 +19,7 @@ namespace Hikan.AutoCAD
         private static readonly System.Drawing.Color OutlineColor = System.Drawing.Color.FromArgb(80, 80, 80);
         private static readonly System.Drawing.Color DimensionColor = System.Drawing.Color.FromArgb(30, 60, 200);
         private static readonly System.Drawing.Color NoteColor = System.Drawing.Color.FromArgb(90, 90, 90);
+        private static readonly System.Drawing.Color HaunchColor = System.Drawing.Color.FromArgb(200, 40, 40);
 
         private readonly System.Drawing.Graphics g;
         private readonly System.Drawing.Font font;
@@ -52,34 +53,73 @@ namespace Hikan.AutoCAD
 
         // ---------------------------------------------------------------- 図
 
-        /// <summary>函体: 断面(下流を見る)と側面。</summary>
-        public void Barrel()
+        /// <summary>
+        /// 函体の断面(下流を見る)。記号は手本の樋門設計ソフトの「断面寸法」に合わせる(WL・WR は側壁厚で左右共通)。
+        /// 内空の 4 隅のハンチ LT・RT・LB・RB は H(鉛直)× W(水平)の直角三角形。
+        /// </summary>
+        public void BarrelSection()
         {
-            // 断面。外形 x 11〜39 / y 12〜40、内空 x 15〜35 / y 17〜36。
-            Solid(11, 12, 39, 12, 39, 40, 11, 40);
-            Hollow(15, 17, 35, 17, 35, 36, 15, 36);
-            Dashed(25, 7, 25, 45);
-            Note(25, 46.5f, "CL(X = 0)");
-            Dim(15, 22, 35, 22, 0, "B");
-            Dim(31, 17, 31, 36, 0, "H");
-            Dim(11, 40, 15, 40, 3, "tw");
-            Dim(39, 36, 39, 40, -3, "tt");
-            Dim(39, 12, 39, 17, -3, "tb");
-            Point(25, 12);
-            Note(25, 9, "基準点(Z = 0)");
-            Title(25, 57, "断面(下流を見る)");
+            // 外形 x 22〜78 / y 6〜50、内空 x 29〜71 / y 13〜43。上のハンチ 6、下のハンチ 4 の例。
+            Solid(22, 6, 78, 6, 78, 50, 22, 50);
+            Hollow(33, 13, 67, 13, 71, 17, 71, 37, 65, 43, 35, 43, 29, 37, 29, 17);
+            Dashed(50, 3, 50, 53);
+            Dim(22, 50, 29, 50, 4, "WL");
+            Dim(29, 50, 71, 50, 4, "SW");
+            Dim(71, 50, 78, 50, 4, "WR");
+            Dim(22, 50, 22, 43, -4, "WT");
+            Dim(22, 43, 22, 13, -4, "SH");
+            Dim(22, 13, 22, 6, -4, "WB");
+            Text(42, 46.5f, "LT", HaunchColor);
+            Text(58, 46.5f, "RT", HaunchColor);
+            Text(42, 9.5f, "LB", HaunchColor);
+            Text(58, 9.5f, "RB", HaunchColor);
+            Dim(29, 43, 29, 37, -2.5f, "H");
+            Dim(29, 43, 35, 43, 2.5f, "W");
+            Note(88, 28, "WL = WR");
+        }
 
-            // 側面。底版下面が (54,22) → (94,16) に下がる。
-            Solid(54, 22, 94, 16, 94, 28, 54, 34);
-            Dashed(54, 25, 94, 19);
-            Dashed(54, 31, 94, 25);
-            Dashed(54, 22, 97, 22);
-            Dim(54, 22, 94, 16, -4, "L(底版下面に沿う斜距離)");
-            Note(54, 37, "川裏端 S = 0");
-            Note(94, 31, "川表端");
-            Note(76, 44, "底版勾配 i(下流下がり)");
-            Note(76, 48.5f, "川裏(上流)→ 川表(下流) = +Y");
-            Title(76, 57, "側面");
+        /// <summary>函体の縦断面(中心線で切る)。端部は部材厚を変えられ、外形が段違いになる。スパンの合計が函体延長。</summary>
+        public void BarrelProfile()
+        {
+            // 標準部の外形 y 22〜38、端部 y 20〜40(厚くした例)。内空 y 26〜34 は全長で共通。
+            Solid(8, 20, 24, 20, 24, 22, 76, 22, 76, 20, 92, 20, 92, 40, 76, 40, 76, 38, 24, 38, 24, 40, 8, 40);
+            Fill(System.Drawing.Color.White, 8, 26, 92, 26, 92, 34, 8, 34);
+            Line(8, 26, 92, 26);
+            Line(8, 34, 92, 34);
+            Dashed(24, 18, 24, 42);
+            Dashed(76, 18, 76, 42);
+            Dim(8, 40, 24, 40, 4, "川裏側端部");
+            Dim(24, 40, 76, 40, 4, "標準部");
+            Dim(76, 40, 92, 40, 4, "川表側端部");
+            Dashed(36, 12, 36, 20);
+            Dashed(62, 12, 62, 20);
+            Dim(8, 20, 36, 20, -5, "スパン1");
+            Dim(36, 20, 62, 20, -5, "スパン2");
+            Dim(62, 20, 92, 20, -5, "スパン3");
+            Note(16, 30, "川裏");
+            Note(84, 30, "川表");
+            Note(50, 30, "内空");
+            Note(50, 6, "函体延長 L = スパン長の合計(継手 = スパンの境目)");
+            Title(50, 55, "縦断面");
+        }
+
+        /// <summary>函体の平断面(内空の高さで切る)。内空幅は全長で共通、端部は側壁厚を変えられる。</summary>
+        public void BarrelPlan()
+        {
+            // 左の側壁(下流を見て左 = 図の上)と右の側壁。端部は側壁を厚くした例。
+            Solid(8, 44, 24, 44, 24, 42, 76, 42, 76, 44, 92, 44, 92, 38, 8, 38);
+            Solid(8, 16, 24, 16, 24, 18, 76, 18, 76, 16, 92, 16, 92, 22, 8, 22);
+            Dashed(24, 12, 24, 48);
+            Dashed(76, 12, 76, 48);
+            Dim(50, 22, 50, 38, 0, "SW");
+            Dim(92, 38, 92, 44, -4, "WL");
+            Dim(92, 16, 92, 22, -4, "WR");
+            Note(16, 30, "川裏");
+            Note(84, 30, "川表");
+            Note(16, 8, "川裏側端部");
+            Note(50, 8, "標準部");
+            Note(84, 8, "川表側端部");
+            Title(50, 55, "平断面");
         }
 
         /// <summary>胸壁: 断面(下流を見る)と側面。川裏側はつま先が川裏端側、川表側は川表端側。</summary>

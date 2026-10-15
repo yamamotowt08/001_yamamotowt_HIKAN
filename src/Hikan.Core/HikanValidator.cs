@@ -26,10 +26,9 @@ namespace Hikan.Core
 
             if (p.InnerWidth <= 0m) { errors.Add("内空幅 B は正の値にしてください。"); }
             if (p.InnerHeight <= 0m) { errors.Add("内空高 H は正の値にしてください。"); }
-            if (p.BarrelLength <= 0m) { errors.Add("函体延長 L は正の値にしてください。"); }
+            CheckSpans(errors, p);
             if (p.SoilCover < 0m) { errors.Add("土かぶりは 0 以上にしてください。"); }
             if (p.BottomSlope < 0m) { errors.Add("底版勾配 i は 0 以上(下流下がり)にしてください。"); }
-            if (p.BlockCount < 1) { errors.Add("ブロック数は 1 以上にしてください。"); }
             if (p.ExcavationMargin < 0m) { errors.Add("床掘り余裕幅は 0 以上にしてください。"); }
             if (p.ExcavationSlope < 0m) { errors.Add("床掘り法勾配 n は 0 以上にしてください。"); }
             if (p.FoundationThickness < 0m) { errors.Add("基礎材厚は 0 以上にしてください。"); }
@@ -38,6 +37,8 @@ namespace Hikan.Core
             CheckThickness(errors, p.WallThickness, "側壁厚");
             CheckThickness(errors, p.TopSlabThickness, "頂版厚");
             CheckThickness(errors, p.BottomSlabThickness, "底版厚");
+            CheckHaunches(errors, p, p.Standard, "標準部");
+            CheckBarrelEnds(errors, p);
 
             CheckBreastWall(errors, p, p.UpstreamBreast, "川裏側胸壁");
             CheckBreastWall(errors, p, p.DownstreamBreast, "川表側胸壁");
@@ -63,13 +64,20 @@ namespace Hikan.Core
                 errors.Add("土かぶりが適用範囲(" + MaxSoilCover + " m 程度以下)を超えています。");
             }
 
-            // 整合性チェック: 函体の部位別体積の和 == 函体断面積 × 延長。断面の分解と全体が食い違う入力を弾く。
+            // 整合性チェック: 函体の部位別体積(頂版・底版・側壁・ハンチ)の和 == Σ 区間の断面積 × 区間長。
+            // 断面の分解と全体が食い違う入力を弾く。
             // 比較相手は BarrelVolume(函体のみ)であって ModelVolume(胸壁・しゃ水壁を含む総計)ではない。
             if (p.InnerWidth > 0m && p.InnerHeight > 0m && p.BarrelLength > 0m)
             {
-                decimal parts = p.OuterWidth * p.TopSlabThickness * p.BarrelLength
-                    + p.OuterWidth * p.BottomSlabThickness * p.BarrelLength
-                    + 2m * p.WallThickness * p.InnerHeight * p.BarrelLength;
+                decimal parts = HikanGeometry.BarrelHaunchVolume(p);
+                foreach ((string Name, decimal SMin, decimal SMax, HikanBarrelSection Section) z in HikanGeometry.BarrelZones(p))
+                {
+                    decimal l = z.SMax - z.SMin;
+                    decimal width = 2m * HikanGeometry.OuterHalfWidth(p, z.Section);
+                    parts += width * z.Section.TopSlabThickness * l
+                        + width * z.Section.BottomSlabThickness * l
+                        + 2m * z.Section.WallThickness * p.InnerHeight * l;
+                }
                 decimal whole = HikanGeometry.BarrelVolume(p);
                 if (System.Math.Abs(parts - whole) > Tolerance)
                 {
@@ -114,6 +122,7 @@ namespace Hikan.Core
                 errors.Add(name + "のたて壁(軸位置 " + w.Position + " m ± 厚/2 = " + w.StemStart + "〜" + w.StemEnd
                     + " m)が函体延長 0〜" + p.BarrelLength + " m からはみ出しています。");
             }
+            CheckOuterStep(errors, p, w.StemStart, w.StemEnd, name + "のたて壁");
         }
 
         /// <summary>
@@ -156,6 +165,12 @@ namespace Hikan.Core
                 errors.Add("しゃ水壁厚 × 枚数 = " + (p.CutoffThickness * p.CutoffCount)
                     + " m が函体延長 " + p.BarrelLength + " m 以上です。カラーが互いに接触するか函体からはみ出します。");
                 return;
+            }
+
+            for (int i = 1; i <= p.CutoffCount; i++)
+            {
+                decimal c = HikanGeometry.CutoffPosition(p, i);
+                CheckOuterStep(errors, p, c - p.CutoffThickness / 2m, c + p.CutoffThickness / 2m, "しゃ水壁 " + i + " 枚目");
             }
 
             // 胸壁とカラーは X・Z で重なるので、Y(S)で離れていないと体積の解析解が崩れる。
@@ -284,10 +299,11 @@ namespace Hikan.Core
             if (g.LongitudinalWallWidth < 0m) { errors.Add(name + "の縦方向壁幅 X4 は 0 以上にしてください。"); }
             if (g.TransverseWallWidth < 0m) { errors.Add(name + "の横方向壁幅 X8 は 0 以上にしてください。"); }
             // 門柱は胸壁の底版の上面(敷高)から立つ。操作台(門柱の天端)は頂版上面より上にあること。
-            decimal above = HikanGeometry.GateColumnTop(p) - p.OuterHeight;   // 頂版上面から操作台下面まで
+            decimal slab = HikanGeometry.GateSlabTop(p);                  // 門柱が立つ区間の頂版上面
+            decimal above = HikanGeometry.GateColumnTop(p) - slab;          // 頂版上面から操作台下面まで
             if (above <= 0m)
             {
-                errors.Add(name + "の柱高さ Y2(胸壁の底版の上面から)は 頂版上面 − 敷高 = " + (p.OuterHeight - HikanGeometry.BreastFootingTop(p))
+                errors.Add(name + "の柱高さ Y2(胸壁の底版の上面から)は 頂版上面 − 敷高 = " + (slab - HikanGeometry.BreastFootingTop(p))
                     + " m より大きくしてください(操作台が頂版より下になります)。");
             }
             if (g.RetainingWallHeight < 0m) { errors.Add(name + "の土留壁高さ WH は 0 以上にしてください(0 で土留壁なし)。"); }
@@ -297,7 +313,7 @@ namespace Hikan.Core
             }
             if (g.RetainingWallHeight > 0m && p.DownstreamBreast.Exists)
             {
-                CheckRetainingWallTop(errors, p, g.RetainingWallHeight, p.DownstreamBreast, name + "の土留壁高さ WH", "川表側胸壁");
+                CheckRetainingWallTop(errors, slab, g.RetainingWallHeight, p.DownstreamBreast, name + "の土留壁高さ WH", "川表側胸壁");
             }
             if (g.HaunchHeight < 0m) { errors.Add(name + "のハンチ高 H2 は 0 以上にしてください。"); }
             else if (g.HaunchHeight >= p.InnerWidth / 2m + g.TransverseWallWidth)
@@ -305,7 +321,7 @@ namespace Hikan.Core
                 errors.Add(name + "のハンチ高 H2 は 内空幅の半分 + X8(" + (p.InnerWidth / 2m + g.TransverseWallWidth)
                     + " m)より小さくしてください(左右のハンチが重なります)。");
             }
-            else if (g.HaunchHeight > HikanGeometry.GateColumnTop(p) - p.OuterHeight)
+            else if (g.HaunchHeight > above)
             {
                 errors.Add(name + "のハンチ高 H2 は 頂版上面から操作台下面までの高さ以下にしてください(函体に食い込みます)。");
             }
@@ -354,6 +370,7 @@ namespace Hikan.Core
                 errors.Add(name + "の門柱(川表側胸壁のたて壁の背面 " + column.Min + " m から X4 + X5 = " + g.ColumnLength
                     + " m)が函体延長 0〜" + p.BarrelLength + " m からはみ出します。川表側胸壁の軸位置を見直してください。");
             }
+            CheckOuterStep(errors, p, column.Min, column.Max, name + "の門柱");
             for (int i = 1; i <= p.CutoffCount; i++)
             {
                 decimal c = HikanGeometry.CutoffPosition(p, i);
@@ -386,7 +403,8 @@ namespace Hikan.Core
                 return;
             }
             if (!r.Exists || !p.UpstreamBreast.Exists) { return; }
-            CheckRetainingWallTop(errors, p, r.Height, p.UpstreamBreast, name + "の高さ", "川裏側胸壁");
+            CheckRetainingWallTop(errors, HikanGeometry.SlabTop(p, HikanGeometry.UpstreamRetainingWallSection(p)),
+                r.Height, p.UpstreamBreast, name + "の高さ", "川裏側胸壁");
             CheckThickness(errors, r.Thickness, name + "の厚さ");
             decimal back = p.UpstreamBreast.StemEnd;
             decimal front = back - r.Thickness;
@@ -394,6 +412,7 @@ namespace Hikan.Core
             {
                 errors.Add(name + "の厚さ " + r.Thickness + " m では川裏函体端(S = 0)からはみ出します(背面 S = " + back + " m)。");
             }
+            CheckOuterStep(errors, p, front, back, name);
             for (int i = 1; i <= p.CutoffCount; i++)
             {
                 decimal c = HikanGeometry.CutoffPosition(p, i);
@@ -414,11 +433,11 @@ namespace Hikan.Core
             }
         }
 
-        /// <summary>土留壁の上端(頂版上面 + 高さ)は、隣り合う胸壁のたて壁の天端より低くしない。</summary>
+        /// <summary>土留壁の上端(頂版上面 slab + 高さ)は、隣り合う胸壁のたて壁の天端より低くしない。</summary>
         private static void CheckRetainingWallTop(
-            System.Collections.Generic.List<string> errors, HikanParameters p, decimal height, HikanBreastWall w, string label, string breast)
+            System.Collections.Generic.List<string> errors, decimal slab, decimal height, HikanBreastWall w, string label, string breast)
         {
-            decimal min = w.CrownHeight - p.OuterHeight;
+            decimal min = w.CrownHeight - slab;
             if (height < min - Tolerance)
             {
                 errors.Add(label + " は " + breast + "のたて壁の天端 − 頂版上面 = " + min
@@ -476,6 +495,118 @@ namespace Hikan.Core
                     errors.Add(name + "(" + b.Min + "〜" + b.Max + " m)が " + i + " 枚目のしゃ水壁("
                         + cMin + "〜" + cMax + " m)と干渉します。");
                 }
+            }
+        }
+
+        /// <summary>
+        /// スパン長。1〜5 個で、どれも正。合計が函体延長 L になる。
+        /// </summary>
+        private static void CheckSpans(System.Collections.Generic.List<string> errors, HikanParameters p)
+        {
+            if (p.Spans.Length == 0)
+            {
+                errors.Add("スパン1 の長さを入力してください(スパンは 1 個以上。合計が函体延長 L になります)。");
+                return;
+            }
+            if (p.Spans.Length > HikanParameters.MaxSpans)
+            {
+                errors.Add("スパンの数 " + p.Spans.Length + " が上限 " + HikanParameters.MaxSpans + " を超えています。");
+            }
+            for (int i = 0; i < p.Spans.Length; i++)
+            {
+                if (p.Spans[i] <= 0m)
+                {
+                    errors.Add("スパン" + (i + 1) + " の長さは正の値にしてください(使わないスパンは後ろから空けてください)。");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 川裏側端部・川表側端部。長さは 0 以上(0 で端部なし)で、両端部の長さの和は函体延長以下。
+        /// 長さが正なら、その断面の部材厚は最小部材厚 0.40 m・0.10 m ピッチ、ハンチは標準部と同じ検査。
+        /// </summary>
+        private static void CheckBarrelEnds(System.Collections.Generic.List<string> errors, HikanParameters p)
+        {
+            CheckBarrelEnd(errors, p, p.UpstreamEnd, p.UpstreamEndLength, "川裏側端部");
+            CheckBarrelEnd(errors, p, p.DownstreamEnd, p.DownstreamEndLength, "川表側端部");
+            decimal sum = p.UpstreamEndLength + p.DownstreamEndLength;
+            if (p.UpstreamEndLength >= 0m && p.DownstreamEndLength >= 0m && sum > p.BarrelLength + Tolerance)
+            {
+                errors.Add("川裏側端部の長さ + 川表側端部の長さ = " + sum + " m が函体延長 L = " + p.BarrelLength
+                    + " m(スパン長の合計)を超えています。");
+            }
+        }
+
+        private static void CheckBarrelEnd(
+            System.Collections.Generic.List<string> errors, HikanParameters p, HikanBarrelSection z, decimal length, string name)
+        {
+            if (length < 0m)
+            {
+                errors.Add(name + "の長さ は 0 以上にしてください(0 で端部なし)。");
+                return;
+            }
+            if (length == 0m) { return; }
+            CheckThickness(errors, z.WallThickness, name + "の側壁厚");
+            CheckThickness(errors, z.TopSlabThickness, name + "の頂版厚");
+            CheckThickness(errors, z.BottomSlabThickness, name + "の底版厚");
+            CheckHaunches(errors, p, z, name);
+        }
+
+        /// <summary>
+        /// 内空の 4 隅のハンチ。H・W は 0 以上で、両方正(ハンチあり)か両方 0(なし)。
+        /// 上下・左右のハンチどうしが内空の中で重ならない(LT と LB の高さの和 &lt; 内空高 など)。
+        /// </summary>
+        private static void CheckHaunches(
+            System.Collections.Generic.List<string> errors, HikanParameters p, HikanBarrelSection z, string name)
+        {
+            CheckHaunch(errors, z.LeftTop, name + "のハンチ LT");
+            CheckHaunch(errors, z.LeftBottom, name + "のハンチ LB");
+            CheckHaunch(errors, z.RightTop, name + "のハンチ RT");
+            CheckHaunch(errors, z.RightBottom, name + "のハンチ RB");
+            if (z.LeftTop.Height + z.LeftBottom.Height >= p.InnerHeight && p.InnerHeight > 0m)
+            {
+                errors.Add(name + "のハンチ LT の H は、LB の H との和を内空高 H(" + p.InnerHeight + " m)より小さくしてください。");
+            }
+            if (z.RightTop.Height + z.RightBottom.Height >= p.InnerHeight && p.InnerHeight > 0m)
+            {
+                errors.Add(name + "のハンチ RT の H は、RB の H との和を内空高 H(" + p.InnerHeight + " m)より小さくしてください。");
+            }
+            if (z.LeftTop.Width + z.RightTop.Width >= p.InnerWidth && p.InnerWidth > 0m)
+            {
+                errors.Add(name + "のハンチ LT の W は、RT の W との和を内空幅 B(" + p.InnerWidth + " m)より小さくしてください。");
+            }
+            if (z.LeftBottom.Width + z.RightBottom.Width >= p.InnerWidth && p.InnerWidth > 0m)
+            {
+                errors.Add(name + "のハンチ LB の W は、RB の W との和を内空幅 B(" + p.InnerWidth + " m)より小さくしてください。");
+            }
+        }
+
+        private static void CheckHaunch(System.Collections.Generic.List<string> errors, HikanHaunch h, string name)
+        {
+            if (h.Height < 0m) { errors.Add(name + " の H は 0 以上にしてください。"); }
+            if (h.Width < 0m) { errors.Add(name + " の W は 0 以上にしてください。"); }
+            if (h.Height > 0m && h.Width == 0m)
+            {
+                errors.Add(name + " の W は正の値にしてください(H と W は両方正か、両方 0 でハンチなし)。");
+            }
+            if (h.Width > 0m && h.Height == 0m)
+            {
+                errors.Add(name + " の H は正の値にしてください(H と W は両方正か、両方 0 でハンチなし)。");
+            }
+        }
+
+        /// <summary>
+        /// 函体の外側に取り付く部材(胸壁のたて壁・しゃ水壁・門柱・土留壁)は、函体の外形(部材厚)が変わる所をまたがない。
+        /// またぐと取り付く面が段違いになって形が決まらない。ハンチだけが違う境目はまたいでよい。
+        /// </summary>
+        private static void CheckOuterStep(
+            System.Collections.Generic.List<string> errors, HikanParameters p, decimal a, decimal b, string name)
+        {
+            decimal? step = HikanGeometry.OuterStep(p, a, b);
+            if (step.HasValue)
+            {
+                errors.Add(name + "(" + a + "〜" + b + " m)が、函体の部材厚が変わる所(S = " + step.Value
+                    + " m、端部と標準部の境目)をまたいでいます。端部の長さか部材の位置を見直してください。");
             }
         }
 

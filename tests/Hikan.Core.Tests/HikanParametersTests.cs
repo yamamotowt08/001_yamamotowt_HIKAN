@@ -12,10 +12,17 @@ namespace Hikan.Core.Tests
             p.WallThickness = 0.5m;
             p.TopSlabThickness = 0.6m;
             p.BottomSlabThickness = 0.7m;
-            p.BarrelLength = 33.456m;
+            p.Spans = new decimal[] { 10.5m, 12.456m, 10.5m };
+            p.UpstreamEndLength = 3.5m;
+            p.DownstreamEndLength = 4.25m;
+            p.UpstreamEnd.WallThickness = 0.6m;
+            p.DownstreamEnd.BottomSlabThickness = 0.9m;
+            p.Standard.LeftTop.Height = 0.15m;
+            p.Standard.LeftTop.Width = 0.3m;
+            p.DownstreamEnd.RightBottom.Height = 0.25m;
+            p.DownstreamEnd.RightBottom.Width = 0.125m;
             p.BottomSlope = 0.015m;
             p.SoilCover = 3.25m;
-            p.BlockCount = 7;
             p.ExcavationMargin = 0.75m;
             p.ExcavationSlope = 1.2m;
             p.FoundationThickness = 0.15m;
@@ -70,7 +77,7 @@ namespace Hikan.Core.Tests
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
             System.Collections.Generic.Dictionary<string, string> d = p.ToDictionary();
-            d["block_count"] = "3.5";
+            d["span_count"] = "3.5";
             Xunit.Assert.Throws<Hikan.Core.HikanValidationException>(
                 () => Hikan.Core.HikanParameters.FromDictionary(d));
         }
@@ -128,12 +135,28 @@ namespace Hikan.Core.Tests
             {
                 Xunit.Assert.True(d.Remove(key), "キーが存在すること: " + key);
             }
+            // 端部・ハンチ・スパンのキーも無く、代わりに函体延長とブロック数がある。
+            foreach (string key in new System.Collections.Generic.List<string>(d.Keys))
+            {
+                if (key.StartsWith("upstream_end_", System.StringComparison.Ordinal)
+                    || key.StartsWith("downstream_end_", System.StringComparison.Ordinal)
+                    || key.StartsWith("haunch_", System.StringComparison.Ordinal)
+                    || key.StartsWith("span_", System.StringComparison.Ordinal))
+                {
+                    d.Remove(key);
+                }
+            }
+            d["barrel_length"] = "20.000";
+            d["block_count"] = "4";
 
             Hikan.Core.HikanParameters q = Hikan.Core.HikanParameters.FromDictionary(d);
             Xunit.Assert.Equal(0m, q.UpstreamBreast.StemThickness);
             Xunit.Assert.Equal(0m, q.DownstreamBreast.StemThickness);
             Xunit.Assert.Equal(0, q.CutoffCount);
             Xunit.Assert.Equal(76.800m, Hikan.Core.HikanGeometry.ModelVolume(q));
+            Xunit.Assert.Equal(new decimal[] { 5m, 5m, 5m, 5m }, q.Spans);
+            Xunit.Assert.Equal(0m, q.UpstreamEndLength);
+            Xunit.Assert.Equal(0m, q.Standard.HaunchArea);
             Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(q));
         }
 

@@ -36,6 +36,70 @@ namespace Hikan.AutoCAD
             return true;
         }
 
+        /// <summary>
+        /// スパン長(川裏側から順に 1〜5 個)。合計が函体延長 L(底版下面に沿う斜距離)、個数がブロック数になる。
+        /// </summary>
+        private static bool PromptSpans(Autodesk.AutoCAD.EditorInput.Editor ed, Hikan.Core.HikanParameters p)
+        {
+            int n;
+            if (!GetInt(ed, "スパン数 (1〜" + Hikan.Core.HikanParameters.MaxSpans + "。スパン長の合計が函体延長 L)", p.Spans.Length, out n)) { return false; }
+            if (n < 0) { n = 0; }
+            decimal[] spans = new decimal[n];
+            for (int i = 0; i < n; i++)
+            {
+                decimal current = i < p.Spans.Length ? p.Spans[i] : (p.Spans.Length > 0 ? p.Spans[p.Spans.Length - 1] : 5m);
+                decimal d;
+                if (!GetDecimal(ed, "スパン" + (i + 1) + " の長さ [m]", current, out d)) { return false; }
+                spans[i] = d;
+            }
+            p.Spans = spans;
+            return true;
+        }
+
+        /// <summary>
+        /// 川裏側端部・川表側端部。長さ 0 で端部なし。長さが正なら部材厚とハンチを入力する(内空は標準部と共通)。
+        /// </summary>
+        private static bool PromptEnd(Autodesk.AutoCAD.EditorInput.Editor ed, Hikan.Core.HikanParameters p, bool upstream)
+        {
+            string name = upstream ? "川裏側端部" : "川表側端部";
+            Hikan.Core.HikanBarrelSection z = upstream ? p.UpstreamEnd : p.DownstreamEnd;
+            decimal d;
+            if (!GetDecimal(ed, name + "の長さ [m] (函体端から。0 で端部なし)", upstream ? p.UpstreamEndLength : p.DownstreamEndLength, out d)) { return false; }
+            if (upstream) { p.UpstreamEndLength = d; } else { p.DownstreamEndLength = d; }
+            if (d <= 0m) { return true; }
+            if (!GetDecimal(ed, name + " 側壁厚 [m] (0.40 以上・0.10 ピッチ)", z.WallThickness, out d)) { return false; }
+            z.WallThickness = d;
+            if (!GetDecimal(ed, name + " 頂版厚 [m] (0.40 以上・0.10 ピッチ)", z.TopSlabThickness, out d)) { return false; }
+            z.TopSlabThickness = d;
+            if (!GetDecimal(ed, name + " 底版厚 [m] (0.40 以上・0.10 ピッチ。敷高は標準部と共通)", z.BottomSlabThickness, out d)) { return false; }
+            z.BottomSlabThickness = d;
+            return PromptHaunches(ed, z, name);
+        }
+
+        /// <summary>内空の 4 隅のハンチ(LT・LB・RT・RB、下流を見て)。H(鉛直)が 0 ならハンチなしで W は聞かない。</summary>
+        private static bool PromptHaunches(Autodesk.AutoCAD.EditorInput.Editor ed, Hikan.Core.HikanBarrelSection z, string name)
+        {
+            return PromptHaunch(ed, z.LeftTop, name + " ハンチ LT(左上)")
+                && PromptHaunch(ed, z.LeftBottom, name + " ハンチ LB(左下)")
+                && PromptHaunch(ed, z.RightTop, name + " ハンチ RT(右上)")
+                && PromptHaunch(ed, z.RightBottom, name + " ハンチ RB(右下)");
+        }
+
+        private static bool PromptHaunch(Autodesk.AutoCAD.EditorInput.Editor ed, Hikan.Core.HikanHaunch h, string name)
+        {
+            decimal d;
+            if (!GetDecimal(ed, name + " の H [m] (鉛直。0 でなし)", h.Height, out d)) { return false; }
+            h.Height = d;
+            if (d <= 0m)
+            {
+                h.Width = 0m;
+                return true;
+            }
+            if (!GetDecimal(ed, name + " の W [m] (水平)", h.Width, out d)) { return false; }
+            h.Width = d;
+            return true;
+        }
+
         /// <summary>胸壁 1 端ぶん。胸壁は必ず設置する(たて壁厚 0.40 m 以上)。</summary>
         /// <remarks>左右の胸壁は同一形状なので、入力は片側分だけ。底版上面は函体の敷高に合わせるので、高さは聞かない。</remarks>
         private static bool PromptBreast(
@@ -184,14 +248,14 @@ namespace Hikan.AutoCAD
             p.TopSlabThickness = d;
             if (!GetDecimal(ed, "底版厚 [m] (0.40 以上・0.10 ピッチ)", p.BottomSlabThickness, out d)) { return false; }
             p.BottomSlabThickness = d;
-            if (!GetDecimal(ed, "函体延長 L [m] (底版下面に沿う斜距離)", p.BarrelLength, out d)) { return false; }
-            p.BarrelLength = d;
+            if (!PromptHaunches(ed, p.Standard, "標準部")) { return false; }
+            if (!PromptSpans(ed, p)) { return false; }
+            if (!PromptEnd(ed, p, true)) { return false; }
+            if (!PromptEnd(ed, p, false)) { return false; }
             if (!GetDecimal(ed, "底版勾配 i (下流下がり、0 で水平)", p.BottomSlope, out d)) { return false; }
             p.BottomSlope = d;
             if (!GetDecimal(ed, "土かぶり (頂版上面〜現地盤) [m]", p.SoilCover, out d)) { return false; }
             p.SoilCover = d;
-            if (!GetInt(ed, "ブロック数 (数量の按分表示のみ)", p.BlockCount, out n)) { return false; }
-            p.BlockCount = n;
             if (!GetDecimal(ed, "床掘り余裕幅 (片側) [m]", p.ExcavationMargin, out d)) { return false; }
             p.ExcavationMargin = d;
             if (!GetDecimal(ed, "床掘り法勾配 1:n の n", p.ExcavationSlope, out d)) { return false; }

@@ -77,7 +77,7 @@ namespace Hikan.Core.Tests
             AssertInvalid(p);
 
             Hikan.Core.HikanParameters q = HikanTestData.BarrelOnly();
-            q.BarrelLength = 0m;
+            q.Spans = new decimal[] { 0m };
             AssertInvalid(q);
         }
 
@@ -89,7 +89,7 @@ namespace Hikan.Core.Tests
             AssertInvalid(p);
 
             Hikan.Core.HikanParameters q = HikanTestData.BarrelOnly();
-            q.BlockCount = 0;
+            q.Spans = new decimal[0];
             AssertInvalid(q);
         }
 
@@ -286,7 +286,7 @@ namespace Hikan.Core.Tests
             p.InnerWidth = 0m;
             p.WallThickness = 0.25m;
             p.SoilCover = 12m;
-            p.BlockCount = 0;
+            p.Spans = new decimal[0];
             System.Collections.Generic.List<string> errors = Hikan.Core.HikanValidator.Validate(p);
             Xunit.Assert.True(errors.Count >= 3, "複数エラーが収集されること。実際: " + errors.Count);
         }

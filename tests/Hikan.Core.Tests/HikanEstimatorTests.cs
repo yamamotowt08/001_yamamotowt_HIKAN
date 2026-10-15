@@ -121,7 +121,7 @@ namespace Hikan.Core.Tests
         public void Rounding_IsHalfUp()
         {
             Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
-            p.BarrelLength = 3.2175m;
+            p.Spans = new decimal[] { 0.8m, 0.8m, 0.8m, 0.8175m };   // 函体延長 3.2175、4 スパン
             Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
             // 3.840 × 3.2175 = 12.35520 → そのまま 3 位
             Xunit.Assert.Equal(12.355m, e.ConcreteVolume);
@@ -134,7 +134,7 @@ namespace Hikan.Core.Tests
         public void BlockDivision_IsPlainDivision()
         {
             Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
-            p.BlockCount = 5;
+            p.Spans = new decimal[] { 4m, 4m, 4m, 4m, 4m };
             Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
             Xunit.Assert.Equal(4.000m, e.BlockLength);
             Xunit.Assert.Equal(15.360m, e.ConcretePerBlock);
