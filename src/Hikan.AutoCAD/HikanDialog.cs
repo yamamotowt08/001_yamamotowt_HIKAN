@@ -172,7 +172,9 @@ namespace Hikan.AutoCAD
                 "函体の左右側面に 1 基ずつ取り付く逆T字擁壁(左右同一)。たて壁厚・底版厚は 0.40 m 以上・0.10 m ピッチ。"
                 + "底版上面は函体の敷高にそろえ、たて壁は敷高から立ち上がる。左右の底版は函体の下を通って 1 枚につながる。"
                 + "d は川裏函体端からたて壁の軸(厚さの中心)まで。つま先版は近い方の函体端の側、かかと版は函体中央の側。"
-                + "つま先版長・かかと版長のどちらかを 0 にすると L 字。");
+                + "つま先版長・かかと版長のどちらかを 0 にすると L 字。"
+                + (upstream ? "土留壁(WH・WT)は左右のたて壁の間をふさぐ壁で、下端は頂版上面、背面はたて壁の背面(函体中央側の面)。"
+                    + "WT は 0.40 m 以上・0.10 m ピッチ。" : ""));
             AddField(w, "t", "たて壁厚", "m", title + "のたて壁厚",
                 q => wall(q).StemThickness, (q, v) => wall(q).StemThickness = v);
             AddField(w, "d", "たて壁の軸位置", "m", title + "のたて壁(",
@@ -187,6 +189,14 @@ namespace Hikan.AutoCAD
                 q => wall(q).ToeLength, (q, v) => wall(q).ToeLength = v);
             AddField(w, "Lh", "かかと版長", "m", title + "のかかと版長",
                 q => wall(q).HeelLength, (q, v) => wall(q).HeelLength = v);
+            if (upstream)
+            {
+                // 川裏側の土留壁(左右のたて壁の間、頂版の上。背面 = たて壁の背面、厚さは川裏側へ)
+                AddField(w, "WH", "土留壁高さ(頂版上面から、0 でなし)", "m", "川裏側土留壁の高さ",
+                    q => q.UpstreamRetainingWall.Height, (q, v) => q.UpstreamRetainingWall.Height = v);
+                AddField(w, "WT", "土留壁厚(背面から川裏側へ)", "m", "川裏側土留壁の厚さ",
+                    q => q.UpstreamRetainingWall.Thickness, (q, v) => q.UpstreamRetainingWall.Thickness = v);
+            }
         }
 
         /// <summary>
@@ -236,20 +246,37 @@ namespace Hikan.AutoCAD
             protection.Controls.Add(BuildSheet(s => s.Protection(),
                 "翼壁の端部から左右へ張り出す逆T字擁壁(左右同一)。たて壁は外側の面を翼壁端部にそろえる。"
                 + "X4 は翼壁端部の側壁内面から外向き(側壁厚を含む)。底版は上面 = 敷高、厚さ = 翼壁の底版厚。"
-                + "つま先版は水路床の下も含めて左右つながる。", out w.Grid));
+                + "つま先版は水路床の下も含めて左右つながる。たて壁高 Y3 は入力せず、たて壁の上面を翼壁端部の天端 H1 にそろえる。", out w.Grid));
             w.InnerTab = protection;
             int first = w.Fields.Count;
             AddField(w, "X4", "張出し幅(端部の側壁内面から)", "m", name + "の張出し幅",
                 q => wing(q).Protection.Width, (q, v) => wing(q).Protection.Width = v);
             AddField(w, "L3", "たて壁厚", "m", name + "のたて壁厚",
                 q => wing(q).Protection.StemThickness, (q, v) => wing(q).Protection.StemThickness = v);
-            AddField(w, "Y3", "たて壁高(敷高から)", "m", name + "のたて壁高",
-                q => wing(q).Protection.StemHeight, (q, v) => wing(q).Protection.StemHeight = v);
             AddField(w, "L2", "つま先版長(端部より外側)", "m", name + "のつま先版長",
                 q => wing(q).Protection.ToeLength, (q, v) => wing(q).Protection.ToeLength = v);
             AddField(w, "L4", "かかと版長(函体側)", "m", name + "のかかと版",
                 q => wing(q).Protection.HeelLength, (q, v) => wing(q).Protection.HeelLength = v);
             System.Collections.Generic.List<Field> protectionFields = w.Fields.GetRange(first, w.Fields.Count - first);
+
+            // Y3 = H1 − 敷高(函体の底版厚)は計算値なので表示だけする。H1・底版厚を書き換えたら表示し直す。
+            Field crownEnd = w.Fields.Find(f => f.Name == "側壁の天端高(端部)");
+            Field slab = pages[0].Fields.Find(f => f.Name == "底版厚");
+            System.Windows.Forms.Label y3 = GridLabel("", System.Drawing.Color.DimGray);
+            int y3Row = w.Grid.RowStyles.Count;
+            w.Grid.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            w.Grid.Controls.Add(y3, 0, y3Row);
+            w.Grid.SetColumnSpan(y3, 4);
+            System.Action showY3 = delegate
+            {
+                decimal h1, tb;
+                y3.Text = TryRead(crownEnd, out h1) && TryRead(slab, out tb)
+                    ? "Y3 たて壁高(自動)= H1 − 敷高 = " + (h1 - tb).ToString("0.000###", System.Globalization.CultureInfo.InvariantCulture) + " m"
+                    : "Y3 たて壁高(自動)= H1 − 敷高";
+            };
+            crownEnd.Box.TextChanged += delegate { showY3(); };
+            slab.Box.TextChanged += delegate { showY3(); };
+            showY3();
 
             System.Windows.Forms.RadioButton install = Choice("設置する", true);
             System.Windows.Forms.RadioButton none = Choice("設置しない", true);
@@ -336,6 +363,7 @@ namespace Hikan.AutoCAD
             column.Controls.Add(BuildSheet(s => s.GateColumn(),
                 "門柱は函体の左右の側壁の上に立つ L 字の柱(左右同一)。内側の切欠き(X8 × X4)がゲートの溝で、横方向壁(X5)は川裏側。"
                 + "内面は函体の内空側面にそろえる。門柱の位置は入力しない: 門柱の背面(川裏側の面)を川表側胸壁のたて壁の背面にそろえる。"
+                + "門柱は胸壁の底版の上面(敷高)から立ち、柱高さ Y2 もそこから測る。"
                 + "X5・X7 は 0.40 m 以上・0.10 m ピッチ。ハンチ(H2)は縦方向壁の内面(切欠き側)と操作台下面の隅の三角(1:1)で、"
                 + "縦方向壁の区間(川表側の柱)に付く。0 でハンチなし。"
                 + "土留壁(WH)は左右の門柱の間をふさぐ壁で、下端は頂版上面、背面は門柱の背面、厚さは X5。0 で土留壁なし。", out g.Grid));
@@ -348,7 +376,7 @@ namespace Hikan.AutoCAD
                 q => q.Gate.LongitudinalWallThickness, (q, v) => q.Gate.LongitudinalWallThickness = v);
             AddField(g, "X8", "横方向壁幅", "m", title + "の横方向壁幅",
                 q => q.Gate.TransverseWallWidth, (q, v) => q.Gate.TransverseWallWidth = v);
-            AddField(g, "Y2", "柱高さ(頂版上面から)", "m", title + "の柱高さ",
+            AddField(g, "Y2", "柱高さ(胸壁底版の上面から)", "m", title + "の柱高さ",
                 q => q.Gate.ColumnHeight, (q, v) => q.Gate.ColumnHeight = v);
             AddField(g, "H2", "ハンチ高(川表側の柱の内面)", "m", title + "のハンチ高",
                 q => q.Gate.HaunchHeight, (q, v) => q.Gate.HaunchHeight = v);

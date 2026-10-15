@@ -85,7 +85,7 @@ namespace Hikan.AutoCAD
             if (!GetDecimal(ed, name + " 底版厚 [m] (上面は函体の敷高)", w.FloorThickness, out d)) { return false; }
             w.FloorThickness = d;
 
-            // 堤防保護部(翼壁の端部から左右へ張り出す逆 T 字擁壁)。設置しないなら残りは聞かない。
+            // 堤防保護部(翼壁の端部から左右へ張り出す逆 T 字擁壁)。設置しないなら残りは聞かない。たて壁高 Y3 は H1 − 敷高で決まる。
             Hikan.Core.HikanLeveeProtection g = w.Protection;
             int n;
             if (!GetInt(ed, name + " 堤防保護部 (1 = 設置する / 0 = 設置しない)", g.Exists ? 1 : 0, out n)) { return false; }
@@ -95,8 +95,6 @@ namespace Hikan.AutoCAD
             g.Width = d;
             if (!GetDecimal(ed, name + " 堤防保護部 L3 たて壁厚 [m] (外側の面を翼壁端部にそろえる)", g.StemThickness, out d)) { return false; }
             g.StemThickness = d;
-            if (!GetDecimal(ed, name + " 堤防保護部 Y3 たて壁高 [m] (敷高から)", g.StemHeight, out d)) { return false; }
-            g.StemHeight = d;
             if (!GetDecimal(ed, name + " 堤防保護部 L2 つま先版長 [m] (翼壁端部より外側)", g.ToeLength, out d)) { return false; }
             g.ToeLength = d;
             if (!GetDecimal(ed, name + " 堤防保護部 L4 かかと版長 [m] (函体側)", g.HeelLength, out d)) { return false; }
@@ -123,7 +121,7 @@ namespace Hikan.AutoCAD
             g.LongitudinalWallThickness = d;
             if (!GetDecimal(ed, "門柱 X8 横方向壁幅 [m] (内側、切欠きの幅)", g.TransverseWallWidth, out d)) { return false; }
             g.TransverseWallWidth = d;
-            if (!GetDecimal(ed, "門柱 Y2 柱高さ [m] (頂版上面から操作台下面まで)", g.ColumnHeight, out d)) { return false; }
+            if (!GetDecimal(ed, "門柱 Y2 柱高さ [m] (胸壁の底版の上面 = 敷高から操作台下面まで)", g.ColumnHeight, out d)) { return false; }
             g.ColumnHeight = d;
             if (!GetDecimal(ed, "門柱 H2 ハンチ高 [m] (川表側の柱の内面と操作台下面の隅の三角 1:1、0 でなし)", g.HaunchHeight, out d)) { return false; }
             g.HaunchHeight = d;
@@ -203,6 +201,13 @@ namespace Hikan.AutoCAD
 
             // 胸壁(必ず設置する)。
             if (!PromptBreast(ed, p.UpstreamBreast, "川裏側胸壁")) { return false; }
+            if (!GetDecimal(ed, "川裏側土留壁 高さ [m] (左右のたて壁の間、頂版上面から。0 でなし)", p.UpstreamRetainingWall.Height, out d)) { return false; }
+            p.UpstreamRetainingWall.Height = d;
+            if (p.UpstreamRetainingWall.Exists)
+            {
+                if (!GetDecimal(ed, "川裏側土留壁 厚さ [m] (背面 = たて壁の背面から川裏側へ)", p.UpstreamRetainingWall.Thickness, out d)) { return false; }
+                p.UpstreamRetainingWall.Thickness = d;
+            }
             if (!PromptBreast(ed, p.DownstreamBreast, "川表側胸壁")) { return false; }
 
             // 翼壁(必ず設置する)。

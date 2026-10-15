@@ -48,6 +48,7 @@ namespace Hikan.Core
             CheckProtection(errors, p, p.UpstreamWing, true, "川裏側堤防保護部");
             CheckProtection(errors, p, p.DownstreamWing, false, "川表側堤防保護部");
             CheckGate(errors, p);
+            CheckUpstreamRetainingWall(errors, p);
 
             if (p.InnerWidth > MaxInnerDimension + Tolerance)
             {
@@ -226,7 +227,6 @@ namespace Hikan.Core
             HikanLeveeProtection g = w.Protection;
 
             CheckThickness(errors, g.StemThickness, name + "のたて壁厚");
-            if (g.StemHeight <= 0m) { errors.Add(name + "のたて壁高は正の値にしてください。"); }
             if (g.ToeLength < 0m) { errors.Add(name + "のつま先版長は 0 以上にしてください。"); }
             if (g.HeelLength < 0m) { errors.Add(name + "のかかと版長は 0 以上にしてください。"); }
 
@@ -282,11 +282,17 @@ namespace Hikan.Core
             CheckThickness(errors, g.DeckThickness, name + "の操作台高さ Y1");
             if (g.LongitudinalWallWidth < 0m) { errors.Add(name + "の縦方向壁幅 X4 は 0 以上にしてください。"); }
             if (g.TransverseWallWidth < 0m) { errors.Add(name + "の横方向壁幅 X8 は 0 以上にしてください。"); }
-            if (g.ColumnHeight <= 0m) { errors.Add(name + "の柱高さ Y2 は正の値にしてください。"); }
-            if (g.RetainingWallHeight < 0m) { errors.Add(name + "の土留壁高さ WH は 0 以上にしてください(0 で土留壁なし)。"); }
-            else if (g.RetainingWallHeight > g.ColumnHeight + Tolerance)
+            // 門柱は胸壁の底版の上面(敷高)から立つ。操作台(門柱の天端)は頂版上面より上にあること。
+            decimal above = HikanGeometry.GateColumnTop(p) - p.OuterHeight;   // 頂版上面から操作台下面まで
+            if (above <= 0m)
             {
-                errors.Add(name + "の土留壁高さ WH は柱高さ Y2 以下にしてください(操作台に食い込みます)。");
+                errors.Add(name + "の柱高さ Y2(胸壁の底版の上面から)は 頂版上面 − 敷高 = " + (p.OuterHeight - HikanGeometry.BreastFootingTop(p))
+                    + " m より大きくしてください(操作台が頂版より下になります)。");
+            }
+            if (g.RetainingWallHeight < 0m) { errors.Add(name + "の土留壁高さ WH は 0 以上にしてください(0 で土留壁なし)。"); }
+            else if (above > 0m && g.RetainingWallHeight > above + Tolerance)
+            {
+                errors.Add(name + "の土留壁高さ WH は 頂版上面から操作台下面まで(" + above + " m)以下にしてください(操作台に食い込みます)。");
             }
             if (g.HaunchHeight < 0m) { errors.Add(name + "のハンチ高 H2 は 0 以上にしてください。"); }
             else if (g.HaunchHeight >= p.InnerWidth / 2m + g.TransverseWallWidth)
@@ -294,9 +300,9 @@ namespace Hikan.Core
                 errors.Add(name + "のハンチ高 H2 は 内空幅の半分 + X8(" + (p.InnerWidth / 2m + g.TransverseWallWidth)
                     + " m)より小さくしてください(左右のハンチが重なります)。");
             }
-            else if (g.HaunchHeight > g.ColumnHeight)
+            else if (g.HaunchHeight > HikanGeometry.GateColumnTop(p) - p.OuterHeight)
             {
-                errors.Add(name + "のハンチ高 H2 は柱高さ Y2 以下にしてください。");
+                errors.Add(name + "のハンチ高 H2 は 頂版上面から操作台下面までの高さ以下にしてください(函体に食い込みます)。");
             }
             if (g.DeckAxialOverhang < 0m) { errors.Add(name + "の操作台縦方向張出長 X3 は 0 以上にしてください。"); }
             if (g.DeckSideOverhang < 0m) { errors.Add(name + "の操作台横方向張出長 X6 は 0 以上にしてください。"); }
@@ -361,6 +367,47 @@ namespace Hikan.Core
         }
 
         /// <summary>川裏側胸壁の底版・たて壁と門柱・操作台が函体方向に重なると 3 部材の重なりになり得るので弾く。</summary>
+        /// <summary>
+        /// 川裏側の土留壁。高さ 0 は設置しない。厚さは最小部材厚 0.40 m・0.10 m ピッチ。
+        /// 函体延長の中に収まり、しゃ水壁・門柱・操作台と函体方向に重ならないこと(重なると体積の解析解が崩れる)。
+        /// </summary>
+        private static void CheckUpstreamRetainingWall(System.Collections.Generic.List<string> errors, HikanParameters p)
+        {
+            HikanRetainingWall r = p.UpstreamRetainingWall;
+            const string name = "川裏側土留壁";
+            if (r.Height < 0m)
+            {
+                errors.Add(name + "の高さは 0 以上にしてください(0 で設置しない)。");
+                return;
+            }
+            if (!r.Exists || !p.UpstreamBreast.Exists) { return; }
+            CheckThickness(errors, r.Thickness, name + "の厚さ");
+            decimal back = p.UpstreamBreast.StemEnd;
+            decimal front = back - r.Thickness;
+            if (front < -Tolerance)
+            {
+                errors.Add(name + "の厚さ " + r.Thickness + " m では川裏函体端(S = 0)からはみ出します(背面 S = " + back + " m)。");
+            }
+            for (int i = 1; i <= p.CutoffCount; i++)
+            {
+                decimal c = HikanGeometry.CutoffPosition(p, i);
+                decimal cMin = c - p.CutoffThickness / 2m;
+                decimal cMax = c + p.CutoffThickness / 2m;
+                if (front < cMax && cMin < back)
+                {
+                    errors.Add(name + "(" + front + "〜" + back + " m)が " + i + " 枚目のしゃ水壁(" + cMin + "〜" + cMax + " m)と重なります。");
+                }
+            }
+            if (p.Gate.Exists && p.DownstreamBreast.Exists)
+            {
+                (decimal Min, decimal Max) deck = HikanGeometry.GateDeckRange(p);
+                if (front < deck.Max && deck.Min < back)
+                {
+                    errors.Add(name + "(" + front + "〜" + back + " m)が門柱・操作台(" + deck.Min + "〜" + deck.Max + " m)と重なります。");
+                }
+            }
+        }
+
         private static void CheckGateAgainstBreast(
             System.Collections.Generic.List<string> errors, HikanParameters p, HikanBreastWall w, string name)
         {
@@ -382,9 +429,9 @@ namespace Hikan.Core
             decimal top = System.Math.Max(w.CrownStart, w.CrownEnd);
             if (w.Protection.Exists)
             {
-                top = System.Math.Max(top, HikanGeometry.WingFloorTop(p) + w.Protection.StemHeight);
+                top = System.Math.Max(top, HikanGeometry.WingFloorTop(p) + HikanGeometry.ProtectionStemHeight(p, w));
             }
-            decimal deckBottom = p.OuterHeight + p.Gate.ColumnHeight;
+            decimal deckBottom = HikanGeometry.GateColumnTop(p);
             if (deckBottom < top)
             {
                 errors.Add("門柱・操作台の柱高さ Y2 では操作台の下面(" + deckBottom + " m)が" + end + "翼壁(堤防保護部を含む)の天端 "

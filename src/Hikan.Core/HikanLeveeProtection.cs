@@ -17,6 +17,7 @@ namespace Hikan.Core
     ///
     /// たて壁は外側(函体から遠い側)の面を翼壁端部にそろえ、かかと版は函体側、つま先版は翼壁端部より外側へ伸びる。
     /// つま先版は水路床の下も含めて左右つながる。底版は上面 = 敷高、厚さ = 翼壁の底版厚。
+    /// たて壁高 Y3 は入力しない: たて壁の上面を翼壁端部の天端 H1 にそろえる(Y3 = H1 − 敷高、HikanGeometry.ProtectionStemHeight)。
     /// </summary>
     public sealed class HikanLeveeProtection
     {
@@ -26,8 +27,6 @@ namespace Hikan.Core
         public decimal Width { get; set; } = 1.000m;
         /// <summary>L3: たて壁厚(函体軸方向)[m]</summary>
         public decimal StemThickness { get; set; } = 0.400m;
-        /// <summary>Y3: たて壁高(底版上面 = 敷高から)[m]</summary>
-        public decimal StemHeight { get; set; } = 2.000m;
         /// <summary>L2: つま先版長(翼壁端部より外側)[m]。0 でつま先版なし。</summary>
         public decimal ToeLength { get; set; } = 0.500m;
         /// <summary>L4: かかと版長(函体側)[m]。0 でかかと版なし。</summary>
@@ -39,7 +38,6 @@ namespace Hikan.Core
             d[prefix + "exists"] = Exists ? "1" : "0";
             d[prefix + "width"] = Width.ToString(inv);
             d[prefix + "stem_thickness"] = StemThickness.ToString(inv);
-            d[prefix + "stem_height"] = StemHeight.ToString(inv);
             d[prefix + "toe_length"] = ToeLength.ToString(inv);
             d[prefix + "heel_length"] = HeelLength.ToString(inv);
         }
@@ -53,7 +51,6 @@ namespace Hikan.Core
             Exists = get(d, prefix + "exists", Exists ? 1m : 0m) != 0m;
             Width = get(d, prefix + "width", Width);
             StemThickness = get(d, prefix + "stem_thickness", StemThickness);
-            StemHeight = get(d, prefix + "stem_height", StemHeight);
             ToeLength = get(d, prefix + "toe_length", ToeLength);
             HeelLength = get(d, prefix + "heel_length", HeelLength);
         }

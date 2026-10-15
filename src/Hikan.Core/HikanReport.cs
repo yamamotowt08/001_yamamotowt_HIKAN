@@ -78,7 +78,6 @@ namespace Hikan.Core
             if (!g.Exists) { return; }
             Add(list, prefix + "protection_width", F(g.Width), "m", "入力");
             Add(list, prefix + "protection_stem_thickness", F(g.StemThickness), "m", "入力");
-            Add(list, prefix + "protection_stem_height", F(g.StemHeight), "m", "入力");
             Add(list, prefix + "protection_toe_length", F(g.ToeLength), "m", "入力");
             Add(list, prefix + "protection_heel_length", F(g.HeelLength), "m", "入力");
         }
@@ -100,6 +99,8 @@ namespace Hikan.Core
             Add(r, "excavation_slope", F(p.ExcavationSlope), "", "入力");
             Add(r, "foundation_thickness", F(p.FoundationThickness), "m", "入力");
             AddBreast(r, p.UpstreamBreast, "upstream_breast_");
+            Add(r, "upstream_retaining_wall_height", F(p.UpstreamRetainingWall.Height), "m", "入力");
+            Add(r, "upstream_retaining_wall_thickness", F(p.UpstreamRetainingWall.Thickness), "m", "入力");
             AddBreast(r, p.DownstreamBreast, "downstream_breast_");
             AddWing(r, p.UpstreamWing, "upstream_wing_");
             AddWing(r, p.DownstreamWing, "downstream_wing_");
@@ -125,6 +126,7 @@ namespace Hikan.Core
             Add(r, "gate_column_volume", F(e.GateColumnVolume), "m3", "確定");
             Add(r, "gate_deck_volume", F(e.GateDeckVolume), "m3", "確定");
             Add(r, "gate_retaining_wall_volume", F(e.GateRetainingWallVolume), "m3", "確定");
+            Add(r, "upstream_retaining_wall_volume", F(e.UpstreamRetainingWallVolume), "m3", "確定");
             Add(r, "upstream_protection_volume", F(e.UpstreamProtectionVolume), "m3", "確定");
             Add(r, "downstream_protection_volume", F(e.DownstreamProtectionVolume), "m3", "確定");
             Add(r, "upstream_wing_flare_angle", F(e.UpstreamWingFlareAngle), "度", "確定");

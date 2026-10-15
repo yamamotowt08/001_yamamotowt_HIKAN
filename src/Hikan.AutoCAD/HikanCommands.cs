@@ -205,6 +205,7 @@ namespace Hikan.AutoCAD
             p.UpstreamWing.StemThickness = 0m;
             p.DownstreamWing.StemThickness = 0m;
             p.Gate.Exists = false;
+            p.UpstreamRetainingWall.Height = 0m;
             p.TopSlabThickness = 0.4m;
             p.BottomSlabThickness = 0.6m;
             p.BaseX = 1.5m;
@@ -231,6 +232,9 @@ namespace Hikan.AutoCAD
                 p.CutoffCount = 2;
                 p.CutoffThickness = 0.5m;
                 p.CutoffProjection = 0.7m;
+                // 川裏側の土留壁(たて壁 1.75〜2.25 の背面 2.25 から川裏側へ 0.5、頂版上面から 1.0)
+                p.UpstreamRetainingWall.Height = 1.0m;
+                p.UpstreamRetainingWall.Thickness = 0.5m;
             }
 
             if (withWings)
@@ -268,14 +272,12 @@ namespace Hikan.AutoCAD
             up.Exists = true;
             up.Width = 1.2m;
             up.StemThickness = 0.4m;
-            up.StemHeight = 2.0m;
             up.ToeLength = 0.5m;
             up.HeelLength = 1.0m;
             Hikan.Core.HikanLeveeProtection down = p.DownstreamWing.Protection;
             down.Exists = true;
             down.Width = 1.5m;
             down.StemThickness = 0.5m;
-            down.StemHeight = 2.5m;
             down.ToeLength = 0.6m;
             down.HeelLength = 1.2m;
             return p;

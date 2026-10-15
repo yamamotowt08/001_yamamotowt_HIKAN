@@ -31,6 +31,7 @@ namespace Hikan.Dynamo
             "門柱_m3",
             "操作台_m3",
             "土留壁_m3",
+            "川裏側土留壁_m3",
             "川裏側翼壁開き角_度",
             "川表側翼壁開き角_度",
             "浸透路長_m",
@@ -73,6 +74,8 @@ namespace Hikan.Dynamo
             double upstreamBreastFootingThickness = 0.5,
             double upstreamBreastToeLength = 0.8,
             double upstreamBreastHeelLength = 1.2,
+            double upstreamRetainingWallHeight = 0.5,
+            double upstreamRetainingWallThickness = 0.4,
             double downstreamBreastStemThickness = 0.4,
             double downstreamBreastPosition = 18.0,
             double downstreamBreastLength = 2.0,
@@ -95,13 +98,11 @@ namespace Hikan.Dynamo
             bool upstreamWingProtection = false,
             double upstreamProtectionWidth = 1.0,
             double upstreamProtectionStemThickness = 0.4,
-            double upstreamProtectionStemHeight = 2.0,
             double upstreamProtectionToeLength = 0.5,
             double upstreamProtectionHeelLength = 1.0,
             bool downstreamWingProtection = false,
             double downstreamProtectionWidth = 1.0,
             double downstreamProtectionStemThickness = 0.4,
-            double downstreamProtectionStemHeight = 2.0,
             double downstreamProtectionToeLength = 0.5,
             double downstreamProtectionHeelLength = 1.0,
             bool gate = true,
@@ -145,6 +146,8 @@ namespace Hikan.Dynamo
             p.UpstreamBreast.FootingThickness = (decimal)upstreamBreastFootingThickness;
             p.UpstreamBreast.ToeLength = (decimal)upstreamBreastToeLength;
             p.UpstreamBreast.HeelLength = (decimal)upstreamBreastHeelLength;
+            p.UpstreamRetainingWall.Height = (decimal)upstreamRetainingWallHeight;
+            p.UpstreamRetainingWall.Thickness = (decimal)upstreamRetainingWallThickness;
             p.DownstreamBreast.StemThickness = (decimal)downstreamBreastStemThickness;
             p.DownstreamBreast.Position = (decimal)downstreamBreastPosition;
             p.DownstreamBreast.Length = (decimal)downstreamBreastLength;
@@ -167,13 +170,11 @@ namespace Hikan.Dynamo
             p.UpstreamWing.Protection.Exists = upstreamWingProtection;
             p.UpstreamWing.Protection.Width = (decimal)upstreamProtectionWidth;
             p.UpstreamWing.Protection.StemThickness = (decimal)upstreamProtectionStemThickness;
-            p.UpstreamWing.Protection.StemHeight = (decimal)upstreamProtectionStemHeight;
             p.UpstreamWing.Protection.ToeLength = (decimal)upstreamProtectionToeLength;
             p.UpstreamWing.Protection.HeelLength = (decimal)upstreamProtectionHeelLength;
             p.DownstreamWing.Protection.Exists = downstreamWingProtection;
             p.DownstreamWing.Protection.Width = (decimal)downstreamProtectionWidth;
             p.DownstreamWing.Protection.StemThickness = (decimal)downstreamProtectionStemThickness;
-            p.DownstreamWing.Protection.StemHeight = (decimal)downstreamProtectionStemHeight;
             p.DownstreamWing.Protection.ToeLength = (decimal)downstreamProtectionToeLength;
             p.DownstreamWing.Protection.HeelLength = (decimal)downstreamProtectionHeelLength;
             p.Gate.Exists = gate;
@@ -218,6 +219,7 @@ namespace Hikan.Dynamo
             r["門柱_m3"] = (double)e.GateColumnVolume;
             r["操作台_m3"] = (double)e.GateDeckVolume;
             r["土留壁_m3"] = (double)e.GateRetainingWallVolume;
+            r["川裏側土留壁_m3"] = (double)e.UpstreamRetainingWallVolume;
             r["川裏側翼壁開き角_度"] = (double)e.UpstreamWingFlareAngle;
             r["川表側翼壁開き角_度"] = (double)e.DownstreamWingFlareAngle;
             r["浸透路長_m"] = (double)e.SeepagePathLength;

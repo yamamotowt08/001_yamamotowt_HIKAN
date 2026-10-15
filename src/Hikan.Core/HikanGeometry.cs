@@ -112,6 +112,7 @@ namespace Hikan.Core
             AddProtection(parts, p, p.UpstreamWing, true);
             AddProtection(parts, p, p.DownstreamWing, false);
             AddGate(parts, p);
+            AddUpstreamRetainingWall(parts, p);
 
             // 内空は函体のみを貫通する。胸壁は函体側面より外側にあり開口を塞がないため関与しない。
             parts.Add(Tag(Centred("内空", p.InnerWidth, p.BottomSlabThickness, p.BottomSlabThickness + p.InnerHeight,
@@ -299,7 +300,7 @@ namespace Hikan.Core
                 decimal uMin = right ? inner : -outer;
                 decimal uMax = right ? outer : -inner;
                 string side = name + (right ? "右" : "左");
-                parts.Add(Tag(Box(side + "たて壁", uMin, uMax, top, top + g.StemHeight, stem.Min, stem.Max, false), name));
+                parts.Add(Tag(Box(side + "たて壁", uMin, uMax, top, w.CrownEnd, stem.Min, stem.Max, false), name));
                 parts.Add(Tag(Box(side + "底版", uMin, uMax, bottom, top, footing.Min, footing.Max, false), name));
             }
             if (g.ToeLength > 0m)
@@ -315,15 +316,17 @@ namespace Hikan.Core
         ///   縦方向壁 … U [B/2 + X8, B/2 + X8 + X7] × S [横方向壁の川表側の面, + X4](内側の X8 × X4 は切欠き)
         /// 操作台は V = 外形高 + Y2 から厚 Y1、U は ±X2/2、S は門柱の範囲 ± X3。管理橋を設置するなら、
         /// 川裏側の端の上面を W1 × W2(中央)× 深さ H1 で欠く(切欠きを避けて直方体に分ける)。
-        /// 門柱と頂版、門柱と操作台は面で接するだけで重ならない。他の部材と重ならないことは HikanValidator が保証する。
+        /// 門柱は胸壁の底版の上面(敷高)から立つので、函体の側壁と重なる(函体の幅の内側、敷高〜頂版上面)。
+        /// 胸壁のたて壁とも重なり得る。重なりは BoxOverlapVolume で 1 回だけ差し引き、数量では函体・胸壁に含める。
         /// </summary>
         private static void AddGate(System.Collections.Generic.List<HikanPart> parts, HikanParameters p)
         {
             HikanGateTower g = p.Gate;
             if (!g.Exists) { return; }
             decimal inner = p.InnerWidth / 2m;
-            decimal bottom = p.OuterHeight;
-            decimal top = bottom + g.ColumnHeight;
+            decimal bottom = BreastFootingTop(p);   // 門柱は胸壁の底版の上面(敷高)から立つ
+            decimal top = GateColumnTop(p);
+            decimal slab = p.OuterHeight;           // 土留壁の下端 = 頂版上面
             (decimal Min, decimal Max) column = GateColumnRange(p);
             decimal split = column.Min + g.TransverseWallThickness;
 
@@ -338,7 +341,7 @@ namespace Hikan.Core
                     bottom, top, split, column.Max));
             }
             // 土留壁: 左右の門柱(横方向壁)の間をふさぐ。下端 = 頂版上面、背面 = 門柱の背面、厚さ = X5。
-            gate.Add(Box("土留壁", -inner, inner, bottom, bottom + g.RetainingWallHeight, column.Min, split, false));
+            gate.Add(Box("土留壁", -inner, inner, slab, slab + g.RetainingWallHeight, column.Min, split, false));
 
             (decimal Min, decimal Max) deck = GateDeckRange(p);
             decimal half = g.DeckWidth / 2m;
@@ -387,6 +390,36 @@ namespace Hikan.Core
             return (c.Min - p.Gate.DeckAxialOverhang, c.Max + p.Gate.DeckAxialOverhang);
         }
 
+        /// <summary>門柱の天端(= 操作台の下面)の高さ = 胸壁の底版上面(敷高)+ 柱高さ Y2。</summary>
+        public static decimal GateColumnTop(HikanParameters p)
+        {
+            return BreastFootingTop(p) + p.Gate.ColumnHeight;
+        }
+
+        /// <summary>
+        /// 川裏側の土留壁(川裏側胸壁の左右のたて壁の間、頂版の上)。U は函体の外形幅、V は頂版上面から高さぶん、
+        /// S は川裏側胸壁のたて壁の背面(函体中央側の面)から川裏側へ厚さぶん。函体・たて壁とは面で接するだけ。
+        /// </summary>
+        private static void AddUpstreamRetainingWall(System.Collections.Generic.List<HikanPart> parts, HikanParameters p)
+        {
+            HikanRetainingWall r = p.UpstreamRetainingWall;
+            if (!r.Exists || !p.UpstreamBreast.Exists) { return; }
+            decimal back = p.UpstreamBreast.StemEnd;
+            HikanPart wall = Centred("川裏側土留壁", p.OuterWidth, p.OuterHeight, p.OuterHeight + r.Height,
+                back - r.Thickness, back, false);
+            wall.Member = "川裏側土留壁";
+            wall.IsSuperstructure = true;
+            parts.Add(wall);
+        }
+
+        /// <summary>川裏側の土留壁の体積 [m3] = 外形幅 × 厚さ × 高さ。</summary>
+        public static decimal UpstreamRetainingWallVolume(HikanParameters p)
+        {
+            HikanRetainingWall r = p.UpstreamRetainingWall;
+            if (!r.Exists || !p.UpstreamBreast.Exists) { return 0m; }
+            return p.OuterWidth * r.Thickness * r.Height;
+        }
+
         /// <summary>右側(U ≥ 0)の範囲 [a, b] で直方体を作り、左側なら中心線について鏡映する。</summary>
         private static HikanPart Mirrored(string name, bool right, decimal a, decimal b,
             decimal vMin, decimal vMax, decimal sMin, decimal sMax)
@@ -433,7 +466,7 @@ namespace Hikan.Core
             HikanGateTower g = p.Gate;
             if (!g.Exists || g.HaunchHeight <= 0m) { return new HikanPrismPart[0]; }
             decimal inner = p.InnerWidth / 2m + g.TransverseWallWidth;   // 縦方向壁の内面
-            decimal top = p.OuterHeight + g.ColumnHeight;
+            decimal top = GateColumnTop(p);
             decimal h = g.HaunchHeight;
             (decimal Min, decimal Max) column = GateColumnRange(p);
             decimal start = column.Min + g.TransverseWallThickness;
@@ -462,39 +495,11 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 門柱・操作台のうち高さ V ≤ ground の部分の体積 [m3]。床掘りの埋戻しから控除する地下占有分に使う
-        /// (現地盤より上に出た部分は埋め戻す空間を占めない)。
-        /// </summary>
-        public static decimal GateVolumeBelow(HikanParameters p, decimal ground)
-        {
-            decimal v = 0m;
-            foreach (HikanPart part in GetParts(p))
-            {
-                if (!part.IsSuperstructure) { continue; }
-                decimal top = part.VMax < ground ? part.VMax : ground;
-                if (top > part.VMin)
-                {
-                    v += (part.UMax - part.UMin) * (top - part.VMin) * (part.SMax - part.SMin);
-                }
-            }
-            // ハンチの三角は下端(高さ top − H2)で幅 0、上へ 1:1 で広がるので、地盤より下の部分は h² / 2 × 長さ。
-            HikanGateTower g = p.Gate;
-            foreach (HikanPrismPart part in GetHaunchParts(p))
-            {
-                decimal h = ground - (p.OuterHeight + g.ColumnHeight - g.HaunchHeight);
-                if (h <= 0m) { continue; }
-                if (h > g.HaunchHeight) { h = g.HaunchHeight; }
-                v += h * h / 2m * (part.SMax - part.SMin);
-            }
-            return v;
-        }
-
-        /// <summary>
-        /// 門柱・操作台・土留壁(上部工)のうち高さ V ≥ ground の部分の体積 [m3](他の部材との重なりは除く)。
+        /// 上部工(門柱・操作台・川表側と川裏側の土留壁)のうち高さ V ≥ ground の部分の体積 [m3](他の部材との重なりは除く)。
         /// 床掘りの地下占有体積は、外形エンベロープからこれを引いて求める(現地盤より上の上部工は埋め戻す空間を占めない)。
-        /// 上部工が胸壁のたて壁と重なる部分は胸壁に数えるので、ここには含めない。
+        /// 上部工が函体・胸壁のたて壁と重なる部分は函体・胸壁に数えるので、ここには含めない。
         /// </summary>
-        public static decimal GateVolumeAbove(HikanParameters p, decimal ground)
+        public static decimal SuperstructureVolumeAbove(HikanParameters p, decimal ground)
         {
             HikanPart[] parts = GetParts(p);
             decimal v = 0m;
@@ -514,7 +519,7 @@ namespace Hikan.Core
             HikanGateTower g = p.Gate;
             foreach (HikanPrismPart part in GetHaunchParts(p))
             {
-                decimal h = ground - (p.OuterHeight + g.ColumnHeight - g.HaunchHeight);
+                decimal h = ground - (GateColumnTop(p) - g.HaunchHeight);
                 if (h <= 0m) { continue; }
                 if (h > g.HaunchHeight) { h = g.HaunchHeight; }
                 v -= h * h / 2m * (part.SMax - part.SMin);
@@ -537,15 +542,21 @@ namespace Hikan.Core
             return a < b ? (a, b) : (b, a);
         }
 
+        /// <summary>堤防保護部のたて壁高 Y3 = 翼壁端部の天端 H1 − 敷高(たて壁の上面を H1 にそろえる)[m]。</summary>
+        public static decimal ProtectionStemHeight(HikanParameters p, HikanWingWall w)
+        {
+            return w.CrownEnd - WingFloorTop(p);
+        }
+
         /// <summary>
         /// 堤防保護部 1 端ぶんの体積 [m3](翼壁との重なりを含む総量)。部材の和とは別の式で、テストで突き合わせる。
-        /// 左右の たて壁 X4·Y3·L3 と 底版 X4·tf·(L3 + L4)、つま先版 (端部水路幅 + 2·X4)·tf·L2。
+        /// 左右の たて壁 X4·Y3·L3 と 底版 X4·tf·(L3 + L4)、つま先版 (端部水路幅 + 2·X4)·tf·L2。Y3 = H1 − 敷高。
         /// </summary>
-        public static decimal ProtectionVolume(HikanWingWall w)
+        public static decimal ProtectionVolume(HikanParameters p, HikanWingWall w)
         {
             if (!w.Exists || !w.Protection.Exists) { return 0m; }
             HikanLeveeProtection g = w.Protection;
-            decimal stems = 2m * g.Width * g.StemHeight * g.StemThickness;
+            decimal stems = 2m * g.Width * ProtectionStemHeight(p, w) * g.StemThickness;
             decimal footings = 2m * g.Width * w.FloorThickness * (g.StemThickness + g.HeelLength);
             decimal toe = (w.EndWidth + 2m * g.Width) * w.FloorThickness * g.ToeLength;
             return stems + footings + toe;

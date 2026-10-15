@@ -9,13 +9,15 @@ namespace Hikan.Core.Tests
         /// <summary>
         /// 函体の底版厚 0.6(敷高 0.6)。川裏側翼壁は八の字(内空幅 2.0 → 端部 3.0、翼壁長 3.0、tanθ = 1/6)、
         /// 川表側翼壁は平行(翼壁長 4.0)。胸壁は既定位置(函体の中)。しゃ水壁なし。
-        /// 川裏側保護部: X4 1.2 / L3 0.4 / Y3 2.0 / L2 0.5 / L4 1.0、川表側: X4 1.5 / L3 0.5 / Y3 2.5 / L2 0.6 / L4 1.2。
+        /// 川裏側保護部: X4 1.2 / L3 0.4 / L2 0.5 / L4 1.0、川表側: X4 1.5 / L3 0.5 / L2 0.6 / L4 1.2。
+        /// たて壁高 Y3 は入力せず、上面を翼壁端部の天端 H1 にそろえる: 川裏側 2.0 − 0.6 = 1.4、川表側 2.5 − 0.6 = 1.9。
         /// </summary>
         private static Hikan.Core.HikanParameters WithProtection()
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
             p.BottomSlabThickness = 0.6m;
             p.Gate.Exists = false;   // 門柱・操作台は HikanGateTests で確かめる
+            p.UpstreamRetainingWall.Height = 0m;   // 川裏側の土留壁は HikanRetainingWallTests で確かめる
 
             p.UpstreamWing.StemThickness = 0.5m;
             p.UpstreamWing.Length = 3.0m;
@@ -34,14 +36,12 @@ namespace Hikan.Core.Tests
             up.Exists = true;
             up.Width = 1.2m;
             up.StemThickness = 0.4m;
-            up.StemHeight = 2.0m;
             up.ToeLength = 0.5m;
             up.HeelLength = 1.0m;
             Hikan.Core.HikanLeveeProtection down = p.DownstreamWing.Protection;
             down.Exists = true;
             down.Width = 1.5m;
             down.StemThickness = 0.5m;
-            down.StemHeight = 2.5m;
             down.ToeLength = 0.6m;
             down.HeelLength = 1.2m;
             return p;
@@ -89,26 +89,26 @@ namespace Hikan.Core.Tests
             System.Collections.Generic.Dictionary<string, Hikan.Core.HikanPart> b = ByName(WithProtection());
 
             // 川表側: 翼壁端部 S = 24、内面 U = 1.0、外端 U = 2.5、底版 V −0.2〜0.6
-            AssertBox(b["川表側堤防保護部右たて壁"], 1.0m, 2.5m, 0.6m, 3.1m, 23.5m, 24.0m);
+            AssertBox(b["川表側堤防保護部右たて壁"], 1.0m, 2.5m, 0.6m, 2.5m, 23.5m, 24.0m);
             AssertBox(b["川表側堤防保護部右底版"], 1.0m, 2.5m, -0.2m, 0.6m, 22.3m, 24.0m);
-            AssertBox(b["川表側堤防保護部左たて壁"], -2.5m, -1.0m, 0.6m, 3.1m, 23.5m, 24.0m);
+            AssertBox(b["川表側堤防保護部左たて壁"], -2.5m, -1.0m, 0.6m, 2.5m, 23.5m, 24.0m);
             AssertBox(b["川表側堤防保護部つま先版"], -2.5m, 2.5m, -0.2m, 0.6m, 24.0m, 24.6m);
 
             // 川裏側: 翼壁端部 S = −3、内面 U = 1.5、外端 U = 2.7、底版 V 0.0〜0.6、函体側は +S
-            AssertBox(b["川裏側堤防保護部右たて壁"], 1.5m, 2.7m, 0.6m, 2.6m, -3.0m, -2.6m);
+            AssertBox(b["川裏側堤防保護部右たて壁"], 1.5m, 2.7m, 0.6m, 2.0m, -3.0m, -2.6m);
             AssertBox(b["川裏側堤防保護部右底版"], 1.5m, 2.7m, 0.0m, 0.6m, -3.0m, -1.6m);
             AssertBox(b["川裏側堤防保護部つま先版"], -2.7m, 2.7m, 0.0m, 0.6m, -3.5m, -3.0m);
         }
 
         // テスト2: 体積の閉じた式 = 部材の和 = 手計算。
-        // 川表側: たて壁 2×1.5×2.5×0.5 = 3.75、底版 2×1.5×0.8×1.7 = 4.08、つま先版 (2.0 + 3.0)×0.8×0.6 = 2.4 → 10.23
-        // 川裏側: たて壁 2×1.2×2.0×0.4 = 1.92、底版 2×1.2×0.6×1.4 = 2.016、つま先版 (3.0 + 2.4)×0.6×0.5 = 1.62 → 5.556
+        // 川表側: たて壁 2×1.5×1.9×0.5 = 2.85、底版 2×1.5×0.8×1.7 = 4.08、つま先版 (2.0 + 3.0)×0.8×0.6 = 2.4 → 9.33
+        // 川裏側: たて壁 2×1.2×1.4×0.4 = 1.344、底版 2×1.2×0.6×1.4 = 2.016、つま先版 (3.0 + 2.4)×0.6×0.5 = 1.62 → 4.98
         [Xunit.Fact]
         public void Volume_MatchesPartsAndHandCalculation()
         {
             Hikan.Core.HikanParameters p = WithProtection();
-            Xunit.Assert.Equal(10.23m, Hikan.Core.HikanGeometry.ProtectionVolume(p.DownstreamWing));
-            Xunit.Assert.Equal(5.556m, Hikan.Core.HikanGeometry.ProtectionVolume(p.UpstreamWing));
+            Xunit.Assert.Equal(9.33m, Hikan.Core.HikanGeometry.ProtectionVolume(p, p.DownstreamWing));
+            Xunit.Assert.Equal(4.98m, Hikan.Core.HikanGeometry.ProtectionVolume(p, p.UpstreamWing));
 
             decimal up = 0m, down = 0m;
             foreach (Hikan.Core.HikanPart part in Hikan.Core.HikanGeometry.GetParts(p))
@@ -116,25 +116,25 @@ namespace Hikan.Core.Tests
                 if (part.Name.StartsWith("川裏側堤防保護部", System.StringComparison.Ordinal)) { up += part.Volume; }
                 if (part.Name.StartsWith("川表側堤防保護部", System.StringComparison.Ordinal)) { down += part.Volume; }
             }
-            Xunit.Assert.Equal(5.556m, up);
-            Xunit.Assert.Equal(10.23m, down);
+            Xunit.Assert.Equal(4.98m, up);
+            Xunit.Assert.Equal(9.33m, down);
         }
 
         // テスト3: 翼壁との重なり(手計算)。川表側(平行)は
-        // たて壁 ∩ 側壁: U 1.0〜1.6(0.6)× V 0.6〜天端(S 23.5 で 2.6875、24 で 2.5、平均 2.59375)× S 0.5 = 0.598125 / 片側、
-        // 底版 ∩ 翼壁底版: U 1.0〜1.6(0.6)× V −0.2〜0.6(0.8)× S 1.7 = 0.816 / 片側 → 2 × 1.414125 = 2.82825
+        // たて壁 ∩ 側壁: U 1.0〜1.6(0.6)× V 0.6〜2.5(たて壁の上面 = H1 2.5。側壁の天端は 2.5 以上)× S 0.5 = 0.57 / 片側、
+        // 底版 ∩ 翼壁底版: U 1.0〜1.6(0.6)× V −0.2〜0.6(0.8)× S 1.7 = 0.816 / 片側 → 2 × 1.386 = 2.772
         [Xunit.Fact]
         public void OverlapWithWing_MatchesHandCalculation()
         {
             Hikan.Core.HikanParameters p = WithProtection();
-            AssertClose(2.82825m, Hikan.Core.HikanGeometry.WingOverlapVolume(p, false), 0.000000001m, "川表側の重なり");
+            AssertClose(2.772m, Hikan.Core.HikanGeometry.WingOverlapVolume(p, false), 0.000000001m, "川表側の重なり");
 
             // 翼壁の数量は重なりを差し引いた正味、保護部は総量。部材別の和が総計に一致する。
             Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
-            AssertClose(Hikan.Core.HikanGeometry.WingWallVolume(p, p.DownstreamWing) - 2.82825m,
+            AssertClose(Hikan.Core.HikanGeometry.WingWallVolume(p, p.DownstreamWing) - 2.772m,
                 e.DownstreamWingVolume, 0.0005m, "川表側翼壁の正味");
-            Xunit.Assert.Equal(10.230m, e.DownstreamProtectionVolume);
-            Xunit.Assert.Equal(5.556m, e.UpstreamProtectionVolume);
+            Xunit.Assert.Equal(9.330m, e.DownstreamProtectionVolume);
+            Xunit.Assert.Equal(4.98m, e.UpstreamProtectionVolume);
             decimal parts = e.BarrelConcreteVolume + e.UpstreamBreastVolume + e.DownstreamBreastVolume
                 + e.CutoffTotalVolume + e.UpstreamWingVolume + e.DownstreamWingVolume
                 + e.UpstreamProtectionVolume + e.DownstreamProtectionVolume;
@@ -180,7 +180,7 @@ namespace Hikan.Core.Tests
             {
                 Xunit.Assert.DoesNotContain("堤防保護部", part.Name);
             }
-            Xunit.Assert.Equal(0m, Hikan.Core.HikanGeometry.ProtectionVolume(p.UpstreamWing));
+            Xunit.Assert.Equal(0m, Hikan.Core.HikanGeometry.ProtectionVolume(p, p.UpstreamWing));
 
             System.Collections.Generic.Dictionary<string, string> d = WithProtection().ToDictionary();
             Xunit.Assert.Equal("1", d["upstream_wing_protection_exists"]);
@@ -227,9 +227,6 @@ namespace Hikan.Core.Tests
             c.DownstreamWing.Protection.HeelLength = 3.6m;   // 0.5 + 3.6 > 翼壁長 4.0
             Xunit.Assert.StartsWith("川表側堤防保護部のたて壁厚 + かかと版長", FirstError(c));
 
-            Hikan.Core.HikanParameters d = WithProtection();
-            d.UpstreamWing.Protection.StemHeight = 0m;
-            Xunit.Assert.StartsWith("川裏側堤防保護部のたて壁高", FirstError(d));
 
             Hikan.Core.HikanParameters e = WithProtection();
             e.UpstreamWing.Protection.ToeLength = -0.1m;

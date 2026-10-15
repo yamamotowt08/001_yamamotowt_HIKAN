@@ -19,6 +19,7 @@ namespace Hikan.Core.Tests
             p.TopSlabThickness = 0.4m;
             p.BottomSlabThickness = 0.6m;
             p.Gate.Exists = false;   // 門柱・操作台は HikanGateTests で確かめる
+            p.UpstreamRetainingWall.Height = 0m;   // 川裏側の土留壁は HikanRetainingWallTests で確かめる
 
             p.UpstreamBreast.StemThickness = 0.5m;
             p.UpstreamBreast.Position = 2.0m;

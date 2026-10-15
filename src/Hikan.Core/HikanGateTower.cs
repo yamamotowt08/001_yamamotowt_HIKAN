@@ -10,7 +10,7 @@ namespace Hikan.Core
     ///   ┌────────────┬────┬────────────┐ ↕Y1           ┌────────────┬─W1─┐ ← 受け台(管理橋の桁受け切欠き、
     ///   └──┬──┬──────┴────┴──────┬──┬──┘               └──┬────┬──┬─┴────┘    深さ H1、正面で幅 W2、川裏側の端)
     ///   ├X6┤  │                  │  ├X6┤                ├X3┤    │  ├X3┤
-    ///      │  │                  │  │  ↕Y2(柱高さ)        │縦壁│横│
+    ///      │  │                  │  │  ↕Y2(柱高さ、敷高から)      │縦壁│横│
     ///   ───┴──┴──────────────────┴──┴─── 頂版上面          ├X4──┼X5┤  川表 ←→ 川裏
     ///      ├X7┼X8┤  内空幅 B   ├X8┼X7┤
     ///
@@ -57,7 +57,7 @@ namespace Hikan.Core
         public decimal LongitudinalWallThickness { get; set; } = 0.400m;
         /// <summary>X8: 横方向壁幅(横断方向、内側 = 切欠きの幅)[m]</summary>
         public decimal TransverseWallWidth { get; set; } = 0.400m;
-        /// <summary>Y2: 柱高さ(頂版上面から操作台下面まで)[m]</summary>
+        /// <summary>Y2: 柱高さ(胸壁の底版の上面 = 敷高から操作台下面まで)[m]。門柱は胸壁の底版の上から立つ。</summary>
         public decimal ColumnHeight { get; set; } = 6.400m;
         /// <summary>
         /// H2: ハンチ高 [m]。縦方向壁の内面(切欠き側)と操作台下面の隅に付く、高さ・幅とも H2 の三角(1:1)で、
@@ -66,7 +66,7 @@ namespace Hikan.Core
         public decimal HaunchHeight { get; set; } = 0.200m;
         /// <summary>
         /// WH: 土留壁高さ(頂版上面から)[m]。土留壁は左右の門柱の間(±内空幅/2)をふさぐ壁で、下端は頂版上面、
-        /// 背面は門柱の背面(川裏側の面)、厚さは横方向壁厚 X5。0 で土留壁なし。柱高さ Y2 以下。
+        /// 背面は門柱の背面(川裏側の面)、厚さは横方向壁厚 X5。0 で土留壁なし。頂版上面から操作台下面までの高さ以下。
         /// </summary>
         public decimal RetainingWallHeight { get; set; } = 0.500m;
 

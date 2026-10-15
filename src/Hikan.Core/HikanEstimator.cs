@@ -83,7 +83,14 @@ namespace Hikan.Core
         {
             HikanGateTower g = p.Gate;
             if (!g.Exists) { return 0m; }
-            decimal columns = 2m * 2m * (g.ColumnLength + g.ColumnBreadth) * g.ColumnHeight;
+            // 門柱は胸壁の底版の上面(敷高)から立つ。頂版上面より上は L 字の周長(= 外接矩形の周長)の全面。
+            // 頂版上面より下は函体の外へ出た部分(全幅 X7 + X8 − 側壁厚 = e)だけが見え、函体の側面に接する面を除いた
+            // 2e + (X4 + X5)。胸壁のたて壁と重なる部分の面は控除しない(概算)。
+            decimal above = HikanGeometry.GateColumnTop(p) - p.OuterHeight;
+            decimal below = p.OuterHeight - HikanGeometry.BreastFootingTop(p);
+            decimal outside = g.ColumnBreadth - p.WallThickness;
+            decimal columns = 2m * 2m * (g.ColumnLength + g.ColumnBreadth) * above;
+            if (outside > 0m) { columns += 2m * (2m * outside + g.ColumnLength) * below; }
             decimal columnTop = g.TransverseWallThickness * g.ColumnBreadth + g.LongitudinalWallWidth * g.LongitudinalWallThickness;
             decimal deck = 2m * (g.DeckLength + g.DeckWidth) * g.DeckThickness
                 + g.DeckLength * g.DeckWidth - 2m * columnTop;
@@ -103,9 +110,20 @@ namespace Hikan.Core
             {
                 decimal b = p.InnerWidth;
                 wall = 2m * b * wh - 2m * g.TransverseWallThickness * wh;
-                wall += wh < g.ColumnHeight ? b * g.TransverseWallThickness : -b * g.TransverseWallThickness;
+                wall += wh < above ? b * g.TransverseWallThickness : -b * g.TransverseWallThickness;
             }
             return columns + deck + haunch + wall;
+        }
+
+        /// <summary>
+        /// 川裏側の土留壁の型枠面積 [m2] = 前後の面 2 × 外形幅 × 高さ + 天端 外形幅 × 厚さ。
+        /// 左右の端は胸壁のたて壁の内側の端面(もともと計上しない面)に接する。胸壁の型枠(formwork_breast)に含める。
+        /// </summary>
+        private static decimal UpstreamRetainingWallFormwork(HikanParameters p)
+        {
+            HikanRetainingWall r = p.UpstreamRetainingWall;
+            if (!r.Exists || !p.UpstreamBreast.Exists) { return 0m; }
+            return 2m * p.OuterWidth * r.Height + p.OuterWidth * r.Thickness;
         }
 
         public static HikanEstimate Calculate(HikanParameters p)
@@ -145,14 +163,16 @@ namespace Hikan.Core
             e.DownstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallNetVolume(p, false), Digits);
             // 堤防保護部は翼壁と重なる部分も含めた総量で数え、その分は翼壁の正味から差し引かれている。
             // 門柱・操作台は胸壁のたて壁と重なる(背面をそろえるため)。重なりは胸壁に含め、門柱・操作台から差し引く。
-            System.Func<string, bool> breast = m => m == "川裏側胸壁" || m == "川表側胸壁";
+            // 門柱は胸壁の底版の上面から立つので函体の側壁とも重なる。重なりは函体・胸壁に含め、門柱から差し引く。
+            System.Func<string, bool> earlier = m => m == "函体" || m == "川裏側胸壁" || m == "川表側胸壁";
             e.GateColumnVolume = RoundHalfUp(HikanGeometry.GateColumnVolume(p)
-                - HikanGeometry.OverlapBetween(p, m => m == "門柱", breast), Digits);
+                - HikanGeometry.OverlapBetween(p, m => m == "門柱", earlier), Digits);
             e.GateDeckVolume = RoundHalfUp(HikanGeometry.GateDeckVolume(p)
-                - HikanGeometry.OverlapBetween(p, m => m == "操作台", breast), Digits);
+                - HikanGeometry.OverlapBetween(p, m => m == "操作台", earlier), Digits);
             e.GateRetainingWallVolume = RoundHalfUp(HikanGeometry.GateRetainingWallVolume(p), Digits);
-            e.UpstreamProtectionVolume = RoundHalfUp(HikanGeometry.ProtectionVolume(p.UpstreamWing), Digits);
-            e.DownstreamProtectionVolume = RoundHalfUp(HikanGeometry.ProtectionVolume(p.DownstreamWing), Digits);
+            e.UpstreamRetainingWallVolume = RoundHalfUp(HikanGeometry.UpstreamRetainingWallVolume(p), Digits);
+            e.UpstreamProtectionVolume = RoundHalfUp(HikanGeometry.ProtectionVolume(p, p.UpstreamWing), Digits);
+            e.DownstreamProtectionVolume = RoundHalfUp(HikanGeometry.ProtectionVolume(p, p.DownstreamWing), Digits);
             e.UpstreamWingFlareAngle = RoundHalfUp(HikanGeometry.WingFlareAngle(p, p.UpstreamWing), Digits);
             e.DownstreamWingFlareAngle = RoundHalfUp(HikanGeometry.WingFlareAngle(p, p.DownstreamWing), Digits);
 
@@ -172,7 +192,8 @@ namespace Hikan.Core
             e.FormworkTop = RoundHalfUp(bOut * l, Digits);
             e.FormworkEnd = RoundHalfUp(2m * HikanGeometry.SectionArea(p), Digits);
             e.FormworkBreast = RoundHalfUp(
-                BreastFormwork(p, p.UpstreamBreast, true) + BreastFormwork(p, p.DownstreamBreast, false), Digits);
+                BreastFormwork(p, p.UpstreamBreast, true) + BreastFormwork(p, p.DownstreamBreast, false)
+                + UpstreamRetainingWallFormwork(p), Digits);
             // しゃ水壁は外周面 + 前後の環状面。
             e.FormworkCutoff = RoundHalfUp(CutoffFormwork(p), Digits);
             e.FormworkWing = RoundHalfUp(
@@ -209,7 +230,7 @@ namespace Hikan.Core
             // 内空は埋戻さないのでコンクリート体積では控除できない。
             // 門柱・操作台・土留壁は現地盤(頂版上面 + 土かぶり)より下の部分だけを数える(上に出た部分を引く)。
             decimal ground = hOut + p.SoilCover;
-            decimal occupied = HikanGeometry.EnvelopeVolume(p) - HikanGeometry.GateVolumeAbove(p, ground);
+            decimal occupied = HikanGeometry.EnvelopeVolume(p) - HikanGeometry.SuperstructureVolumeAbove(p, ground);
             e.FoundationVolume = RoundHalfUp(foundation, Digits);
             e.OccupiedVolume = RoundHalfUp(occupied, Digits);
             e.BackfillVolume = RoundHalfUp(exc - occupied - foundation, Digits);

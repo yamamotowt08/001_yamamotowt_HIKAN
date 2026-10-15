@@ -45,6 +45,8 @@ namespace Hikan.Core
         // --- 翼壁(U 字の 3 面張り水路)。函体端から外へ。必ず設置する(側壁厚 0 は旧図面の「設置なし」)。 ---
         /// <summary>川裏側翼壁(左右に 1 基ずつ)。川裏函体端(S = 0)から川裏へ伸びる。</summary>
         public HikanWingWall UpstreamWing { get; set; } = new HikanWingWall();
+        /// <summary>川裏側の土留壁(川裏側胸壁の左右のたて壁の間、頂版の上)。</summary>
+        public HikanRetainingWall UpstreamRetainingWall { get; set; } = new HikanRetainingWall();
         /// <summary>川表側翼壁(左右に 1 基ずつ)。川表函体端(S = L)から川表へ伸びる。</summary>
         public HikanWingWall DownstreamWing { get; set; } = new HikanWingWall();
 
@@ -104,6 +106,7 @@ namespace Hikan.Core
             d["excavation_slope"] = ExcavationSlope.ToString(inv);
             d["foundation_thickness"] = FoundationThickness.ToString(inv);
             UpstreamBreast.Write(d, "upstream_breast_");
+            UpstreamRetainingWall.Write(d, "upstream_retaining_wall_");
             DownstreamBreast.Write(d, "downstream_breast_");
             UpstreamWing.Write(d, "upstream_wing_");
             DownstreamWing.Write(d, "downstream_wing_");
@@ -144,6 +147,7 @@ namespace Hikan.Core
             // 欠けている場合は「設置なし」(厚 0)で補い、函体だけのモデルとして読めるようにする。
             // キーが在るのに値が不正な場合は従来どおりエラー停止する。
             p.UpstreamBreast.Read(d, "upstream_breast_", GetDecimalOrDefault);
+            p.UpstreamRetainingWall.Read(d, "upstream_retaining_wall_", GetDecimalOrDefault);
             p.DownstreamBreast.Read(d, "downstream_breast_", GetDecimalOrDefault);
             p.UpstreamWing.Read(d, "upstream_wing_", GetDecimalOrDefault);
             p.DownstreamWing.Read(d, "downstream_wing_", GetDecimalOrDefault);
