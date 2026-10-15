@@ -124,7 +124,7 @@ namespace Hikan.AutoCAD
             g.TransverseWallWidth = d;
             if (!GetDecimal(ed, "門柱 Y2 柱高さ [m] (頂版上面から操作台下面まで)", g.ColumnHeight, out d)) { return false; }
             g.ColumnHeight = d;
-            if (!GetDecimal(ed, "門柱 H2 ハンチ高 [m] (保存のみ、形状には未反映)", g.HaunchHeight, out d)) { return false; }
+            if (!GetDecimal(ed, "門柱 H2 ハンチ高 [m] (内面と操作台下面の隅の三角 1:1、0 でなし)", g.HaunchHeight, out d)) { return false; }
             g.HaunchHeight = d;
             if (!GetDecimal(ed, "操作台 X1 縦方向幅 [m] (= X4 + X5 + 2 × X3)", g.DeckLength, out d)) { return false; }
             g.DeckLength = d;

@@ -73,7 +73,7 @@ namespace Hikan.Core
         /// <summary>
         /// 門柱・操作台の型枠面積 [m2]。門柱は L 字断面の周囲(= 外接矩形の周長 2·(X4 + X5 + X7 + X8))× 柱高さ × 2 本。
         /// 操作台は 4 側面 + 下面(門柱の天端と接する部分を除く)。管理橋の受け台(切欠き)は 3 つの立ち上がり面を加える。
-        /// 操作台の上面と、門柱が頂版に接する下面は計上しない。
+        /// 操作台の上面と、門柱が頂版に接する下面は計上しない。ハンチは斜面を加え、覆われる面を除く。
         /// </summary>
         private static decimal GateFormwork(HikanParameters p)
         {
@@ -84,7 +84,14 @@ namespace Hikan.Core
             decimal deck = 2m * (g.DeckLength + g.DeckWidth) * g.DeckThickness
                 + g.DeckLength * g.DeckWidth - 2m * columnTop;
             if (g.Bridge) { deck += (2m * g.SeatLength + g.SeatWidth) * g.SeatDepth; }
-            return columns + deck;
+            // ハンチは斜面(√2 × H2 × X5)を加え、覆われる門柱の内面と操作台の下面(各 H2 × X5)を除く。左右 2 か所。
+            decimal haunch = 0m;
+            if (g.HaunchHeight > 0m)
+            {
+                decimal h = g.HaunchHeight;
+                haunch = 2m * (HikanGeometry.Sqrt(2m) * h - 2m * h) * g.TransverseWallThickness;
+            }
+            return columns + deck + haunch;
         }
 
         public static HikanEstimate Calculate(HikanParameters p)

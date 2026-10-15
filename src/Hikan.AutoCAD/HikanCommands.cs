@@ -285,7 +285,7 @@ namespace Hikan.AutoCAD
         /// 門柱・操作台を付ける。門柱(L 字、X4 0.9 / X5 0.5 / X7 0.5 / X8 0.4、柱高さ 6.0)は川表側の函体端に寄せ
         /// (軸位置 19.3 → 18.6〜20.0)、操作台は前後に X3 0.7 張り出して函体端より外(翼壁の上)へ出す。
         /// X7 ≠ X8・X4 ≠ X5 にして、横方向壁の向き(川裏側)や内外の取り違えを重心で検出できるようにする。
-        /// 管理橋ありで、操作台の川裏側の端に受け台(桁受けの切欠き)を作る。
+        /// 管理橋ありで、操作台の川裏側の端に受け台(桁受けの切欠き)を作る。ハンチ H2 0.3(三角柱を BoolUnite する経路の確認)。
         /// 内空幅 2.0 なので X1 = 1.4 + 1.4 = 2.8、X2 = 2.0 + 2 × 0.9 + 2 × 1.1 = 6.0。
         /// </summary>
         private static Hikan.Core.HikanParameters WithGate(Hikan.Core.HikanParameters p)
@@ -307,6 +307,7 @@ namespace Hikan.AutoCAD
             g.SeatLength = 0.4m;
             g.SeatWidth = 1.4m;
             g.SeatDepth = 0.3m;
+            g.HaunchHeight = 0.3m;
             return p;
         }
 

@@ -283,6 +283,14 @@ namespace Hikan.Core
             if (g.TransverseWallWidth < 0m) { errors.Add(name + "の横方向壁幅 X8 は 0 以上にしてください。"); }
             if (g.ColumnHeight <= 0m) { errors.Add(name + "の柱高さ Y2 は正の値にしてください。"); }
             if (g.HaunchHeight < 0m) { errors.Add(name + "のハンチ高 H2 は 0 以上にしてください。"); }
+            else if (2m * g.HaunchHeight >= p.InnerWidth)
+            {
+                errors.Add(name + "のハンチ高 H2 は内空幅の半分(" + p.InnerWidth / 2m + " m)より小さくしてください(左右のハンチが重なります)。");
+            }
+            else if (g.HaunchHeight > g.ColumnHeight)
+            {
+                errors.Add(name + "のハンチ高 H2 は柱高さ Y2 以下にしてください。");
+            }
             if (g.DeckAxialOverhang < 0m) { errors.Add(name + "の操作台縦方向張出長 X3 は 0 以上にしてください。"); }
             if (g.DeckSideOverhang < 0m) { errors.Add(name + "の操作台横方向張出長 X6 は 0 以上にしてください。"); }
 

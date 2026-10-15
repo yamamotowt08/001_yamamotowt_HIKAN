@@ -11,7 +11,7 @@ namespace Hikan.Core.Tests
         /// 函体だけ(内空 2.0 × 2.0、側壁 0.4、頂版 0.4、底版 0.6 → 外形高 3.0、延長 20)に門柱・操作台を付ける。
         /// 門柱: d 10.0 / X4 0.9 / X5 0.5 / X7 0.5 / X8 0.4 / Y2 6.0(X7 ≠ X8、X4 ≠ X5 にして向きの取り違えを検出する)。
         /// 操作台: X3 0.7 / X6 1.1 / Y1 0.6 → X1 = 1.4 + 1.4 = 2.8、X2 = 2.0 + 2 × 0.9 + 2 × 1.1 = 6.0。
-        /// 管理橋あり: W1 0.4 / W2 1.4 / H1 0.3。土かぶり 2.0 → 現地盤 V = 5.0。
+        /// 管理橋あり: W1 0.4 / W2 1.4 / H1 0.3。ハンチ H2 0.2。土かぶり 2.0 → 現地盤 V = 5.0。
         /// </summary>
         private static Hikan.Core.HikanParameters WithGate()
         {
@@ -35,6 +35,7 @@ namespace Hikan.Core.Tests
             g.SeatLength = 0.4m;
             g.SeatWidth = 1.4m;
             g.SeatDepth = 0.3m;
+            g.HaunchHeight = 0.2m;
             return p;
         }
 
@@ -99,20 +100,22 @@ namespace Hikan.Core.Tests
             AssertBox(b["操作台受け台右"], 0.7m, 3.0m, 9.3m, 9.6m, 8.6m, 9.0m);
         }
 
-        // テスト2: 体積。門柱 L 字断面 0.5 × 0.9 + 0.9 × 0.5 = 0.9 × 高さ 6.0 × 2 本 = 10.8、
+        // テスト2: 体積。門柱 L 字断面 0.5 × 0.9 + 0.9 × 0.5 = 0.9 × 高さ 6.0 × 2 本 = 10.8 + ハンチ 2 × 0.2² / 2 × 0.5 = 0.02、
         // 操作台 0.6 × 2.8 × 6.0 = 10.08 − 受け台 0.4 × 1.4 × 0.3 = 0.168 → 9.912。
-        // 他の部材と重ならないので全体の体積は 20.712 増え、独立のスラブ分解とも一致する。
+        // 他の部材と重ならないので全体の体積は 20.732 増える。直方体部分は独立のスラブ分解と一致する。
         [Xunit.Fact]
         public void Volume_MatchesHandCalculationAndSlabIntegral()
         {
             Hikan.Core.HikanParameters p = WithGate();
-            Xunit.Assert.Equal(10.8m, Hikan.Core.HikanGeometry.GateColumnVolume(p));
+            Xunit.Assert.Equal(0.02m, Hikan.Core.HikanGeometry.GateHaunchVolume(p));
+            Xunit.Assert.Equal(10.82m, Hikan.Core.HikanGeometry.GateColumnVolume(p));
             Xunit.Assert.Equal(9.912m, Hikan.Core.HikanGeometry.GateDeckVolume(p));
-            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(WithoutGate()) + 20.712m, Hikan.Core.HikanGeometry.ModelVolume(p));
-            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p), HikanPartsTests.SlabVolume(p));
+            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(WithoutGate()) + 20.732m, Hikan.Core.HikanGeometry.ModelVolume(p));
+            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p),
+                HikanPartsTests.SlabVolume(p) + Hikan.Core.HikanGeometry.GateHaunchVolume(p));
 
             Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
-            Xunit.Assert.Equal(10.800m, e.GateColumnVolume);
+            Xunit.Assert.Equal(10.820m, e.GateColumnVolume);
             Xunit.Assert.Equal(9.912m, e.GateDeckVolume);
             Xunit.Assert.Equal(e.BarrelConcreteVolume + e.GateColumnVolume + e.GateDeckVolume, e.ConcreteVolume);
         }
@@ -127,7 +130,8 @@ namespace Hikan.Core.Tests
             Xunit.Assert.False(b.ContainsKey("操作台受け台下"));
             AssertBox(b["操作台"], -3.0m, 3.0m, 9.0m, 9.6m, 8.6m, 11.4m);
             Xunit.Assert.Equal(10.08m, Hikan.Core.HikanGeometry.GateDeckVolume(p));
-            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p), HikanPartsTests.SlabVolume(p));
+            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p),
+                HikanPartsTests.SlabVolume(p) + Hikan.Core.HikanGeometry.GateHaunchVolume(p));
         }
 
         // テスト4: 横方向壁幅 X8 = 0 なら切欠きのない矩形の柱(X4 + X5)× X7 になる。
@@ -138,8 +142,9 @@ namespace Hikan.Core.Tests
             p.Gate.TransverseWallWidth = 0m;
             p.Gate.DeckWidth = 2.0m + 2m * 0.5m + 2m * 1.1m;   // X2 を合わせ直す
             Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
-            Xunit.Assert.Equal(2m * 6.0m * 1.4m * 0.5m, Hikan.Core.HikanGeometry.GateColumnVolume(p));
-            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p), HikanPartsTests.SlabVolume(p));
+            Xunit.Assert.Equal(2m * 6.0m * 1.4m * 0.5m + 0.02m, Hikan.Core.HikanGeometry.GateColumnVolume(p));
+            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p),
+                HikanPartsTests.SlabVolume(p) + Hikan.Core.HikanGeometry.GateHaunchVolume(p));
         }
 
         // テスト5: 横方向壁は川裏側(S の小さい側)なので、門柱の重心は軸位置 d = 10 より川裏側に寄る。
@@ -158,11 +163,12 @@ namespace Hikan.Core.Tests
         }
 
         // テスト6: 型枠。門柱 2 × 2 × (1.4 + 0.9) × 6.0 = 55.2、
-        // 操作台 側面 2 × (2.8 + 6.0) × 0.6 = 10.56 + 下面 2.8 × 6.0 − 2 × 0.9 = 15.0 + 受け台 (2 × 0.4 + 1.4) × 0.3 = 0.66 → 81.42
+        // 操作台 側面 2 × (2.8 + 6.0) × 0.6 = 10.56 + 下面 2.8 × 6.0 − 2 × 0.9 = 15.0 + 受け台 (2 × 0.4 + 1.4) × 0.3 = 0.66 → 81.42、
+        // ハンチ 2 × (√2 × 0.2 − 2 × 0.2) × 0.5 = −0.117157 → 81.302843
         [Xunit.Fact]
         public void Formwork_MatchesHandCalculation()
         {
-            Xunit.Assert.Equal(81.420m, Hikan.Core.HikanEstimator.Calculate(WithGate()).FormworkGate);
+            Xunit.Assert.Equal(81.303m, Hikan.Core.HikanEstimator.Calculate(WithGate()).FormworkGate);
             Xunit.Assert.Equal(0.000m, Hikan.Core.HikanEstimator.Calculate(WithoutGate()).FormworkGate);
         }
 
@@ -178,7 +184,9 @@ namespace Hikan.Core.Tests
             Xunit.Assert.Equal(without.OccupiedVolume + 3.6m, with.OccupiedVolume);
             Xunit.Assert.Equal(without.BackfillVolume - 3.6m, with.BackfillVolume);
             Xunit.Assert.Equal(3.6m, Hikan.Core.HikanGeometry.GateVolumeBelow(WithGate(), 5.0m));
-            Xunit.Assert.Equal(20.712m, Hikan.Core.HikanGeometry.GateVolumeBelow(WithGate(), 100m));
+            Xunit.Assert.Equal(20.732m, Hikan.Core.HikanGeometry.GateVolumeBelow(WithGate(), 100m));
+            // 現地盤がハンチの途中(V 8.9、ハンチは 8.8〜9.0)なら、地盤より下のハンチは 2 × 0.1² / 2 × 0.5 = 0.005
+            Xunit.Assert.Equal(10.8m * (8.9m - 3.0m) / 6.0m + 0.005m, Hikan.Core.HikanGeometry.GateVolumeBelow(WithGate(), 8.9m));
         }
 
         // テスト8: エクステント。上端は操作台の上面 9.6、横幅は操作台の ±3.0。
@@ -192,6 +200,43 @@ namespace Hikan.Core.Tests
             Xunit.Assert.Equal(3.0m, x.MaxX);
             Xunit.Assert.Equal(-3.0m, x.MinX);
             Xunit.Assert.Equal(20m, Hikan.Core.HikanGeometry.GlobalSMax(p));
+        }
+
+        // テスト8b: ハンチは門柱の内面(U = ±1.0)と操作台下面(V = 9.0)の隅の三角(1:1、H2 = 0.2)で、
+        // 横方向壁の区間 S 9.3〜9.8 に付く(切欠きの区間には付かない)。左右対称なので重心の X は 0 のまま。
+        [Xunit.Fact]
+        public void Haunch_IsTriangleAtInnerFaceUnderDeck()
+        {
+            Hikan.Core.HikanPrismPart[] h = Hikan.Core.HikanGeometry.GetHaunchParts(WithGate());
+            Xunit.Assert.Equal(2, h.Length);
+            Hikan.Core.HikanPrismPart right = h[0];
+            Xunit.Assert.Equal("門柱右ハンチ", right.Name);
+            Xunit.Assert.Equal(new (decimal U, decimal V)[] { (0.8m, 9.0m), (1.0m, 8.8m), (1.0m, 9.0m) }, right.Section);
+            Xunit.Assert.Equal(9.3m, right.SMin);
+            Xunit.Assert.Equal(9.8m, right.SMax);
+            Xunit.Assert.Equal(0.02m, right.Area);
+            Hikan.Core.HikanPrismPart left = h[1];
+            Xunit.Assert.Equal(0.02m, left.Area);
+            Xunit.Assert.Equal(-right.Centroid.U, left.Centroid.U);
+            Xunit.Assert.Equal(right.Centroid.V, left.Centroid.V);
+            Xunit.Assert.Equal(0m, Hikan.Core.HikanGeometry.ExpectedCentroid(WithGate()).X);
+
+            Hikan.Core.HikanParameters none = WithGate();
+            none.Gate.HaunchHeight = 0m;
+            Xunit.Assert.Empty(Hikan.Core.HikanGeometry.GetHaunchParts(none));
+            Xunit.Assert.Equal(10.8m, Hikan.Core.HikanGeometry.GateColumnVolume(none));
+        }
+
+        // テスト8c: ハンチは左右で重ならないこと(H2 < 内空幅 / 2)。
+        [Xunit.Theory]
+        [Xunit.InlineData(0.9, true)]
+        [Xunit.InlineData(1.0, false)]
+        public void Haunch_MustBeSmallerThanHalfInnerWidth(double h, bool valid)
+        {
+            Hikan.Core.HikanParameters p = WithGate();
+            p.Gate.HaunchHeight = (decimal)h;
+            if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
+            else { Xunit.Assert.StartsWith("門柱・操作台のハンチ高 H2", FirstError(p)); }
         }
 
         // テスト9: 旧 XData(門柱のキーなし)は設置しないとして読む。往復で値が戻る。

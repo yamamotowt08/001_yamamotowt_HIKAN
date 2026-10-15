@@ -19,6 +19,7 @@ namespace Hikan.Core
     ///                                       ├──┼──┤
     ///                                       │▓▓│▓▓│ X5  ← 横方向壁(厚 X5、川裏側)
     ///   内面(X8 の内側の端)= 函体の内空側面。切欠き(X8 × X4)はゲートの通る溝。
+    ///   ハンチ(H2)は門柱の内面と操作台下面の隅の三角(1:1)で、横方向壁の区間(X5)に付く。
     /// </summary>
     public sealed class HikanGateTower
     {
@@ -57,7 +58,10 @@ namespace Hikan.Core
         public decimal TransverseWallWidth { get; set; } = 0.400m;
         /// <summary>Y2: 柱高さ(頂版上面から操作台下面まで)[m]</summary>
         public decimal ColumnHeight { get; set; } = 6.400m;
-        /// <summary>H2: ハンチ高 [m]。値は保存するが、形と位置が未確定のため形状・数量には入れない。</summary>
+        /// <summary>
+        /// H2: ハンチ高 [m]。門柱の内面(= 内空側面)と操作台下面の隅に付く、高さ・幅とも H2 の三角(1:1)で、
+        /// 横方向壁の区間(X5)に付ける。0 でハンチなし。
+        /// </summary>
         public decimal HaunchHeight { get; set; } = 0.200m;
 
         /// <summary>門柱の函体軸方向の全長 = X4 + X5</summary>

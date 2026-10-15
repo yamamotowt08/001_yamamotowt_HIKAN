@@ -336,7 +336,8 @@ namespace Hikan.AutoCAD
             column.Controls.Add(BuildSheet(s => s.GateColumn(),
                 "門柱は函体の左右の側壁の上に立つ L 字の柱(左右同一)。内側の切欠き(X8 × X4)がゲートの溝で、横方向壁(X5)は川裏側。"
                 + "内面は函体の内空側面にそろえる。d は川裏函体端から門柱の中心(X4 + X5 の中央)まで。"
-                + "X5・X7 は 0.40 m 以上・0.10 m ピッチ。ハンチ高 H2 は保存するが、形と位置が未確定のため形状・数量には入れない。", out g.Grid));
+                + "X5・X7 は 0.40 m 以上・0.10 m ピッチ。ハンチ(H2)は門柱の内面と操作台下面の隅の三角(1:1)で、"
+                + "横方向壁の区間に付く(切欠きは塞がない)。0 でハンチなし。", out g.Grid));
             g.InnerTab = column;
             AddField(g, "d", "門柱の軸位置(川裏函体端から)", "m", title + "の軸位置",
                 q => q.Gate.Position, (q, v) => q.Gate.Position = v);
@@ -350,7 +351,7 @@ namespace Hikan.AutoCAD
                 q => q.Gate.TransverseWallWidth, (q, v) => q.Gate.TransverseWallWidth = v);
             AddField(g, "Y2", "柱高さ(頂版上面から)", "m", title + "の柱高さ",
                 q => q.Gate.ColumnHeight, (q, v) => q.Gate.ColumnHeight = v);
-            AddField(g, "H2", "ハンチ高(形状には未反映)", "m", title + "のハンチ高",
+            AddField(g, "H2", "ハンチ高(内面と操作台下面の隅)", "m", title + "のハンチ高",
                 q => q.Gate.HaunchHeight, (q, v) => q.Gate.HaunchHeight = v);
 
             System.Windows.Forms.RadioButton install = Choice("設置する", true);

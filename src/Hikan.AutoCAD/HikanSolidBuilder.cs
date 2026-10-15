@@ -133,6 +133,7 @@ namespace Hikan.AutoCAD
             }
 
             Combine(solid, parts, k, false, Autodesk.AutoCAD.DatabaseServices.BooleanOperationType.BoolUnite);
+            CombineHaunches(solid, p, k);
             CombineWings(solid, p, k);
             Combine(solid, parts, k, true, Autodesk.AutoCAD.DatabaseServices.BooleanOperationType.BoolSubtract);
 
@@ -181,6 +182,30 @@ namespace Hikan.AutoCAD
                 (double)(globalSMax - part.SMax),
                 (double)(part.SMax - part.SMin),
                 (double)((part.UMax - part.UMin) * (part.VMax - part.VMin)));
+        }
+
+        /// <summary>
+        /// 門柱のハンチ(断面が三角の柱)を合成する。断面を作図平面に置いて押出すのは直方体の部材と同じ。
+        /// 門柱の内面・操作台の下面と面で接するだけで他と重ならない(HikanValidator で検査済み)。
+        /// </summary>
+        private static void CombineHaunches(
+            Autodesk.AutoCAD.DatabaseServices.Solid3d solid,
+            Hikan.Core.HikanParameters p,
+            decimal k)
+        {
+            foreach (Hikan.Core.HikanPrismPart part in Hikan.Core.HikanGeometry.GetHaunchParts(p))
+            {
+                Autodesk.AutoCAD.DatabaseServices.Solid3d other = ExtrudePolygon(
+                    part.Section, part.Name, (double)(k - part.SMax), (double)(part.SMax - part.SMin), (double)part.Area);
+                try
+                {
+                    solid.BooleanOperation(Autodesk.AutoCAD.DatabaseServices.BooleanOperationType.BoolUnite, other);
+                }
+                finally
+                {
+                    other.Dispose();
+                }
+            }
         }
 
         /// <summary>

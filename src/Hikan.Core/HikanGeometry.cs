@@ -25,6 +25,51 @@ namespace Hikan.Core
     }
 
     /// <summary>
+    /// 断面 (U, V) が多角形で S 方向に一定のプリズム(門柱のハンチなど、直方体でない部材)。
+    /// 直方体を前提にした計算(HikanPart の Volume・隅の座標・重なり)に紛れ込まないよう、HikanPart とは別の型にする。
+    /// </summary>
+    public sealed class HikanPrismPart
+    {
+        public string Name { get; set; }
+        /// <summary>断面の頂点(反時計回り)</summary>
+        public (decimal U, decimal V)[] Section { get; set; }
+        public decimal SMin { get; set; }
+        public decimal SMax { get; set; }
+
+        /// <summary>断面積(靴紐公式)</summary>
+        public decimal Area
+        {
+            get
+            {
+                decimal a = 0m;
+                for (int i = 0; i < Section.Length; i++)
+                {
+                    (decimal U, decimal V) p = Section[i];
+                    (decimal U, decimal V) q = Section[(i + 1) % Section.Length];
+                    a += p.U * q.V - q.U * p.V;
+                }
+                return a / 2m;
+            }
+        }
+
+        public decimal Volume
+        {
+            get { return Area * (SMax - SMin); }
+        }
+
+        /// <summary>断面の図心(三角形なら頂点の平均。ハンチは三角形のみ)</summary>
+        public (decimal U, decimal V) Centroid
+        {
+            get
+            {
+                decimal u = 0m, v = 0m;
+                foreach ((decimal U, decimal V) p in Section) { u += p.U; v += p.V; }
+                return (u / Section.Length, v / Section.Length);
+            }
+        }
+    }
+
+    /// <summary>
     /// 断面座標・体積・生成後検証の期待値。
     ///
     /// 構造は「中実の直方体部材を BoolUnite し、最後に内空プリズムを 1 回 BoolSubtract」で作る。
@@ -317,13 +362,51 @@ namespace Hikan.Core
                 : Box(name, -b, -a, vMin, vMax, sMin, sMax, false);
         }
 
-        /// <summary>門柱 2 本の体積 [m3] = 2 × Y2 × (X5 × (X7 + X8) + X4 × X7)(L 字の断面積 × 高さ)。</summary>
+        /// <summary>
+        /// 門柱 2 本の体積 [m3] = 2 × Y2 × (X5 × (X7 + X8) + X4 × X7)(L 字の断面積 × 高さ)+ ハンチ。
+        /// </summary>
         public static decimal GateColumnVolume(HikanParameters p)
         {
             HikanGateTower g = p.Gate;
             if (!g.Exists) { return 0m; }
             decimal area = g.TransverseWallThickness * g.ColumnBreadth + g.LongitudinalWallWidth * g.LongitudinalWallThickness;
-            return 2m * g.ColumnHeight * area;
+            return 2m * g.ColumnHeight * area + GateHaunchVolume(p);
+        }
+
+        /// <summary>門柱のハンチ 2 か所の体積 [m3] = 2 × H2² / 2 × X5 = H2² × X5。</summary>
+        public static decimal GateHaunchVolume(HikanParameters p)
+        {
+            HikanGateTower g = p.Gate;
+            if (!g.Exists || g.HaunchHeight <= 0m) { return 0m; }
+            return g.HaunchHeight * g.HaunchHeight * g.TransverseWallThickness;
+        }
+
+        /// <summary>
+        /// 門柱のハンチ(左右 2 か所)。門柱の内面(= 内空側面 ±B/2)と操作台下面の隅に付く、高さ・幅とも H2 の三角(1:1)で、
+        /// 横方向壁の区間(S = 門柱の川裏側の面 〜 + X5)に付ける。切欠き(ゲートの溝)は塞がない。
+        /// 門柱の内面・操作台の下面と面で接するだけで、他の部材とは重ならない(HikanValidator が H2 &lt; B/2 を保証)。
+        /// </summary>
+        public static HikanPrismPart[] GetHaunchParts(HikanParameters p)
+        {
+            HikanGateTower g = p.Gate;
+            if (!g.Exists || g.HaunchHeight <= 0m) { return new HikanPrismPart[0]; }
+            decimal inner = p.InnerWidth / 2m;
+            decimal top = p.OuterHeight + g.ColumnHeight;
+            decimal h = g.HaunchHeight;
+            (decimal Min, decimal Max) column = g.ColumnRange;
+            decimal end = column.Min + g.TransverseWallThickness;
+
+            HikanPrismPart right = new HikanPrismPart();
+            right.Name = "門柱右ハンチ";
+            right.Section = new (decimal U, decimal V)[] { (inner - h, top), (inner, top - h), (inner, top) };
+            right.SMin = column.Min;
+            right.SMax = end;
+            HikanPrismPart left = new HikanPrismPart();
+            left.Name = "門柱左ハンチ";
+            left.Section = new (decimal U, decimal V)[] { (-inner, top - h), (-inner + h, top), (-inner, top) };
+            left.SMin = column.Min;
+            left.SMax = end;
+            return new HikanPrismPart[] { right, left };
         }
 
         /// <summary>操作台の体積 [m3] = Y1 × X1 × X2 − (管理橋ありなら)W1 × W2 × H1。</summary>
@@ -351,6 +434,15 @@ namespace Hikan.Core
                 {
                     v += (part.UMax - part.UMin) * (top - part.VMin) * (part.SMax - part.SMin);
                 }
+            }
+            // ハンチの三角は下端(高さ top − H2)で幅 0、上へ 1:1 で広がるので、地盤より下の部分は h² / 2 × 長さ。
+            HikanGateTower g = p.Gate;
+            foreach (HikanPrismPart part in GetHaunchParts(p))
+            {
+                decimal h = ground - (p.OuterHeight + g.ColumnHeight - g.HaunchHeight);
+                if (h <= 0m) { continue; }
+                if (h > g.HaunchHeight) { h = g.HaunchHeight; }
+                v += h * h / 2m * (part.SMax - part.SMin);
             }
             return v;
         }
@@ -753,6 +845,15 @@ namespace Hikan.Core
                     Extend(ref first, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ, ToWorld(p, u, v, s));
                 }
             }
+            // ハンチは門柱と操作台の内側にあるので実際には範囲を広げないが、頂点で確かめておく。
+            foreach (HikanPrismPart part in GetHaunchParts(p))
+            {
+                foreach ((decimal U, decimal V) c in part.Section)
+                {
+                    Extend(ref first, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ, ToWorld(p, c.U, c.V, part.SMin));
+                    Extend(ref first, ref minX, ref minY, ref minZ, ref maxX, ref maxY, ref maxZ, ToWorld(p, c.U, c.V, part.SMax));
+                }
+            }
             // 翼壁は凸多面体なので、頂点の min/max がエクステントになる。
             foreach (HikanTaperedPart part in GetWingParts(p))
             {
@@ -810,6 +911,13 @@ namespace Hikan.Core
             {
                 Accumulate(ref mass, ref mu, ref mv, ref ms, -collarOverlap,
                     0m, p.OuterHeight / 2m, CutoffPosition(p, k));
+            }
+
+            // 門柱のハンチ(三角柱)。他の部材と重ならない。
+            foreach (HikanPrismPart part in GetHaunchParts(p))
+            {
+                (decimal U, decimal V) c = part.Centroid;
+                Accumulate(ref mass, ref mu, ref mv, ref ms, part.Volume, c.U, c.V, (part.SMin + part.SMax) / 2m);
             }
 
             // 翼壁はシンプソン積分した体積とモーメントを足し、胸壁などとの重なりを 1 回引く。
