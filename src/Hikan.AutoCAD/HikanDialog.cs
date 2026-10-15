@@ -3,6 +3,8 @@ namespace Hikan.AutoCAD
 {
     /// <summary>
     /// パラメータ入力画面。構造物ごとのタブ(函体 / 胸壁 / 翼壁 / しゃ水壁 / 床掘り・色)で入力する。
+    /// 翼壁のタブは内側に「基本条件 / 形状寸法 / 堤防保護部」のタブを持ち、堤防保護部のタブは
+    /// 基本条件で「設置する」を選んだときだけ表示する。
     /// 入力項目と意味はコマンドライン入力(HikanPrompt)と同じ。基準点はここでは扱わない。
     /// 確定時に Core の整合性チェック(HikanValidator.ValidateInput)を通し、エラーがあれば画面を閉じずに
     /// 該当欄へ印を付けてそのタブへ切り替える。
@@ -19,6 +21,8 @@ namespace Hikan.AutoCAD
             public System.Action<Hikan.Core.HikanParameters, decimal> Set;
             public System.Windows.Forms.TextBox Box;
             public Page Page;
+            /// <summary>翼壁タブの内側のタブ(基本条件 / 形状寸法 / 堤防保護部)に置いた欄なら、そのタブ。</summary>
+            public System.Windows.Forms.TabPage InnerTab;
         }
 
         /// <summary>タブ 1 枚。Presence は「0 で設置しない」欄(しゃ水壁の枚数)で、0 のとき他の欄を無効にする。</summary>
@@ -27,8 +31,12 @@ namespace Hikan.AutoCAD
             public string Title;
             public string Prefix;
             public System.Windows.Forms.TabPage Tab;
+            /// <summary>AddField が欄を追加する入力表(と、それを置いた内側のタブ)。</summary>
             public System.Windows.Forms.TableLayoutPanel Grid;
+            public System.Windows.Forms.TabPage InnerTab;
             public Field Presence;
+            /// <summary>欄以外の入力(選択ボタンなど)をパラメータに反映する。</summary>
+            public System.Action<Hikan.Core.HikanParameters> Apply;
             public System.Collections.Generic.List<Field> Fields = new System.Collections.Generic.List<Field>();
         }
 
@@ -179,14 +187,36 @@ namespace Hikan.AutoCAD
                 q => wall(q).HeelLength, (q, v) => wall(q).HeelLength = v);
         }
 
+        /// <summary>
+        /// 翼壁のタブ。内側に「基本条件 / 形状寸法 / 堤防保護部」のタブを持つ。
+        /// 形式は U 型だけ実装済みなので、他の形式は表示だけして選べないようにする。
+        /// 堤防保護部のタブは「設置する」のときだけ出し、「設置しない」なら欄を無効にして値は保持する。
+        /// </summary>
         private void AddWingPage(
             string title,
             bool upstream,
             System.Func<Hikan.Core.HikanParameters, Hikan.Core.HikanWingWall> wing)
         {
-            Page w = AddPage(title, title, s => s.Wing(upstream),
+            Page w = new Page();
+            w.Title = title;
+            w.Prefix = title;
+            w.Tab = new System.Windows.Forms.TabPage(title);
+            pages.Add(w);
+
+            System.Windows.Forms.TabControl inner = new System.Windows.Forms.TabControl();
+            inner.Dock = System.Windows.Forms.DockStyle.Fill;
+            w.Tab.Controls.Add(inner);
+
+            System.Windows.Forms.TabPage basic = new System.Windows.Forms.TabPage("基本条件");
+            System.Windows.Forms.TabPage shape = new System.Windows.Forms.TabPage("形状寸法");
+            System.Windows.Forms.TabPage protection = new System.Windows.Forms.TabPage("堤防保護部");
+            inner.TabPages.Add(basic);
+            inner.TabPages.Add(shape);
+
+            shape.Controls.Add(BuildSheet(s => s.Wing(upstream),
                 "左右の側壁と底版が一体の U 字の 3 面張り水路(左右同一)。側壁厚・底版厚は 0.40 m 以上・0.10 m ピッチ。"
-                + "底版上面は函体の敷高に合わせる。開き角は内空幅 B と端部の水路幅 W の差で決まる。");
+                + "底版上面は函体の敷高に合わせる。開き角は内空幅 B と端部の水路幅 W の差で決まる。", out w.Grid));
+            w.InnerTab = shape;
             AddField(w, "ts", "側壁厚", "m", title + "の側壁厚",
                 q => wing(q).StemThickness, (q, v) => wing(q).StemThickness = v);
             AddField(w, "La", "翼壁長(函体軸方向)", "m", title + "の翼壁長",
@@ -199,6 +229,87 @@ namespace Hikan.AutoCAD
                 q => wing(q).CrownEnd, (q, v) => wing(q).CrownEnd = v);
             AddField(w, "tf", "底版厚", "m", title + "の底版厚",
                 q => wing(q).FloorThickness, (q, v) => wing(q).FloorThickness = v);
+
+            string name = (upstream ? "川裏側" : "川表側") + "堤防保護部";
+            protection.Controls.Add(BuildSheet(s => s.Protection(),
+                "翼壁の端部から左右へ張り出す逆T字擁壁(左右同一)。たて壁は外側の面を翼壁端部にそろえる。"
+                + "X4 は翼壁端部の側壁内面から外向き(側壁厚を含む)。底版は上面 = 敷高、厚さ = 翼壁の底版厚。"
+                + "つま先版は水路床の下も含めて左右つながる。", out w.Grid));
+            w.InnerTab = protection;
+            int first = w.Fields.Count;
+            AddField(w, "X4", "張出し幅(端部の側壁内面から)", "m", name + "の張出し幅",
+                q => wing(q).Protection.Width, (q, v) => wing(q).Protection.Width = v);
+            AddField(w, "L3", "たて壁厚", "m", name + "のたて壁厚",
+                q => wing(q).Protection.StemThickness, (q, v) => wing(q).Protection.StemThickness = v);
+            AddField(w, "Y3", "たて壁高(敷高から)", "m", name + "のたて壁高",
+                q => wing(q).Protection.StemHeight, (q, v) => wing(q).Protection.StemHeight = v);
+            AddField(w, "L2", "つま先版長(端部より外側)", "m", name + "のつま先版長",
+                q => wing(q).Protection.ToeLength, (q, v) => wing(q).Protection.ToeLength = v);
+            AddField(w, "L4", "かかと版長(函体側)", "m", name + "のかかと版",
+                q => wing(q).Protection.HeelLength, (q, v) => wing(q).Protection.HeelLength = v);
+            System.Collections.Generic.List<Field> protectionFields = w.Fields.GetRange(first, w.Fields.Count - first);
+
+            System.Windows.Forms.RadioButton install = Choice("設置する", true);
+            System.Windows.Forms.RadioButton none = Choice("設置しない", true);
+            install.Checked = wing(source).Protection.Exists;
+            none.Checked = !install.Checked;
+            System.Action show = delegate
+            {
+                bool on = install.Checked;
+                if (on && !inner.TabPages.Contains(protection)) { inner.TabPages.Add(protection); }
+                if (!on && inner.TabPages.Contains(protection)) { inner.TabPages.Remove(protection); }
+                foreach (Field f in protectionFields) { f.Box.Enabled = on; }
+            };
+            install.CheckedChanged += delegate { show(); };
+            show();
+            w.Apply = q => wing(q).Protection.Exists = install.Checked;
+
+            System.Windows.Forms.RadioButton u = Choice("U型", true);
+            u.Checked = true;
+            System.Windows.Forms.Label later = new System.Windows.Forms.Label();
+            later.Text = "U型以外は今後対応予定";
+            later.ForeColor = System.Drawing.Color.DimGray;
+            later.AutoSize = true;
+            later.Margin = new System.Windows.Forms.Padding(12, 9, 3, 3);
+
+            System.Windows.Forms.FlowLayoutPanel column = new System.Windows.Forms.FlowLayoutPanel();
+            column.Dock = System.Windows.Forms.DockStyle.Fill;
+            column.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
+            column.WrapContents = false;
+            column.Padding = new System.Windows.Forms.Padding(12);
+            column.Controls.Add(Group("形式", Choice("逆T型", false), u, Choice("U型張り出し", false), Choice("U型底版傾斜", false), later));
+            column.Controls.Add(Group("堤防保護部", install, none));
+            basic.Controls.Add(column);
+        }
+
+        private static System.Windows.Forms.RadioButton Choice(string text, bool enabled)
+        {
+            System.Windows.Forms.RadioButton r = new System.Windows.Forms.RadioButton();
+            r.Text = text;
+            r.Enabled = enabled;
+            r.AutoSize = true;
+            r.Margin = new System.Windows.Forms.Padding(6, 6, 18, 3);
+            return r;
+        }
+
+        /// <summary>枠付きの選択欄。中の選択ボタンは同じ枠の中で排他になる。</summary>
+        private static System.Windows.Forms.GroupBox Group(string text, params System.Windows.Forms.Control[] items)
+        {
+            System.Windows.Forms.FlowLayoutPanel row = new System.Windows.Forms.FlowLayoutPanel();
+            row.Dock = System.Windows.Forms.DockStyle.Fill;
+            row.AutoSize = true;
+            row.WrapContents = true;
+            row.Controls.AddRange(items);
+
+            System.Windows.Forms.GroupBox box = new System.Windows.Forms.GroupBox();
+            box.Text = text;
+            box.AutoSize = true;
+            box.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            box.MinimumSize = new System.Drawing.Size(520, 0);
+            box.Padding = new System.Windows.Forms.Padding(8, 6, 8, 8);
+            box.Margin = new System.Windows.Forms.Padding(3, 3, 3, 14);
+            box.Controls.Add(row);
+            return box;
         }
 
         /// <summary>タブを追加する。左に模式図、右に入力欄(記号 / 名称 / 値 / 単位)と注記。</summary>
@@ -208,22 +319,30 @@ namespace Hikan.AutoCAD
             page.Title = title;
             page.Prefix = prefix;
             page.Tab = new System.Windows.Forms.TabPage(title);
+            page.Tab.Controls.Add(BuildSheet(figure, note, out page.Grid));
+            pages.Add(page);
+            return page;
+        }
 
+        /// <summary>模式図(左)と入力表・注記(右)の 1 画面。入力表は grid に返す。</summary>
+        private System.Windows.Forms.Control BuildSheet(
+            System.Action<HikanSketch> figure, string note, out System.Windows.Forms.TableLayoutPanel grid)
+        {
             System.Windows.Forms.PictureBox picture = new System.Windows.Forms.PictureBox();
             picture.Dock = System.Windows.Forms.DockStyle.Fill;
             picture.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             picture.Paint += (s, e) => HikanSketch.Draw(e.Graphics, picture.ClientRectangle, Font, figure);
             picture.Resize += delegate { picture.Invalidate(); };
 
-            page.Grid = new System.Windows.Forms.TableLayoutPanel();
-            page.Grid.Dock = System.Windows.Forms.DockStyle.Fill;
-            page.Grid.AutoScroll = true;
-            page.Grid.ColumnCount = 4;
-            page.Grid.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
-            page.Grid.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100f));
-            page.Grid.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 110f));
-            page.Grid.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
-            page.Grid.Padding = new System.Windows.Forms.Padding(4, 8, 20, 4);
+            grid = new System.Windows.Forms.TableLayoutPanel();
+            grid.Dock = System.Windows.Forms.DockStyle.Fill;
+            grid.AutoScroll = true;
+            grid.ColumnCount = 4;
+            grid.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
+            grid.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100f));
+            grid.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 110f));
+            grid.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
+            grid.Padding = new System.Windows.Forms.Padding(4, 8, 20, 4);
 
             System.Windows.Forms.Label noteLabel = new System.Windows.Forms.Label();
             noteLabel.Text = note;
@@ -237,7 +356,7 @@ namespace Hikan.AutoCAD
             right.RowCount = 2;
             right.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 70f));
             right.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 30f));
-            right.Controls.Add(page.Grid, 0, 0);
+            right.Controls.Add(grid, 0, 0);
             right.Controls.Add(noteLabel, 0, 1);
 
             System.Windows.Forms.TableLayoutPanel layout = new System.Windows.Forms.TableLayoutPanel();
@@ -247,10 +366,7 @@ namespace Hikan.AutoCAD
             layout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 40f));
             layout.Controls.Add(picture, 0, 0);
             layout.Controls.Add(right, 1, 0);
-            page.Tab.Controls.Add(layout);
-
-            pages.Add(page);
-            return page;
+            return layout;
         }
 
         private void AddIntField(
@@ -274,13 +390,14 @@ namespace Hikan.AutoCAD
             f.Get = get;
             f.Set = set;
             f.Page = page;
+            f.InnerTab = page.InnerTab;
             f.Box = new System.Windows.Forms.TextBox();
             f.Box.Width = 100;
             f.Box.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             f.Box.Text = get(source).ToString("0.000###", System.Globalization.CultureInfo.InvariantCulture);
             f.Box.TextChanged += delegate { UpdateEnabled(page); };
 
-            int row = page.Fields.Count;
+            int row = page.Grid.RowStyles.Count;
             page.Grid.RowCount = row + 2;
             page.Grid.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
             page.Grid.Controls.Add(GridLabel(symbol, System.Drawing.Color.FromArgb(30, 60, 200)), 0, row);
@@ -327,6 +444,7 @@ namespace Hikan.AutoCAD
             Hikan.Core.HikanParameters q = Hikan.Core.HikanParameters.FromDictionary(source.ToDictionary());
             foreach (Page page in pages)
             {
+                if (page.Apply != null) { page.Apply(q); }
                 foreach (Field f in page.Fields)
                 {
                     if (!f.Box.Enabled) { continue; }
@@ -380,6 +498,10 @@ namespace Hikan.AutoCAD
             if (index < 0 || index >= errorPages.Count) { return; }
             tabs.SelectedTab = errorPages[index].Tab;
             Field f = errorTargets[index];
+            if (f != null && f.InnerTab != null && f.InnerTab.Parent is System.Windows.Forms.TabControl inner)
+            {
+                inner.SelectedTab = f.InnerTab;
+            }
             if (f != null && f.Box.Enabled)
             {
                 f.Box.Focus();

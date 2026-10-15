@@ -26,6 +26,8 @@ namespace Hikan.Dynamo
             "しゃ水壁_m3",
             "川裏側翼壁_m3",
             "川表側翼壁_m3",
+            "川裏側堤防保護部_m3",
+            "川表側堤防保護部_m3",
             "川裏側翼壁開き角_度",
             "川表側翼壁開き角_度",
             "浸透路長_m",
@@ -86,6 +88,18 @@ namespace Hikan.Dynamo
             double downstreamWingCrownStart = 3.0,
             double downstreamWingCrownEnd = 2.0,
             double downstreamWingFloorThickness = 0.4,
+            bool upstreamWingProtection = false,
+            double upstreamProtectionWidth = 1.0,
+            double upstreamProtectionStemThickness = 0.4,
+            double upstreamProtectionStemHeight = 2.0,
+            double upstreamProtectionToeLength = 0.5,
+            double upstreamProtectionHeelLength = 1.0,
+            bool downstreamWingProtection = false,
+            double downstreamProtectionWidth = 1.0,
+            double downstreamProtectionStemThickness = 0.4,
+            double downstreamProtectionStemHeight = 2.0,
+            double downstreamProtectionToeLength = 0.5,
+            double downstreamProtectionHeelLength = 1.0,
             int cutoffCount = 0,
             double cutoffThickness = 0.5,
             double cutoffProjection = 0.5)
@@ -129,6 +143,18 @@ namespace Hikan.Dynamo
             p.DownstreamWing.CrownStart = (decimal)downstreamWingCrownStart;
             p.DownstreamWing.CrownEnd = (decimal)downstreamWingCrownEnd;
             p.DownstreamWing.FloorThickness = (decimal)downstreamWingFloorThickness;
+            p.UpstreamWing.Protection.Exists = upstreamWingProtection;
+            p.UpstreamWing.Protection.Width = (decimal)upstreamProtectionWidth;
+            p.UpstreamWing.Protection.StemThickness = (decimal)upstreamProtectionStemThickness;
+            p.UpstreamWing.Protection.StemHeight = (decimal)upstreamProtectionStemHeight;
+            p.UpstreamWing.Protection.ToeLength = (decimal)upstreamProtectionToeLength;
+            p.UpstreamWing.Protection.HeelLength = (decimal)upstreamProtectionHeelLength;
+            p.DownstreamWing.Protection.Exists = downstreamWingProtection;
+            p.DownstreamWing.Protection.Width = (decimal)downstreamProtectionWidth;
+            p.DownstreamWing.Protection.StemThickness = (decimal)downstreamProtectionStemThickness;
+            p.DownstreamWing.Protection.StemHeight = (decimal)downstreamProtectionStemHeight;
+            p.DownstreamWing.Protection.ToeLength = (decimal)downstreamProtectionToeLength;
+            p.DownstreamWing.Protection.HeelLength = (decimal)downstreamProtectionHeelLength;
             p.CutoffCount = cutoffCount;
             p.CutoffThickness = (decimal)cutoffThickness;
             p.CutoffProjection = (decimal)cutoffProjection;
@@ -149,6 +175,8 @@ namespace Hikan.Dynamo
             r["しゃ水壁_m3"] = (double)e.CutoffTotalVolume;
             r["川裏側翼壁_m3"] = (double)e.UpstreamWingVolume;
             r["川表側翼壁_m3"] = (double)e.DownstreamWingVolume;
+            r["川裏側堤防保護部_m3"] = (double)e.UpstreamProtectionVolume;
+            r["川表側堤防保護部_m3"] = (double)e.DownstreamProtectionVolume;
             r["川裏側翼壁開き角_度"] = (double)e.UpstreamWingFlareAngle;
             r["川表側翼壁開き角_度"] = (double)e.DownstreamWingFlareAngle;
             r["浸透路長_m"] = (double)e.SeepagePathLength;

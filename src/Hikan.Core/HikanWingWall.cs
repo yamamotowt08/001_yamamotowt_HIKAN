@@ -32,6 +32,9 @@ namespace Hikan.Core
         /// <summary>底版厚 [m]。底版上面は函体の敷高に合わせるので、函体の底版厚と同じなら底版下面も Z = 0 になる。</summary>
         public decimal FloorThickness { get; set; } = 0.400m;
 
+        /// <summary>堤防保護部(翼壁の端部から左右へ張り出す逆 T 字擁壁)。翼壁を設置するときだけ有効。</summary>
+        public HikanLeveeProtection Protection { get; set; } = new HikanLeveeProtection();
+
         /// <summary>設置するか。側壁厚 0 は旧図面の「設置なし」。</summary>
         public bool Exists
         {
@@ -47,6 +50,7 @@ namespace Hikan.Core
             d[prefix + "crown_start"] = CrownStart.ToString(inv);
             d[prefix + "crown_end"] = CrownEnd.ToString(inv);
             d[prefix + "floor_thickness"] = FloorThickness.ToString(inv);
+            Protection.Write(d, prefix + "protection_");
         }
 
         /// <summary>キーが無い項目は既定値のまま残す。ただし側壁厚のキーが無い旧 XData は翼壁を持たないので 0(設置なし)として読む。</summary>
@@ -61,6 +65,7 @@ namespace Hikan.Core
             CrownStart = get(d, prefix + "crown_start", CrownStart);
             CrownEnd = get(d, prefix + "crown_end", CrownEnd);
             FloorThickness = get(d, prefix + "floor_thickness", FloorThickness);
+            Protection.Read(d, prefix + "protection_", get);
         }
     }
 }

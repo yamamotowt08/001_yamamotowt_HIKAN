@@ -89,7 +89,7 @@ namespace Hikan.Core.Tests
         /// (U, S) の柱ごとに、柱を通る部材の V 区間を集めて厳密に合併・控除する数値積分。
         /// 戻り値: 合併体積、部材区間の重なり体積(同じ柱で 2 部材以上が重なった長さの合計)。
         /// </summary>
-        private static (decimal Union, decimal Overlap) ColumnIntegral(Hikan.Core.HikanParameters p, decimal cell)
+        internal static (decimal Union, decimal Overlap) ColumnIntegral(Hikan.Core.HikanParameters p, decimal cell)
         {
             Hikan.Core.HikanPart[] boxes = Hikan.Core.HikanGeometry.GetParts(p);
             Hikan.Core.HikanTaperedPart[] wings = Hikan.Core.HikanGeometry.GetWingParts(p);

@@ -105,6 +105,9 @@ namespace Hikan.Core
             // (部材別の数量を足すと総計に一致する)。開き角は幅の差から決まる派生量(度)。
             e.UpstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallNetVolume(p, true), Digits);
             e.DownstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallNetVolume(p, false), Digits);
+            // 堤防保護部は翼壁と重なる部分も含めた総量で数え、その分は翼壁の正味から差し引かれている。
+            e.UpstreamProtectionVolume = RoundHalfUp(HikanGeometry.ProtectionVolume(p.UpstreamWing), Digits);
+            e.DownstreamProtectionVolume = RoundHalfUp(HikanGeometry.ProtectionVolume(p.DownstreamWing), Digits);
             e.UpstreamWingFlareAngle = RoundHalfUp(HikanGeometry.WingFlareAngle(p, p.UpstreamWing), Digits);
             e.DownstreamWingFlareAngle = RoundHalfUp(HikanGeometry.WingFlareAngle(p, p.DownstreamWing), Digits);
 

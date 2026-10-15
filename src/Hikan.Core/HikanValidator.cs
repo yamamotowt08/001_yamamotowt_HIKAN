@@ -45,6 +45,8 @@ namespace Hikan.Core
             CheckCutoff(errors, p);
             CheckWingWall(errors, p, p.UpstreamWing, "川裏側翼壁");
             CheckWingWall(errors, p, p.DownstreamWing, "川表側翼壁");
+            CheckProtection(errors, p, p.UpstreamWing, true, "川裏側堤防保護部");
+            CheckProtection(errors, p, p.DownstreamWing, false, "川表側堤防保護部");
 
             if (p.InnerWidth > MaxInnerDimension + Tolerance)
             {
@@ -200,6 +202,62 @@ namespace Hikan.Core
 
             // 函体端近くの胸壁の底版が函体端より外へ出て翼壁と重なるのは、実務で普通の配置なので許す。
             // 重なりは BoolUnite で一体化し、解析解では HikanGeometry.WingOverlapVolume で 1 回差し引く。
+        }
+
+        /// <summary>
+        /// 堤防保護部(翼壁の端部から左右へ張り出す逆 T 字擁壁)。翼壁が無い・保護部を設置しない場合は検査しない。
+        /// - たて壁厚は最小部材厚 0.40 m・0.10 m ピッチ。たて壁高は正、つま先版長・かかと版長は 0 以上。
+        /// - 張出し幅は側壁の U 方向の幅(側壁厚 / cosθ)より大きいこと(側壁の外へ出ないと保護部にならない)。
+        /// - たて壁厚 + かかと版長 ≤ 翼壁長(保護部が函体端を越えて函体に食い込まない)。
+        /// - (たて壁厚 + かかと版長) × tanθ ≤ 側壁の U 方向の幅。八の字に開くと函体側ほど側壁が内へ寄るので、
+        ///   これを超えると保護部(U は端部の側壁内面から外向き)が側壁から離れて浮く。
+        /// - 胸壁の底版と S 方向で重ならないこと(3 部材が重なると体積の解析解が崩れる)。
+        /// </summary>
+        private static void CheckProtection(
+            System.Collections.Generic.List<string> errors,
+            HikanParameters p,
+            HikanWingWall w,
+            bool upstream,
+            string name)
+        {
+            if (!w.Exists || !w.Protection.Exists || w.Length <= 0m) { return; }
+            HikanLeveeProtection g = w.Protection;
+
+            CheckThickness(errors, g.StemThickness, name + "のたて壁厚");
+            if (g.StemHeight <= 0m) { errors.Add(name + "のたて壁高は正の値にしてください。"); }
+            if (g.ToeLength < 0m) { errors.Add(name + "のつま先版長は 0 以上にしてください。"); }
+            if (g.HeelLength < 0m) { errors.Add(name + "のかかと版長は 0 以上にしてください。"); }
+
+            decimal wallWidth = w.StemThickness * HikanGeometry.WingWidthFactor(p, w);
+            if (g.Width <= wallWidth)
+            {
+                errors.Add(name + "の張出し幅 " + g.Width + " m は、翼壁の側壁の幅 " + System.Math.Round(wallWidth, 3)
+                    + " m(側壁内面から外面まで)より大きくしてください。");
+            }
+            decimal depth = g.StemThickness + g.HeelLength;
+            if (depth > w.Length + Tolerance)
+            {
+                errors.Add(name + "のたて壁厚 + かかと版長 = " + depth + " m が翼壁長 " + w.Length
+                    + " m を超えています(函体に食い込みます)。");
+            }
+            else if (depth * HikanGeometry.WingSlope(p, w) > wallWidth + Tolerance)
+            {
+                errors.Add(name + "のたて壁厚 + かかと版長 = " + depth + " m が長すぎます。八の字に開いた側壁から"
+                    + "函体側で離れます(" + System.Math.Round(wallWidth / HikanGeometry.WingSlope(p, w), 3) + " m 以下)。");
+            }
+
+            HikanBreastWall b = upstream ? p.UpstreamBreast : p.DownstreamBreast;
+            if (b.Exists)
+            {
+                (decimal Min, decimal Max) foot = HikanGeometry.BreastFootingRange(b, upstream);
+                decimal reach = upstream ? -w.Length + depth : p.BarrelLength + w.Length - depth;
+                bool overlap = upstream ? foot.Min < reach : foot.Max > reach;
+                if (overlap)
+                {
+                    errors.Add(name + "のかかと版が" + (upstream ? "川裏側" : "川表側") + "胸壁の底版と重なります。"
+                        + "翼壁長を延ばすか、かかと版長・胸壁のつま先版長を短くしてください。");
+                }
+            }
         }
 
         private static void CheckBreastAgainstCutoffs(

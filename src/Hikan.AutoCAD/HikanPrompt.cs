@@ -84,6 +84,23 @@ namespace Hikan.AutoCAD
             w.CrownEnd = d;
             if (!GetDecimal(ed, name + " 底版厚 [m] (上面は函体の敷高)", w.FloorThickness, out d)) { return false; }
             w.FloorThickness = d;
+
+            // 堤防保護部(翼壁の端部から左右へ張り出す逆 T 字擁壁)。設置しないなら残りは聞かない。
+            Hikan.Core.HikanLeveeProtection g = w.Protection;
+            int n;
+            if (!GetInt(ed, name + " 堤防保護部 (1 = 設置する / 0 = 設置しない)", g.Exists ? 1 : 0, out n)) { return false; }
+            g.Exists = n != 0;
+            if (!g.Exists) { return true; }
+            if (!GetDecimal(ed, name + " 堤防保護部 X4 張出し幅 [m] (翼壁端部の側壁内面から外向き)", g.Width, out d)) { return false; }
+            g.Width = d;
+            if (!GetDecimal(ed, name + " 堤防保護部 L3 たて壁厚 [m] (外側の面を翼壁端部にそろえる)", g.StemThickness, out d)) { return false; }
+            g.StemThickness = d;
+            if (!GetDecimal(ed, name + " 堤防保護部 Y3 たて壁高 [m] (敷高から)", g.StemHeight, out d)) { return false; }
+            g.StemHeight = d;
+            if (!GetDecimal(ed, name + " 堤防保護部 L2 つま先版長 [m] (翼壁端部より外側)", g.ToeLength, out d)) { return false; }
+            g.ToeLength = d;
+            if (!GetDecimal(ed, name + " 堤防保護部 L4 かかと版長 [m] (函体側)", g.HeelLength, out d)) { return false; }
+            g.HeelLength = d;
             return true;
         }
 

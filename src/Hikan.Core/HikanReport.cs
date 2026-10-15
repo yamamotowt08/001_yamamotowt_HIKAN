@@ -48,6 +48,14 @@ namespace Hikan.Core
             Add(list, prefix + "crown_start", F(w.CrownStart), "m", "入力");
             Add(list, prefix + "crown_end", F(w.CrownEnd), "m", "入力");
             Add(list, prefix + "floor_thickness", F(w.FloorThickness), "m", "入力");
+            HikanLeveeProtection g = w.Protection;
+            Add(list, prefix + "protection_exists", g.Exists ? "設置する" : "設置しない", "", "入力");
+            if (!g.Exists) { return; }
+            Add(list, prefix + "protection_width", F(g.Width), "m", "入力");
+            Add(list, prefix + "protection_stem_thickness", F(g.StemThickness), "m", "入力");
+            Add(list, prefix + "protection_stem_height", F(g.StemHeight), "m", "入力");
+            Add(list, prefix + "protection_toe_length", F(g.ToeLength), "m", "入力");
+            Add(list, prefix + "protection_heel_length", F(g.HeelLength), "m", "入力");
         }
 
         public static System.Collections.Generic.List<HikanItem> Build(HikanParameters p, HikanEstimate e)
@@ -88,6 +96,8 @@ namespace Hikan.Core
             Add(r, "downstream_breast_volume", F(e.DownstreamBreastVolume), "m3", "確定");
             Add(r, "upstream_wing_volume", F(e.UpstreamWingVolume), "m3", "確定");
             Add(r, "downstream_wing_volume", F(e.DownstreamWingVolume), "m3", "確定");
+            Add(r, "upstream_protection_volume", F(e.UpstreamProtectionVolume), "m3", "確定");
+            Add(r, "downstream_protection_volume", F(e.DownstreamProtectionVolume), "m3", "確定");
             Add(r, "upstream_wing_flare_angle", F(e.UpstreamWingFlareAngle), "度", "確定");
             Add(r, "downstream_wing_flare_angle", F(e.DownstreamWingFlareAngle), "度", "確定");
             Add(r, "cutoff_total_volume", F(e.CutoffTotalVolume), "m3", "確定");
@@ -127,6 +137,7 @@ namespace Hikan.Core
             "翼壁の側壁の天端は函体端から翼壁端部まで直線で変わり、壁の厚さ方向には水平です。側壁厚は壁面に直交する方向で測ります。底版は側壁の外面まで(張出しなし)です。始端・終端は函体端と平行な面で切っています。",
             "函体端近くの胸壁の底版が函体端より外へ出て翼壁(厚い底版など)と重なる場合、重なった部分は一体のコンクリートとして 1 回だけ数え、胸壁の数量に含めて翼壁の数量から差し引きます。",
             "胸壁は函体の左右側面にそれぞれ取り付く逆T字擁壁(たて壁 + 底版)としてモデル化しています。左右は同一形状で、入力は片側分です。底版上面は函体の敷高(内空底面)にそろえ、たて壁は敷高から立ち上がります。つま先版長またはかかと版長を 0 にすれば L 字になります。",
+            "堤防保護部は翼壁の端部から左右へ張り出す逆T字擁壁(たて壁 + 底版、つま先版は水路床の下で左右つながる)としてモデル化しています。底版は上面 = 敷高、厚さ = 翼壁の底版厚です。翼壁と重なる部分は堤防保護部の数量に含め、翼壁の数量から差し引きます。堤防保護部の型枠は計上していません。",
             "胸壁・翼壁は必ず設置します(たて壁厚・側壁厚 0.40 m 以上)。厚 0 は旧版で作った図面の「設置なし」としてのみ読み込みます。",
             "上流端を川裏とします。胸壁のたて壁は函体方向に垂直で、軸位置(川裏函体端からたて壁厚の中心までの斜距離)を中心に置き、函体延長の内側に収めます。函体の上は跨ぎません。",
             "胸壁のつま先版は近い方の函体端の側(川裏側胸壁は川裏、川表側胸壁は川表)、かかと版は函体中央の側に伸びます。つま先版は函体端より外へ出てもかまいません。",

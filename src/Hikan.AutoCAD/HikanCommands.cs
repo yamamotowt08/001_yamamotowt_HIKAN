@@ -167,6 +167,9 @@ namespace Hikan.AutoCAD
                 RunCase(ed, doc, Case(0.02m, true, false, false), "胸壁+しゃ水壁・勾配 0.02");
                 RunCase(ed, doc, Case(0.00m, true, true, false), "胸壁+しゃ水壁+翼壁・勾配なし");
                 RunCase(ed, doc, Case(0.02m, true, true, false), "胸壁+しゃ水壁+翼壁・勾配 0.02");
+                // 翼壁の端部から左右へ張り出す堤防保護部(翼壁の側壁・底版と重なり、BoolUnite で一体化する)。
+                RunCase(ed, doc, WithProtection(Case(0.00m, true, true, false)), "+堤防保護部・勾配なし");
+                RunCase(ed, doc, WithProtection(Case(0.02m, true, true, false)), "+堤防保護部・勾配 0.02");
                 // 胸壁を函体端に寄せ、つま先版が翼壁の底版と重なる配置(BoolUnite で一体化した実体を確かめる)。
                 RunCase(ed, doc, Case(0.00m, true, true, true), "胸壁を函体端に寄せて翼壁と重なる・勾配なし");
                 RunCase(ed, doc, Case(0.02m, true, true, true), "胸壁を函体端に寄せて翼壁と重なる・勾配 0.02");
@@ -248,6 +251,29 @@ namespace Hikan.AutoCAD
                 p.UpstreamBreast.Position = p.UpstreamBreast.StemThickness / 2m;
                 p.DownstreamBreast.Position = p.BarrelLength - p.DownstreamBreast.StemThickness / 2m;
             }
+            return p;
+        }
+
+        /// <summary>
+        /// 堤防保護部を両端に付ける。川裏側(八の字の翼壁)と川表側(平行の翼壁)で寸法を変えて取り違えを検出する。
+        /// 川裏側 X4 1.2 / L3 0.4 / Y3 2.0 / L2 0.5 / L4 1.0、川表側 X4 1.5 / L3 0.5 / Y3 2.5 / L2 0.6 / L4 1.2。
+        /// </summary>
+        private static Hikan.Core.HikanParameters WithProtection(Hikan.Core.HikanParameters p)
+        {
+            Hikan.Core.HikanLeveeProtection up = p.UpstreamWing.Protection;
+            up.Exists = true;
+            up.Width = 1.2m;
+            up.StemThickness = 0.4m;
+            up.StemHeight = 2.0m;
+            up.ToeLength = 0.5m;
+            up.HeelLength = 1.0m;
+            Hikan.Core.HikanLeveeProtection down = p.DownstreamWing.Protection;
+            down.Exists = true;
+            down.Width = 1.5m;
+            down.StemThickness = 0.5m;
+            down.StemHeight = 2.5m;
+            down.ToeLength = 0.6m;
+            down.HeelLength = 1.2m;
             return p;
         }
 

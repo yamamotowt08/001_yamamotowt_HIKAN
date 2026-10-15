@@ -57,6 +57,9 @@ namespace Hikan.Core
                 parts.Add(Centred("しゃ水壁" + i, bo + 2m * a, -a, ho + a, s - tc / 2m, s + tc / 2m, false));
             }
 
+            AddProtection(parts, p, p.UpstreamWing, true);
+            AddProtection(parts, p, p.DownstreamWing, false);
+
             // 内空は函体のみを貫通する。胸壁は函体側面より外側にあり開口を塞がないため関与しない。
             parts.Add(Centred("内空", p.InnerWidth, p.BottomSlabThickness, p.BottomSlabThickness + p.InnerHeight,
                 0m, l, true));
@@ -202,6 +205,67 @@ namespace Hikan.Core
             parts.Add(floor);
         }
 
+        /// <summary>
+        /// 堤防保護部(翼壁の端部から左右へ張り出す逆 T 字擁壁)。左右 × (たて壁 + 底版) + 左右つながるつま先版。
+        /// たて壁は外側の面を翼壁端部にそろえ、U 方向は端部の側壁内面(±端部水路幅/2)から外向きに張出し幅まで。
+        /// 底版(たて壁の下 + かかと版)は同じ U 範囲で函体側へ伸び、つま先版は翼壁端部より外側で水路床の下も含めて左右つながる。
+        /// 底版は上面 = 敷高、厚さ = 翼壁の底版厚。たて壁・底版は翼壁の側壁・底版と重なり、その分は WingOverlapVolume で差し引く。
+        /// </summary>
+        private static void AddProtection(
+            System.Collections.Generic.List<HikanPart> parts,
+            HikanParameters p,
+            HikanWingWall w,
+            bool upstream)
+        {
+            if (!w.Exists || !w.Protection.Exists) { return; }
+            HikanLeveeProtection g = w.Protection;
+
+            decimal top = WingFloorTop(p);
+            decimal bottom = top - w.FloorThickness;
+            decimal inner = w.EndWidth / 2m;
+            decimal outer = inner + g.Width;
+            // 翼壁端部の S と、函体へ向かう向き(川裏側は +S、川表側は −S)。
+            decimal end = upstream ? -w.Length : p.BarrelLength + w.Length;
+            decimal inward = upstream ? 1m : -1m;
+            (decimal Min, decimal Max) stem = Span(end, end + inward * g.StemThickness);
+            (decimal Min, decimal Max) footing = Span(end, end + inward * (g.StemThickness + g.HeelLength));
+            (decimal Min, decimal Max) toe = Span(end, end - inward * g.ToeLength);
+
+            string name = (upstream ? "川裏側" : "川表側") + "堤防保護部";
+            for (int k = 0; k < 2; k++)
+            {
+                bool right = k == 1;
+                decimal uMin = right ? inner : -outer;
+                decimal uMax = right ? outer : -inner;
+                string side = name + (right ? "右" : "左");
+                parts.Add(Box(side + "たて壁", uMin, uMax, top, top + g.StemHeight, stem.Min, stem.Max, false));
+                parts.Add(Box(side + "底版", uMin, uMax, bottom, top, footing.Min, footing.Max, false));
+            }
+            if (g.ToeLength > 0m)
+            {
+                parts.Add(Box(name + "つま先版", -outer, outer, bottom, top, toe.Min, toe.Max, false));
+            }
+        }
+
+        private static (decimal Min, decimal Max) Span(decimal a, decimal b)
+        {
+            return a < b ? (a, b) : (b, a);
+        }
+
+        /// <summary>
+        /// 堤防保護部 1 端ぶんの体積 [m3](翼壁との重なりを含む総量)。部材の和とは別の式で、テストで突き合わせる。
+        /// 左右の たて壁 X4·Y3·L3 と 底版 X4·tf·(L3 + L4)、つま先版 (端部水路幅 + 2·X4)·tf·L2。
+        /// </summary>
+        public static decimal ProtectionVolume(HikanWingWall w)
+        {
+            if (!w.Exists || !w.Protection.Exists) { return 0m; }
+            HikanLeveeProtection g = w.Protection;
+            decimal stems = 2m * g.Width * g.StemHeight * g.StemThickness;
+            decimal footings = 2m * g.Width * w.FloorThickness * (g.StemThickness + g.HeelLength);
+            decimal toe = (w.EndWidth + 2m * g.Width) * w.FloorThickness * g.ToeLength;
+            return stems + footings + toe;
+        }
+
         /// <summary>翼壁の底版上面の高さ = 函体の敷高(局所座標では函体の底版厚)。水路床が函体の内空底面と段差なくつながる。</summary>
         public static decimal WingFloorTop(HikanParameters p)
         {
@@ -321,7 +385,8 @@ namespace Hikan.Core
         /// 直方体部材(内空を除く)と翼壁部材の重なりの合計体積 [m3]。
         /// upstream が null なら両端、true なら川裏側翼壁、false なら川表側翼壁との重なりだけを数える。
         /// 3 部材以上が重なる点は無い(直方体どうし・翼壁部材どうしの重なりは
-        /// 「しゃ水壁 ∩ 函体」以外に無く、それは函体端より内側にしか無い)ので、対ごとの和で厳密。
+        /// 「しゃ水壁 ∩ 函体」以外に無く、それは函体端より内側にしか無い。胸壁と堤防保護部が重ならないことは
+        /// HikanValidator が保証する)ので、対ごとの和で厳密。
         /// </summary>
         public static decimal WingOverlapVolume(HikanParameters p, bool? upstream)
         {
@@ -493,6 +558,7 @@ namespace Hikan.Core
         /// 胸壁は函体と側面で接するだけ、内空は函体のみを貫通する(BarrelVolume が控除済み)。
         /// 翼壁は函体端より外(川裏 S ≤ 0 / 川表 S ≥ L)にあり、函体とは端面で接するだけだが、
         /// 函体端近くの胸壁の底版が函体端より外へ出ていると重なる。その重なりは WingOverlapVolume で 1 回差し引く。
+        /// 堤防保護部は翼壁の側壁・底版と重なり、同じく WingOverlapVolume で差し引く(保護部は総量で数え、翼壁を正味にする)。
         /// </summary>
         public static decimal ModelVolume(HikanParameters p)
         {
@@ -502,6 +568,8 @@ namespace Hikan.Core
                 + CutoffVolume(p)
                 + WingWallVolume(p, p.UpstreamWing)
                 + WingWallVolume(p, p.DownstreamWing)
+                + ProtectionVolume(p.UpstreamWing)
+                + ProtectionVolume(p.DownstreamWing)
                 - WingOverlapVolume(p, null);
         }
 
