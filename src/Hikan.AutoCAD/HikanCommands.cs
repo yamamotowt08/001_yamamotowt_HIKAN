@@ -61,6 +61,7 @@ namespace Hikan.AutoCAD
                     ed.WriteMessage("\nキャンセルしました。");
                     return;
                 }
+                Hikan.Core.HikanValidator.EnsureInputValid(p);
                 Autodesk.AutoCAD.DatabaseServices.ObjectId id = HikanSolidBuilder.Create(doc.Database, p);
                 Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
                 ed.WriteMessage("\nレイヤー: " + HikanSolidBuilder.LayerName
@@ -101,6 +102,7 @@ namespace Hikan.AutoCAD
                     ed.WriteMessage("\nキャンセルしました。");
                     return;
                 }
+                Hikan.Core.HikanValidator.EnsureInputValid(p);
                 Autodesk.AutoCAD.DatabaseServices.ObjectId newId = HikanSolidBuilder.Replace(doc.Database, id, p);
                 ed.WriteMessage("\n同じ基準点 (" + p.BaseX + ", " + p.BaseY + ", " + p.BaseZ
                     + ") で再生成しました。新ハンドル: " + newId.Handle);
@@ -185,11 +187,17 @@ namespace Hikan.AutoCAD
         /// 平面が斜めの部材と天端が傾いた部材(BoolIntersect で作る)の両方を確かめる。
         /// 川表側は底版を 0.8 にして、底版下面が函体底版下面(Z = 0)より下がる場合も確かめる。
         /// </summary>
-        /// <param name="breastAtEnds">true なら胸壁のたて壁を函体端に面一で置き、翼壁の底版を厚くして
+        /// <param name="breastAtEnds">true なら胸壁のたて壁を函体端に面一で置き、
         /// 胸壁のつま先版と翼壁の底版を重ねる(BoolUnite で一体化した実体を確かめる)。</param>
         private static Hikan.Core.HikanParameters Case(decimal slope, bool withExtraParts, bool withWings, bool breastAtEnds)
         {
+            // 胸壁・翼壁は厚 0(旧図面の「設置なし」)から始め、ケースごとに付け足す。
+            // 「函体のみ」のケースは、旧版で作った図面を読み直した場合の互換確認を兼ねる。
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            p.UpstreamBreast.StemThickness = 0m;
+            p.DownstreamBreast.StemThickness = 0m;
+            p.UpstreamWing.StemThickness = 0m;
+            p.DownstreamWing.StemThickness = 0m;
             p.TopSlabThickness = 0.4m;
             p.BottomSlabThickness = 0.6m;
             p.BaseX = 1.5m;
@@ -203,7 +211,6 @@ namespace Hikan.AutoCAD
                 p.UpstreamBreast.Position = 2.0m;
                 p.UpstreamBreast.Length = 1.5m;
                 p.UpstreamBreast.CrownHeight = 4.0m;
-                p.UpstreamBreast.Embedment = 1.0m;
                 p.UpstreamBreast.FootingThickness = 0.5m;
                 p.UpstreamBreast.ToeLength = 0.8m;
                 p.UpstreamBreast.HeelLength = 1.2m;
@@ -211,7 +218,6 @@ namespace Hikan.AutoCAD
                 p.DownstreamBreast.Position = 17.5m;
                 p.DownstreamBreast.Length = 2.0m;
                 p.DownstreamBreast.CrownHeight = 4.5m;
-                p.DownstreamBreast.Embedment = 1.2m;
                 p.DownstreamBreast.FootingThickness = 0.6m;
                 p.DownstreamBreast.ToeLength = 1.0m;
                 p.DownstreamBreast.HeelLength = 1.5m;
@@ -238,11 +244,9 @@ namespace Hikan.AutoCAD
 
             if (breastAtEnds)
             {
+                // 胸壁の底版と翼壁の底版はどちらも上面が敷高なので、函体端に寄せるだけで重なる。
                 p.UpstreamBreast.Position = p.UpstreamBreast.StemThickness / 2m;
                 p.DownstreamBreast.Position = p.BarrelLength - p.DownstreamBreast.StemThickness / 2m;
-                // 底版上面は敷高 0.6 なので、下面が胸壁のつま先版(Z = −0.5 / −0.6 以下)に届く厚さにする
-                p.UpstreamWing.FloorThickness = 1.6m;
-                p.DownstreamWing.FloorThickness = 1.8m;
             }
             return p;
         }

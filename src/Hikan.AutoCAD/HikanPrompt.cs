@@ -36,17 +36,16 @@ namespace Hikan.AutoCAD
             return true;
         }
 
-        /// <summary>胸壁 1 端ぶん。たて壁厚 0 なら「設置しない」として残りを聞かない。</summary>
-        /// <remarks>左右の胸壁は同一形状なので、入力は片側分だけ。</remarks>
+        /// <summary>胸壁 1 端ぶん。胸壁は必ず設置する(たて壁厚 0.40 m 以上)。</summary>
+        /// <remarks>左右の胸壁は同一形状なので、入力は片側分だけ。底版上面は函体の敷高に合わせるので、高さは聞かない。</remarks>
         private static bool PromptBreast(
             Autodesk.AutoCAD.EditorInput.Editor ed,
             Hikan.Core.HikanBreastWall w,
             string name)
         {
             decimal d;
-            if (!GetDecimal(ed, name + " たて壁厚 [m] (0 で設置しない)", w.StemThickness, out d)) { return false; }
+            if (!GetDecimal(ed, name + " たて壁厚 [m] (0.40 以上・0.10 ピッチ)", w.StemThickness, out d)) { return false; }
             w.StemThickness = d;
-            if (!w.Exists) { return true; }
 
             if (!GetDecimal(ed, name + " たて壁軸位置 [m] (川裏函体端からたて壁厚の中心まで)", w.Position, out d)) { return false; }
             w.Position = d;
@@ -54,9 +53,7 @@ namespace Hikan.AutoCAD
             w.Length = d;
             if (!GetDecimal(ed, name + " 天端高 [m] (函体底版下面から)", w.CrownHeight, out d)) { return false; }
             w.CrownHeight = d;
-            if (!GetDecimal(ed, name + " 根入れ深さ [m] (底版厚以上)", w.Embedment, out d)) { return false; }
-            w.Embedment = d;
-            if (!GetDecimal(ed, name + " 底版厚 [m]", w.FootingThickness, out d)) { return false; }
+            if (!GetDecimal(ed, name + " 底版厚 [m] (上面は函体の敷高)", w.FootingThickness, out d)) { return false; }
             w.FootingThickness = d;
             if (!GetDecimal(ed, name + " つま先版長 [m] (近い方の函体端の側。0 で L 字)", w.ToeLength, out d)) { return false; }
             w.ToeLength = d;
@@ -65,7 +62,7 @@ namespace Hikan.AutoCAD
             return true;
         }
 
-        /// <summary>翼壁 1 端ぶん(U 字の 3 面張り水路)。側壁厚 0 なら「設置しない」として残りを聞かない。</summary>
+        /// <summary>翼壁 1 端ぶん(U 字の 3 面張り水路)。翼壁は必ず設置する(側壁厚 0.40 m 以上)。</summary>
         /// <remarks>左右の側壁は同一形状なので、入力は片側分だけ。開き角は端部水路幅と内空幅の差から決まる。
         /// 底版上面は函体の敷高に合わせるので、高さは聞かない。</remarks>
         private static bool PromptWing(
@@ -74,9 +71,8 @@ namespace Hikan.AutoCAD
             string name)
         {
             decimal d;
-            if (!GetDecimal(ed, name + " 側壁厚 [m] (壁面に直交。0 で設置しない)", w.StemThickness, out d)) { return false; }
+            if (!GetDecimal(ed, name + " 側壁厚 [m] (壁面に直交。0.40 以上・0.10 ピッチ)", w.StemThickness, out d)) { return false; }
             w.StemThickness = d;
-            if (!w.Exists) { return true; }
 
             if (!GetDecimal(ed, name + " 翼壁長 [m] (函体端から翼壁端部まで、函体軸方向)", w.Length, out d)) { return false; }
             w.Length = d;
@@ -141,11 +137,11 @@ namespace Hikan.AutoCAD
             if (!GetDecimal(ed, "基礎材厚 (均しコン等) [m]", p.FoundationThickness, out d)) { return false; }
             p.FoundationThickness = d;
 
-            // 胸壁。たて壁厚 0 なら設置しないので残りは聞かない。
+            // 胸壁(必ず設置する)。
             if (!PromptBreast(ed, p.UpstreamBreast, "川裏側胸壁")) { return false; }
             if (!PromptBreast(ed, p.DownstreamBreast, "川表側胸壁")) { return false; }
 
-            // 翼壁。たて壁厚 0 なら設置しないので残りは聞かない。
+            // 翼壁(必ず設置する)。
             if (!PromptWing(ed, p.UpstreamWing, "川裏側翼壁")) { return false; }
             if (!PromptWing(ed, p.DownstreamWing, "川表側翼壁")) { return false; }
 

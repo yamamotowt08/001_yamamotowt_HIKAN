@@ -11,7 +11,7 @@ namespace Hikan.Core.Tests
     {
         private static Hikan.Core.HikanParameters Full()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.TopSlabThickness = 0.4m;
             p.BottomSlabThickness = 0.6m;
             // 軸位置は函体端にたて壁面を合わせた値(川裏側 = 厚/2、川表側 = L − 厚/2)。
@@ -19,7 +19,6 @@ namespace Hikan.Core.Tests
             p.UpstreamBreast.Position = 0.25m;
             p.UpstreamBreast.Length = 1.5m;
             p.UpstreamBreast.CrownHeight = 4.0m;
-            p.UpstreamBreast.Embedment = 1.0m;
             p.UpstreamBreast.FootingThickness = 0.5m;
             p.UpstreamBreast.ToeLength = 0.8m;
             p.UpstreamBreast.HeelLength = 1.2m;
@@ -27,7 +26,6 @@ namespace Hikan.Core.Tests
             p.DownstreamBreast.Position = 19.7m;
             p.DownstreamBreast.Length = 2.0m;
             p.DownstreamBreast.CrownHeight = 4.5m;
-            p.DownstreamBreast.Embedment = 1.2m;
             p.DownstreamBreast.FootingThickness = 0.6m;
             p.DownstreamBreast.ToeLength = 1.0m;
             p.DownstreamBreast.HeelLength = 1.5m;
@@ -112,7 +110,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void SlabVolume_MatchesModelVolume_BarrelOnly()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p), SlabVolume(p));
             Xunit.Assert.Equal(76.800m, Hikan.Core.HikanGeometry.ModelVolume(p));
         }
@@ -123,7 +121,7 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(1, 0.5, 0.7)]
         [Xunit.InlineData(2, 0.5, 0.7)]
         [Xunit.InlineData(3, 0.4, 1.2)]
-        [Xunit.InlineData(5, 0.4, 0.5)]
+        [Xunit.InlineData(4, 0.4, 0.5)]
         public void SlabVolume_MatchesModelVolume_WithExtraParts(int cutoffCount, double thickness, double projection)
         {
             Hikan.Core.HikanParameters p = Full();
@@ -133,6 +131,8 @@ namespace Hikan.Core.Tests
                 p.CutoffThickness = (decimal)thickness;
                 p.CutoffProjection = (decimal)projection;
             }
+            // 胸壁としゃ水壁が S で重なる入力は整合性チェックで弾くので、包除の式もそれを前提にしている
+            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
             Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p), SlabVolume(p));
         }
 
@@ -170,6 +170,40 @@ namespace Hikan.Core.Tests
             Hikan.Core.HikanPart hollow = parts[parts.Length - 1];
             Xunit.Assert.Equal(0m, hollow.SMin);
             Xunit.Assert.Equal(20m, hollow.SMax);
+        }
+
+        // テスト4a: 胸壁の底版上面は函体の敷高(V = 底版厚 0.6)にそろい、たて壁はそこから立ち上がる。
+        [Xunit.Fact]
+        public void BreastFootingTop_IsAtInvert()
+        {
+            Hikan.Core.HikanParameters p = Full();
+            foreach (Hikan.Core.HikanPart part in Hikan.Core.HikanGeometry.GetParts(p))
+            {
+                if (part.Name.EndsWith("底版", System.StringComparison.Ordinal) && part.Name.Contains("胸壁"))
+                {
+                    Xunit.Assert.Equal(0.6m, part.VMax);
+                }
+                if (part.Name.EndsWith("たて壁", System.StringComparison.Ordinal))
+                {
+                    Xunit.Assert.Equal(0.6m, part.VMin);
+                }
+            }
+            Xunit.Assert.Equal(0.6m, Hikan.Core.HikanGeometry.BreastFootingTop(p));
+            // 川裏側: たて壁 2 × 1.5 × (4.0 − 0.6) × 0.5 + 底版 2 × 1.5 × 0.5 × (0.8 + 0.5 + 1.2)
+            Xunit.Assert.Equal(5.1m + 3.75m, Hikan.Core.HikanGeometry.BreastWallVolume(p, p.UpstreamBreast));
+        }
+
+        // テスト4a2: 胸壁の型枠。底版の函体側の側面は、函体側面に接する部分(函体延長内 × 高さ min(底版厚, 敷高))を除く。
+        // 川裏側: たて壁 2×1.5×3.4 + 0.5×3.4 + 1.5×0.5 = 12.65、
+        //         底版 2×2.5×0.5 − 1.7×0.5 + 2×1.5×0.5 + 1.5×2.0 = 6.15 → 左右で 37.6
+        // 川表側: たて壁 2×2.0×3.9 + 0.6×3.9 + 2.0×0.6 = 19.14、
+        //         底版 2×3.1×0.6 − 2.1×0.6 + 2×2.0×0.6 + 2.0×2.5 = 9.86 → 左右で 58.0
+        [Xunit.Fact]
+        public void BreastFormwork_ExcludesFaceTouchingBarrel()
+        {
+            Hikan.Core.HikanParameters p = Full();
+            p.CutoffCount = 0;
+            Xunit.Assert.Equal(95.600m, Hikan.Core.HikanEstimator.Calculate(p).FormworkBreast);
         }
 
         // テスト4b: 胸壁は左右で同一形状(中心線 U = 0 について鏡映)で、函体側面に接し、函体とは重ならないこと。
@@ -247,8 +281,9 @@ namespace Hikan.Core.Tests
             // 上流つま先版が Y<0 に、下流つま先版が Y>L に張り出す
             Xunit.Assert.Equal(-0.8m, x.MinY);
             Xunit.Assert.Equal(21.0m, x.MaxY);
-            // 下端は下流胸壁の根入れ 1.2 m、上端は下流胸壁の天端 4.5 m
-            Xunit.Assert.Equal(-1.2m, x.MinZ);
+            // 下端はしゃ水壁の下方への張出し 0.7 m(胸壁の底版は敷高 0.6 から下に 0.5 / 0.6 なので Z ≥ 0)、
+            // 上端は下流胸壁の天端 4.5 m
+            Xunit.Assert.Equal(-0.7m, x.MinZ);
             Xunit.Assert.Equal(4.5m, x.MaxZ);
         }
 
@@ -362,7 +397,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void GlobalSMax_EqualsBarrelLength_WhenNoDownstreamBreast()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             Xunit.Assert.Equal(p.BarrelLength, Hikan.Core.HikanGeometry.GlobalSMax(p));
 
             Hikan.Core.HikanParameters q = Full();

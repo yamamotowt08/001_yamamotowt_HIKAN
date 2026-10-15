@@ -109,11 +109,11 @@ namespace Hikan.Core.Tests
             {
                 "upstream_breast_stem_thickness", "upstream_breast_position",
                 "upstream_breast_length", "upstream_breast_crown_height",
-                "upstream_breast_embedment", "upstream_breast_footing_thickness",
+                "upstream_breast_footing_thickness",
                 "upstream_breast_toe_length", "upstream_breast_heel_length",
                 "downstream_breast_stem_thickness", "downstream_breast_position",
                 "downstream_breast_length", "downstream_breast_crown_height",
-                "downstream_breast_embedment", "downstream_breast_footing_thickness",
+                "downstream_breast_footing_thickness",
                 "downstream_breast_toe_length", "downstream_breast_heel_length",
                 "cutoff_count", "cutoff_thickness", "cutoff_projection",
                 "upstream_wing_stem_thickness", "upstream_wing_length", "upstream_wing_end_width",
@@ -132,6 +132,22 @@ namespace Hikan.Core.Tests
             Xunit.Assert.Equal(0, q.CutoffCount);
             Xunit.Assert.Equal(76.800m, Hikan.Core.HikanGeometry.ModelVolume(q));
             Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(q));
+        }
+
+        // テスト8b: 旧版(胸壁に根入れ深さがあった版)の XData も読めること。
+        // 根入れ深さのキーは無視し、底版上面は函体の敷高に置く。
+        [Xunit.Fact]
+        public void FromDictionary_LegacyEmbedmentKey_IsIgnored()
+        {
+            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            System.Collections.Generic.Dictionary<string, string> d = p.ToDictionary();
+            Xunit.Assert.False(d.ContainsKey("upstream_breast_embedment"));
+            d["upstream_breast_embedment"] = "1.0";
+            d["downstream_breast_embedment"] = "1.2";
+
+            Hikan.Core.HikanParameters q = Hikan.Core.HikanParameters.FromDictionary(d);
+            Xunit.Assert.Equal(p.ToDictionary(), q.ToDictionary());
+            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p), Hikan.Core.HikanGeometry.ModelVolume(q));
         }
 
         // テスト9: キーが在るのに値が不正なら、補完せずエラー停止すること。

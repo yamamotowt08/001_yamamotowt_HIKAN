@@ -35,14 +35,14 @@ namespace Hikan.Core
         /// <summary>基礎材厚(均しコン等)[m]</summary>
         public decimal FoundationThickness { get; set; } = 0.100m;
 
-        // --- 胸壁(逆T字 / L字)。函体の左右側面に 1 基ずつ取り付く。たて壁厚 0 で「設置しない」。 ---
+        // --- 胸壁(逆T字 / L字)。函体の左右側面に 1 基ずつ取り付く。必ず設置する(たて壁厚 0 は旧図面の「設置なし」)。 ---
         // 上流端 = 川裏 とする(排水樋管の向き)。位置はどちらも川裏函体端からたて壁の軸までの距離で指定する。
         /// <summary>川裏側胸壁(左右に 1 基ずつ)。つま先版は川裏側に伸びる。</summary>
         public HikanBreastWall UpstreamBreast { get; set; } = new HikanBreastWall { Position = 1.000m };
         /// <summary>川表側胸壁(左右に 1 基ずつ)。つま先版は川表側に伸びる。</summary>
         public HikanBreastWall DownstreamBreast { get; set; } = new HikanBreastWall { Position = 19.000m };
 
-        // --- 翼壁(逆T字 / L字)。函体端から外へ、左右に 1 基ずつ。たて壁厚 0 で「設置しない」。 ---
+        // --- 翼壁(U 字の 3 面張り水路)。函体端から外へ。必ず設置する(側壁厚 0 は旧図面の「設置なし」)。 ---
         /// <summary>川裏側翼壁(左右に 1 基ずつ)。川裏函体端(S = 0)から川裏へ伸びる。</summary>
         public HikanWingWall UpstreamWing { get; set; } = new HikanWingWall();
         /// <summary>川表側翼壁(左右に 1 基ずつ)。川表函体端(S = L)から川表へ伸びる。</summary>
@@ -138,7 +138,7 @@ namespace Hikan.Core
             p.FoundationThickness = GetDecimal(d, "foundation_thickness");
 
             // 胸壁・しゃ水壁は第2段階で追加したキー。第1段階で生成したソリッドの XData には存在しないため、
-            // 欠けている場合は既定値(= 設置しない)で補い、函体だけのモデルとして読めるようにする。
+            // 欠けている場合は「設置なし」(厚 0)で補い、函体だけのモデルとして読めるようにする。
             // キーが在るのに値が不正な場合は従来どおりエラー停止する。
             p.UpstreamBreast.Read(d, "upstream_breast_", GetDecimalOrDefault);
             p.DownstreamBreast.Read(d, "downstream_breast_", GetDecimalOrDefault);

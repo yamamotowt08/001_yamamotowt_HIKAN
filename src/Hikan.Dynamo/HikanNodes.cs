@@ -60,29 +60,27 @@ namespace Hikan.Dynamo
             double excavationMargin = 0.5,
             double excavationSlope = 0.5,
             double foundationThickness = 0.1,
-            double upstreamBreastStemThickness = 0.0,
+            double upstreamBreastStemThickness = 0.4,
             double upstreamBreastPosition = 1.0,
             double upstreamBreastLength = 2.0,
             double upstreamBreastCrownHeight = 4.0,
-            double upstreamBreastEmbedment = 1.0,
             double upstreamBreastFootingThickness = 0.5,
             double upstreamBreastToeLength = 0.8,
             double upstreamBreastHeelLength = 1.2,
-            double downstreamBreastStemThickness = 0.0,
+            double downstreamBreastStemThickness = 0.4,
             double downstreamBreastPosition = 19.0,
             double downstreamBreastLength = 2.0,
             double downstreamBreastCrownHeight = 4.0,
-            double downstreamBreastEmbedment = 1.0,
             double downstreamBreastFootingThickness = 0.5,
             double downstreamBreastToeLength = 0.8,
             double downstreamBreastHeelLength = 1.2,
-            double upstreamWingStemThickness = 0.0,
+            double upstreamWingStemThickness = 0.4,
             double upstreamWingLength = 3.0,
             double upstreamWingEndWidth = 3.0,
             double upstreamWingCrownStart = 3.0,
             double upstreamWingCrownEnd = 2.0,
             double upstreamWingFloorThickness = 0.4,
-            double downstreamWingStemThickness = 0.0,
+            double downstreamWingStemThickness = 0.4,
             double downstreamWingLength = 3.0,
             double downstreamWingEndWidth = 3.0,
             double downstreamWingCrownStart = 3.0,
@@ -109,7 +107,6 @@ namespace Hikan.Dynamo
             p.UpstreamBreast.Position = (decimal)upstreamBreastPosition;
             p.UpstreamBreast.Length = (decimal)upstreamBreastLength;
             p.UpstreamBreast.CrownHeight = (decimal)upstreamBreastCrownHeight;
-            p.UpstreamBreast.Embedment = (decimal)upstreamBreastEmbedment;
             p.UpstreamBreast.FootingThickness = (decimal)upstreamBreastFootingThickness;
             p.UpstreamBreast.ToeLength = (decimal)upstreamBreastToeLength;
             p.UpstreamBreast.HeelLength = (decimal)upstreamBreastHeelLength;
@@ -117,7 +114,6 @@ namespace Hikan.Dynamo
             p.DownstreamBreast.Position = (decimal)downstreamBreastPosition;
             p.DownstreamBreast.Length = (decimal)downstreamBreastLength;
             p.DownstreamBreast.CrownHeight = (decimal)downstreamBreastCrownHeight;
-            p.DownstreamBreast.Embedment = (decimal)downstreamBreastEmbedment;
             p.DownstreamBreast.FootingThickness = (decimal)downstreamBreastFootingThickness;
             p.DownstreamBreast.ToeLength = (decimal)downstreamBreastToeLength;
             p.DownstreamBreast.HeelLength = (decimal)downstreamBreastHeelLength;
@@ -137,6 +133,8 @@ namespace Hikan.Dynamo
             p.CutoffThickness = (decimal)cutoffThickness;
             p.CutoffProjection = (decimal)cutoffProjection;
 
+            // 新規入力として検査する(胸壁・翼壁は必ず設置。たて壁厚・側壁厚 0.40 m 以上)。
+            Hikan.Core.HikanValidator.EnsureInputValid(p);
             Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
 
             System.Collections.Generic.Dictionary<string, object> r =

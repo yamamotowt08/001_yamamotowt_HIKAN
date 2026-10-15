@@ -77,9 +77,9 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 胸壁(左右それぞれの逆 T 字擁壁)。たて壁厚 0 は「設置しない」なので寸法を検査しない。
-        /// 根入れ深さ ≥ 底版厚 は、底版上面が函体底版下面(Z = 0)以下に収まり、
-        /// たて壁が Z = 0 から立ち上がって函体側面に確実に接する(ソリッドが 1 個に繋がる)ための条件。
+        /// 胸壁(左右それぞれの逆 T 字擁壁)。たて壁厚 0 は旧図面の「設置なし」なので寸法を検査しない
+        /// (新規入力では ValidateInput が 0 を弾く)。
+        /// 底版上面は函体の敷高にそろえるので、たて壁は敷高から立ち上がる。天端はそれより高いこと。
         /// </summary>
         private static void CheckBreastWall(
             System.Collections.Generic.List<string> errors,
@@ -87,12 +87,7 @@ namespace Hikan.Core
             HikanBreastWall w,
             string name)
         {
-            if (w.StemThickness < 0m)
-            {
-                errors.Add(name + "のたて壁厚は 0 以上にしてください(0 で設置しない)。");
-                return;
-            }
-            if (!w.Exists) { return; }
+            if (w.StemThickness == 0m) { return; }
 
             CheckThickness(errors, w.StemThickness, name + "のたて壁厚");
             CheckThickness(errors, w.FootingThickness, name + "の底版厚");
@@ -101,14 +96,10 @@ namespace Hikan.Core
             {
                 errors.Add(name + "の張出し長は正の値にしてください。");
             }
-            if (w.CrownHeight <= 0m)
+            decimal footingTop = HikanGeometry.BreastFootingTop(p);
+            if (w.CrownHeight <= footingTop)
             {
-                errors.Add(name + "の天端高は正の値にしてください(たて壁が函体側面に接しません)。");
-            }
-            if (w.Embedment < w.FootingThickness - Tolerance)
-            {
-                errors.Add(name + "の根入れ深さは底版厚 " + w.FootingThickness
-                    + " m 以上にしてください(底版上面が函体底版下面より上に出ます)。");
+                errors.Add(name + "の天端高は底版上面(敷高 " + footingTop + " m)より高くしてください。");
             }
             if (w.ToeLength < 0m) { errors.Add(name + "のつま先版長は 0 以上にしてください。"); }
             if (w.HeelLength < 0m) { errors.Add(name + "のかかと版長は 0 以上にしてください。"); }
@@ -169,7 +160,8 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 翼壁(U 字の 3 面張り水路)。側壁厚 0 は「設置しない」なので寸法を検査しない。
+        /// 翼壁(U 字の 3 面張り水路)。側壁厚 0 は旧図面の「設置なし」なので寸法を検査しない
+        /// (新規入力では ValidateInput が 0 を弾く)。
         /// 側壁厚・底版厚は H13 マニュアル Ⅴ章(翼壁)の最小部材厚 0.40 m・0.10 m ピッチの対象。
         /// 胸壁などとの重なりは許す(解析解では HikanGeometry.WingOverlapVolume で差し引く)。
         /// </summary>
@@ -179,12 +171,7 @@ namespace Hikan.Core
             HikanWingWall w,
             string name)
         {
-            if (w.StemThickness < 0m)
-            {
-                errors.Add(name + "の側壁厚は 0 以上にしてください(0 で設置しない)。");
-                return;
-            }
-            if (!w.Exists) { return; }
+            if (w.StemThickness == 0m) { return; }
 
             CheckThickness(errors, w.StemThickness, name + "の側壁厚");
             CheckThickness(errors, w.FloorThickness, name + "の底版厚");
@@ -246,6 +233,35 @@ namespace Hikan.Core
             else if (t % ThicknessPitch != 0m)
             {
                 errors.Add(name + " は " + ThicknessPitch + " m ピッチで規格化してください(基準)。");
+            }
+        }
+
+        /// <summary>
+        /// 新規入力(入力画面・コマンドライン・Dynamo)用。Validate に加えて、胸壁・翼壁を必ず設置すること
+        /// (たて壁厚・側壁厚 0.40 m 以上)を求める。Validate 単体は旧図面(厚 0 = 設置なし)を読めるよう 0 を許す。
+        /// </summary>
+        public static System.Collections.Generic.List<string> ValidateInput(HikanParameters p)
+        {
+            System.Collections.Generic.List<string> errors = Validate(p);
+            RequireWall(errors, p.UpstreamBreast.StemThickness, "川裏側胸壁のたて壁厚");
+            RequireWall(errors, p.DownstreamBreast.StemThickness, "川表側胸壁のたて壁厚");
+            RequireWall(errors, p.UpstreamWing.StemThickness, "川裏側翼壁の側壁厚");
+            RequireWall(errors, p.DownstreamWing.StemThickness, "川表側翼壁の側壁厚");
+            return errors;
+        }
+
+        /// <summary>厚 0(旧図面の「設置なし」)を新規入力では認めない。0 以外は Validate が検査済み。</summary>
+        private static void RequireWall(System.Collections.Generic.List<string> errors, decimal t, string name)
+        {
+            if (t == 0m) { CheckThickness(errors, t, name); }
+        }
+
+        public static void EnsureInputValid(HikanParameters p)
+        {
+            System.Collections.Generic.List<string> errors = ValidateInput(p);
+            if (errors.Count > 0)
+            {
+                throw new HikanValidationException(errors);
             }
         }
 

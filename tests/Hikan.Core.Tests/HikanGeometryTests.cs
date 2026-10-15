@@ -18,7 +18,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void OuterSectionPoints_CounterClockwise_Symmetric()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             (decimal U, decimal V)[] pts = Hikan.Core.HikanGeometry.GetOuterSectionPoints(p);
             Xunit.Assert.Equal(4, pts.Length);
             Xunit.Assert.Equal((-1.4m, 0m), pts[0]);
@@ -32,7 +32,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void InnerSectionPoints_CounterClockwise_LiftedByBottomSlab()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             (decimal U, decimal V)[] pts = Hikan.Core.HikanGeometry.GetInnerSectionPoints(p);
             Xunit.Assert.Equal((-1.0m, 0.4m), pts[0]);
             Xunit.Assert.Equal((1.0m, 0.4m), pts[1]);
@@ -48,7 +48,7 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(1.0, 0.5, 0.7)]
         public void InnerLoop_StrictlyInsideOuterLoop(double wall, double top, double bottom)
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.WallThickness = (decimal)wall;
             p.TopSlabThickness = (decimal)top;
             p.BottomSlabThickness = (decimal)bottom;
@@ -71,7 +71,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void SectionAreaDifference_TimesLength_EqualsModelVolume()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             decimal area = TwiceArea(Hikan.Core.HikanGeometry.GetOuterSectionPoints(p)) / 2m
                 - TwiceArea(Hikan.Core.HikanGeometry.GetInnerSectionPoints(p)) / 2m;
             Xunit.Assert.Equal(Hikan.Core.HikanGeometry.SectionArea(p), area);
@@ -85,7 +85,7 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(0.6, 0.5, 0.9)]
         public void PartVolumes_SumTo_ModelVolume(double wall, double top, double bottom)
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.WallThickness = (decimal)wall;
             p.TopSlabThickness = (decimal)top;
             p.BottomSlabThickness = (decimal)bottom;
@@ -100,7 +100,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void ExpectedExtents_NoSlope()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.BaseX = 1.5m;
             p.BaseY = 2.5m;
             p.BaseZ = 0.75m;
@@ -118,7 +118,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void ExpectedExtents_WithSlope_DownstreamDrops()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.BottomSlope = 0.02m;
             (decimal MinX, decimal MinY, decimal MinZ, decimal MaxX, decimal MaxY, decimal MaxZ) x =
                 Hikan.Core.HikanGeometry.ExpectedExtents(p);
@@ -134,7 +134,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void ExpectedCentroid_SymmetricCase()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.BaseX = 1.5m;
             p.BaseY = 2.5m;
             p.BaseZ = 0.75m;
@@ -149,7 +149,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void ExpectedCentroid_DetectsUpsideDown()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.TopSlabThickness = 0.4m;
             p.BottomSlabThickness = 0.6m;
             (decimal X, decimal Y, decimal Z) g = Hikan.Core.HikanGeometry.ExpectedCentroid(p);
@@ -157,7 +157,7 @@ namespace Hikan.Core.Tests
             Xunit.Assert.NotEqual(half, g.Z);
 
             // 上下反転した断面(頂版 0.6 / 底版 0.4)の重心とも異なること
-            Hikan.Core.HikanParameters flipped = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters flipped = HikanTestData.BarrelOnly();
             flipped.TopSlabThickness = 0.6m;
             flipped.BottomSlabThickness = 0.4m;
             (decimal X, decimal Y, decimal Z) gf = Hikan.Core.HikanGeometry.ExpectedCentroid(flipped);
@@ -171,7 +171,7 @@ namespace Hikan.Core.Tests
         {
             Xunit.Assert.Equal(2m, Hikan.Core.HikanGeometry.Sqrt(4m));
             Xunit.Assert.Equal(0m, Hikan.Core.HikanGeometry.Sqrt(0m));
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             Xunit.Assert.Equal(1m, Hikan.Core.HikanGeometry.SlopeCosine(p));
             decimal r = Hikan.Core.HikanGeometry.Sqrt(2m);
             Xunit.Assert.True(System.Math.Abs(r * r - 2m) < 0.0000000001m, "ニュートン法が収束すること");

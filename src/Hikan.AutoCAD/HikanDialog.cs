@@ -4,7 +4,7 @@ namespace Hikan.AutoCAD
     /// <summary>
     /// パラメータ入力画面。構造物ごとのタブ(函体 / 胸壁 / 翼壁 / しゃ水壁 / 床掘り・色)で入力する。
     /// 入力項目と意味はコマンドライン入力(HikanPrompt)と同じ。基準点はここでは扱わない。
-    /// 確定時に Core の整合性チェック(HikanValidator)を通し、エラーがあれば画面を閉じずに
+    /// 確定時に Core の整合性チェック(HikanValidator.ValidateInput)を通し、エラーがあれば画面を閉じずに
     /// 該当欄へ印を付けてそのタブへ切り替える。
     /// </summary>
     internal sealed class HikanDialog : System.Windows.Forms.Form
@@ -21,7 +21,7 @@ namespace Hikan.AutoCAD
             public Page Page;
         }
 
-        /// <summary>タブ 1 枚。Presence は「0 で設置しない」欄で、0 のとき他の欄を無効にする。</summary>
+        /// <summary>タブ 1 枚。Presence は「0 で設置しない」欄(しゃ水壁の枚数)で、0 のとき他の欄を無効にする。</summary>
         private sealed class Page
         {
             public string Title;
@@ -159,21 +159,19 @@ namespace Hikan.AutoCAD
             System.Func<Hikan.Core.HikanParameters, Hikan.Core.HikanBreastWall> wall)
         {
             Page w = AddPage(title, title, s => s.Breast(upstream),
-                "函体の左右側面に 1 基ずつ取り付く逆T字擁壁(左右同一)。たて壁厚 0 で設置しない。"
+                "函体の左右側面に 1 基ずつ取り付く逆T字擁壁(左右同一)。たて壁厚・底版厚は 0.40 m 以上・0.10 m ピッチ。"
+                + "底版上面は函体の敷高にそろえ、たて壁は敷高から立ち上がる。"
                 + "d は川裏函体端からたて壁の軸(厚さの中心)まで。つま先版は近い方の函体端の側、かかと版は函体中央の側。"
                 + "つま先版長・かかと版長のどちらかを 0 にすると L 字。");
-            AddField(w, "t", "たて壁厚(0 で設置しない)", "m", title + "のたて壁厚",
+            AddField(w, "t", "たて壁厚", "m", title + "のたて壁厚",
                 q => wall(q).StemThickness, (q, v) => wall(q).StemThickness = v);
-            w.Presence = w.Fields[0];
             AddField(w, "d", "たて壁の軸位置", "m", title + "のたて壁(",
                 q => wall(q).Position, (q, v) => wall(q).Position = v);
             AddField(w, "Lw", "張出し長(函体側面から)", "m", title + "の張出し長",
                 q => wall(q).Length, (q, v) => wall(q).Length = v);
             AddField(w, "Hc", "天端高(Z = 0 から)", "m", title + "の天端高",
                 q => wall(q).CrownHeight, (q, v) => wall(q).CrownHeight = v);
-            AddField(w, "De", "根入れ深さ", "m", title + "の根入れ深さ",
-                q => wall(q).Embedment, (q, v) => wall(q).Embedment = v);
-            AddField(w, "tf", "底版厚", "m", title + "の底版厚",
+            AddField(w, "tf", "底版厚(上面は敷高)", "m", title + "の底版厚",
                 q => wall(q).FootingThickness, (q, v) => wall(q).FootingThickness = v);
             AddField(w, "Lt", "つま先版長", "m", title + "のつま先版長",
                 q => wall(q).ToeLength, (q, v) => wall(q).ToeLength = v);
@@ -187,11 +185,10 @@ namespace Hikan.AutoCAD
             System.Func<Hikan.Core.HikanParameters, Hikan.Core.HikanWingWall> wing)
         {
             Page w = AddPage(title, title, s => s.Wing(upstream),
-                "左右の側壁と底版が一体の U 字の 3 面張り水路(左右同一)。側壁厚 0 で設置しない。"
+                "左右の側壁と底版が一体の U 字の 3 面張り水路(左右同一)。側壁厚・底版厚は 0.40 m 以上・0.10 m ピッチ。"
                 + "底版上面は函体の敷高に合わせる。開き角は内空幅 B と端部の水路幅 W の差で決まる。");
-            AddField(w, "ts", "側壁厚(0 で設置しない)", "m", title + "の側壁厚",
+            AddField(w, "ts", "側壁厚", "m", title + "の側壁厚",
                 q => wing(q).StemThickness, (q, v) => wing(q).StemThickness = v);
-            w.Presence = w.Fields[0];
             AddField(w, "La", "翼壁長(函体軸方向)", "m", title + "の翼壁長",
                 q => wing(q).Length, (q, v) => wing(q).Length = v);
             AddField(w, "W", "端部の水路幅", "m", title + "の端部水路幅",
@@ -348,7 +345,7 @@ namespace Hikan.AutoCAD
             // 数値として読めない欄が無いときだけ整合性チェックへ進む(読めない値で判定しても意味がない)。
             if (errorTargets.Count == 0)
             {
-                foreach (string message in Hikan.Core.HikanValidator.Validate(q))
+                foreach (string message in Hikan.Core.HikanValidator.ValidateInput(q))
                 {
                     Field f = FindField(message);
                     AddError(message, f, f != null ? f.Page : FindPage(message));

@@ -80,6 +80,7 @@ namespace Hikan.Core
             if (!w.Exists) { return; }
 
             decimal half = p.OuterWidth / 2m;
+            decimal top = BreastFootingTop(p);
             (decimal Min, decimal Max) foot = BreastFootingRange(w, upstream);
 
             string end = upstream ? "川裏側" : "川表側";
@@ -90,9 +91,15 @@ namespace Hikan.Core
                 decimal uMax = right ? half + w.Length : -half;
                 string name = end + "胸壁" + (right ? "右" : "左");
 
-                parts.Add(Box(name + "たて壁", uMin, uMax, w.FootingTop, w.CrownHeight, w.StemStart, w.StemEnd, false));
-                parts.Add(Box(name + "底版", uMin, uMax, -w.Embedment, w.FootingTop, foot.Min, foot.Max, false));
+                parts.Add(Box(name + "たて壁", uMin, uMax, top, w.CrownHeight, w.StemStart, w.StemEnd, false));
+                parts.Add(Box(name + "底版", uMin, uMax, top - w.FootingThickness, top, foot.Min, foot.Max, false));
             }
+        }
+
+        /// <summary>胸壁の底版上面(= たて壁の下端)の高さ。函体の敷高(内空底面 V = 底版厚)にそろえる。</summary>
+        public static decimal BreastFootingTop(HikanParameters p)
+        {
+            return p.BottomSlabThickness;
         }
 
         /// <summary>
@@ -462,11 +469,13 @@ namespace Hikan.Core
         /// <summary>
         /// 胸壁 1 端ぶん(左右 2 基)の体積 [m3]。たて壁 + 底版。
         /// 函体とは側面で接するだけで重ならないので控除は不要。たて壁厚 0 のときは 0。
+        /// たて壁は底版上面(敷高)から天端まで。
         /// </summary>
-        public static decimal BreastWallVolume(HikanBreastWall w)
+        public static decimal BreastWallVolume(HikanParameters p, HikanBreastWall w)
         {
             if (!w.Exists) { return 0m; }
-            return 2m * (w.StemVolume + w.FootingVolume);
+            decimal stem = w.Length * (w.CrownHeight - BreastFootingTop(p)) * w.StemThickness;
+            return 2m * (stem + w.FootingVolume);
         }
 
         /// <summary>しゃ水壁の合計体積 [m3]。函体と重なる部分を控除した正味。</summary>
@@ -488,8 +497,8 @@ namespace Hikan.Core
         public static decimal ModelVolume(HikanParameters p)
         {
             return BarrelVolume(p)
-                + BreastWallVolume(p.UpstreamBreast)
-                + BreastWallVolume(p.DownstreamBreast)
+                + BreastWallVolume(p, p.UpstreamBreast)
+                + BreastWallVolume(p, p.DownstreamBreast)
                 + CutoffVolume(p)
                 + WingWallVolume(p, p.UpstreamWing)
                 + WingWallVolume(p, p.DownstreamWing)

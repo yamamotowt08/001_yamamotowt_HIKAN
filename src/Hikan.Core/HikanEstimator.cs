@@ -18,15 +18,21 @@ namespace Hikan.Core
         /// 胸壁 1 端ぶん(左右 2 基)の型枠面積 [m2]。
         /// たて壁は上下流 2 面 + 外側端面 + 天端。函体側面に接する内側端面は計上しない。
         /// 底版は内外の側面 + 両端面 + つま先版・かかと版の上面。地盤と接する下面は計上しない。
+        /// 底版の上面は敷高なので、函体側の側面は函体側面に接する(函体延長内かつ Z ≥ 0 の部分を除く)。
         /// </summary>
-        private static decimal BreastFormwork(HikanBreastWall w)
+        private static decimal BreastFormwork(HikanParameters p, HikanBreastWall w, bool upstream)
         {
             if (!w.Exists) { return 0m; }
-            decimal stemHeight = w.CrownHeight - w.FootingTop;
+            decimal top = HikanGeometry.BreastFootingTop(p);
+            decimal stemHeight = w.CrownHeight - top;
             decimal stem = 2m * w.Length * stemHeight
                 + w.StemThickness * stemHeight
                 + w.Length * w.StemThickness;
-            decimal footing = 2m * w.FootingLength * w.FootingThickness
+            (decimal Min, decimal Max) foot = HikanGeometry.BreastFootingRange(w, upstream);
+            decimal contactLength = System.Math.Max(0m,
+                System.Math.Min(foot.Max, p.BarrelLength) - System.Math.Max(foot.Min, 0m));
+            decimal contactHeight = System.Math.Min(w.FootingThickness, top);
+            decimal footing = 2m * w.FootingLength * w.FootingThickness - contactLength * contactHeight
                 + 2m * w.Length * w.FootingThickness
                 + w.Length * (w.ToeLength + w.HeelLength);
             return 2m * (stem + footing);
@@ -90,8 +96,8 @@ namespace Hikan.Core
             e.ConcreteVolume = RoundHalfUp(HikanGeometry.ModelVolume(p), Digits);
 
             // 胸壁は左右 2 基の合計(函体と重ならない)。しゃ水壁は函体と重なる部分を控除した正味。
-            e.UpstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(p.UpstreamBreast), Digits);
-            e.DownstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(p.DownstreamBreast), Digits);
+            e.UpstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(p, p.UpstreamBreast), Digits);
+            e.DownstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(p, p.DownstreamBreast), Digits);
             e.CutoffTotalVolume = RoundHalfUp(HikanGeometry.CutoffVolume(p), Digits);
             e.CutoffSpacing = p.CutoffCount > 0 ? RoundHalfUp(l / p.CutoffCount, Digits) : 0m;
 
@@ -118,7 +124,7 @@ namespace Hikan.Core
             e.FormworkTop = RoundHalfUp(bOut * l, Digits);
             e.FormworkEnd = RoundHalfUp(2m * HikanGeometry.SectionArea(p), Digits);
             e.FormworkBreast = RoundHalfUp(
-                BreastFormwork(p.UpstreamBreast) + BreastFormwork(p.DownstreamBreast), Digits);
+                BreastFormwork(p, p.UpstreamBreast, true) + BreastFormwork(p, p.DownstreamBreast, false), Digits);
             // しゃ水壁は外周面 + 前後の環状面。
             e.FormworkCutoff = RoundHalfUp(CutoffFormwork(p), Digits);
             e.FormworkWing = RoundHalfUp(

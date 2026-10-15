@@ -19,8 +19,8 @@ namespace Hikan.Core
     /// </summary>
     public sealed class HikanWingWall
     {
-        /// <summary>側壁厚(壁面に直交する方向)[m]。0 で設置しない。</summary>
-        public decimal StemThickness { get; set; } = 0.000m;
+        /// <summary>側壁厚(壁面に直交する方向)[m]。0.40 m 以上。0 は旧図面の「設置なし」(新規入力では使わない)。</summary>
+        public decimal StemThickness { get; set; } = 0.400m;
         /// <summary>翼壁長(函体軸方向、函体端から翼壁端部まで)[m]</summary>
         public decimal Length { get; set; } = 3.000m;
         /// <summary>翼壁端部の水路幅(左右の側壁内面間)[m]。内空幅以上。内空幅と同じで平行。</summary>
@@ -32,7 +32,7 @@ namespace Hikan.Core
         /// <summary>底版厚 [m]。底版上面は函体の敷高に合わせるので、函体の底版厚と同じなら底版下面も Z = 0 になる。</summary>
         public decimal FloorThickness { get; set; } = 0.400m;
 
-        /// <summary>設置するか。側壁厚 0 は「設置しない」。</summary>
+        /// <summary>設置するか。側壁厚 0 は旧図面の「設置なし」。</summary>
         public bool Exists
         {
             get { return StemThickness > 0m; }
@@ -49,13 +49,13 @@ namespace Hikan.Core
             d[prefix + "floor_thickness"] = FloorThickness.ToString(inv);
         }
 
-        /// <summary>キーが無い項目は既定値のまま残す(翼壁を持たない旧 XData を読むため)。</summary>
+        /// <summary>キーが無い項目は既定値のまま残す。ただし側壁厚のキーが無い旧 XData は翼壁を持たないので 0(設置なし)として読む。</summary>
         public void Read(
             System.Collections.Generic.IDictionary<string, string> d,
             string prefix,
             System.Func<System.Collections.Generic.IDictionary<string, string>, string, decimal, decimal> get)
         {
-            StemThickness = get(d, prefix + "stem_thickness", StemThickness);
+            StemThickness = get(d, prefix + "stem_thickness", 0m);
             Length = get(d, prefix + "length", Length);
             EndWidth = get(d, prefix + "end_width", EndWidth);
             CrownStart = get(d, prefix + "crown_start", CrownStart);

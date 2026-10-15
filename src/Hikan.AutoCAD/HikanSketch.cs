@@ -85,47 +85,50 @@ namespace Hikan.AutoCAD
         /// <summary>胸壁: 断面(下流を見る)と側面。川裏側はつま先が川裏端側、川表側は川表端側。</summary>
         public void Breast(bool upstream)
         {
-            // 断面。Z = 0 は y = 20。函体の左右に、たて壁(上)と底版(下、根入れ)が同じ幅で並ぶ。
+            // 断面。Z = 0 は y = 20、函体の敷高(内空底面)は y = 22.5。
+            // 函体の左右に、底版(上面 = 敷高)とその上に立つたて壁が同じ幅で並ぶ。
             Solid(17, 20, 33, 20, 33, 34, 17, 34);
             Hollow(19.5f, 22.5f, 30.5f, 22.5f, 30.5f, 32, 19.5f, 32);
             foreach (float x0 in new float[] { 7, 33 })
             {
-                Solid(x0, 17, x0 + 10, 17, x0 + 10, 46, x0, 46);
-                Solid(x0, 14, x0 + 10, 14, x0 + 10, 17, x0, 17);
+                Solid(x0, 22.5f, x0 + 10, 22.5f, x0 + 10, 46, x0, 46);
+                Solid(x0, 20, x0 + 10, 20, x0 + 10, 22.5f, x0, 22.5f);
             }
             Dashed(3, 20, 47, 20);
-            Note(3.5f, 22, "Z=0");
+            Note(25, 17.5f, "Z = 0");
+            Note(25, 24.3f, "敷高");
             Dim(33, 46, 43, 46, 3, "Lw");
             Dim(43, 20, 43, 46, -3, "Hc");
-            Dim(43, 14, 43, 17, -3, "tf");
-            Dim(7, 20, 7, 14, -3, "De");
+            Dim(7, 22.5f, 7, 20, -3, "tf");
+            Note(25, 50, "底版上面 = 函体の敷高");
             Title(25, 57, "断面(下流を見る)");
 
             // 側面。函体側面 x 54〜96、川裏端 S = 0 は x = 54。
             Solid(54, 20, 96, 20, 96, 34, 54, 34);
+            Dashed(54, 22.5f, 96, 22.5f);
             Note(54, 37, "川裏端 S=0");
             Note(96, 37, "川表端");
             float c = upstream ? 64 : 86;
             float toe = upstream ? c - 7 : c + 7;
             float heel = upstream ? c + 13 : c - 13;
-            Solid(System.Math.Min(toe, heel), 14, System.Math.Max(toe, heel), 14,
-                System.Math.Max(toe, heel), 17, System.Math.Min(toe, heel), 17);
-            Solid(c - 2, 17, c + 2, 17, c + 2, 46, c - 2, 46);
-            Dashed(c, 11, c, 51);
+            Solid(System.Math.Min(toe, heel), 20, System.Math.Max(toe, heel), 20,
+                System.Math.Max(toe, heel), 22.5f, System.Math.Min(toe, heel), 22.5f);
+            Solid(c - 2, 22.5f, c + 2, 22.5f, c + 2, 46, c - 2, 46);
+            Dashed(c, 14, c, 51);
             Dashed(54, 34, 54, 51);
             Dim(54, 49, c, 49, 0, "d");
             Dim(c - 2, 40, c + 2, 40, 0, "t");
             if (upstream)
             {
-                Dim(toe, 14, c - 2, 14, -3, "Lt");
-                Dim(c + 2, 14, heel, 14, -3, "Lh");
-                Dim(heel, 14, heel, 17, -3, "tf");
+                Dim(toe, 20, c - 2, 20, -3, "Lt");
+                Dim(c + 2, 20, heel, 20, -3, "Lh");
+                Dim(heel, 20, heel, 22.5f, -3, "tf");
             }
             else
             {
-                Dim(c + 2, 14, toe, 14, -3, "Lt");
-                Dim(heel, 14, c - 2, 14, -3, "Lh");
-                Dim(heel, 14, heel, 17, 3, "tf");
+                Dim(c + 2, 20, toe, 20, -3, "Lt");
+                Dim(heel, 20, c - 2, 20, -3, "Lh");
+                Dim(heel, 20, heel, 22.5f, 3, "tf");
             }
             Title(76, 57, "側面(函体の側面を見る)");
         }

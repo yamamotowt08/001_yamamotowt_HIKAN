@@ -11,7 +11,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void Default_IsValid()
         {
-            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(new Hikan.Core.HikanParameters()));
+            Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(HikanTestData.BarrelOnly()));
         }
 
         // テスト2: 最小部材厚 0.40 m(基準)。0.40 は可、0.35 は不可。
@@ -21,7 +21,7 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(0.30, false)]
         public void WallThickness_MinimumIsFortyCentimetres(double t, bool valid)
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.WallThickness = (decimal)t;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
             else { AssertInvalid(p); }
@@ -34,7 +34,7 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(0.42, false)]
         public void SlabThickness_IsStandardisedInTenCentimetrePitch(double t, bool valid)
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.TopSlabThickness = (decimal)t;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
             else { AssertInvalid(p); }
@@ -46,12 +46,12 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(3.5, false)]
         public void InnerDimension_ApplicableRangeBoundary(double v, bool valid)
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.InnerWidth = (decimal)v;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
             else { AssertInvalid(p); }
 
-            Hikan.Core.HikanParameters q = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters q = HikanTestData.BarrelOnly();
             q.InnerHeight = (decimal)v;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(q)); }
             else { AssertInvalid(q); }
@@ -63,7 +63,7 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(10.5, false)]
         public void SoilCover_ApplicableRangeBoundary(double v, bool valid)
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.SoilCover = (decimal)v;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
             else { AssertInvalid(p); }
@@ -72,11 +72,11 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void NonPositiveDimensions_AreRejected()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.InnerWidth = 0m;
             AssertInvalid(p);
 
-            Hikan.Core.HikanParameters q = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters q = HikanTestData.BarrelOnly();
             q.BarrelLength = 0m;
             AssertInvalid(q);
         }
@@ -84,11 +84,11 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void NegativeSlope_And_ZeroBlockCount_AreRejected()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.BottomSlope = -0.01m;
             AssertInvalid(p);
 
-            Hikan.Core.HikanParameters q = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters q = HikanTestData.BarrelOnly();
             q.BlockCount = 0;
             AssertInvalid(q);
         }
@@ -98,7 +98,7 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(257)]
         public void ColorIndex_OutOfRange_IsRejected(int c)
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.ColorIndex = c;
             AssertInvalid(p);
         }
@@ -110,40 +110,55 @@ namespace Hikan.Core.Tests
             w.Position = position;
             w.Length = 1.5m;
             w.CrownHeight = 4.0m;
-            w.Embedment = 1.0m;
             w.FootingThickness = 0.5m;
             w.ToeLength = 0.8m;
             w.HeelLength = 1.2m;
             return w;
         }
 
-        // テスト10: 胸壁。たて壁厚 0 は「設置しない」なので寸法を検査しない。
+        // テスト10: 胸壁。たて壁厚 0 は旧図面の「設置なし」なので、Validate(読込み時)は寸法を検査しない。
+        // 新規入力用の ValidateInput は 0 を最小部材厚違反として弾く。
         [Xunit.Fact]
-        public void BreastWall_ZeroStemThickness_SkipsDimensionChecks()
+        public void BreastWall_ZeroStemThickness_IsLegacyOnly()
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
             p.UpstreamBreast.StemThickness = 0m;
-            p.UpstreamBreast.Length = 0m;          // 不正値だが設置しないので無視される
+            p.UpstreamBreast.Length = 0m;          // 不正値だが設置なしなので無視される
             p.UpstreamBreast.CrownHeight = 0m;
-            p.UpstreamBreast.Embedment = 0m;
             Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
+
+            System.Collections.Generic.List<string> errors = Hikan.Core.HikanValidator.ValidateInput(p);
+            Xunit.Assert.Single(errors);
+            Xunit.Assert.StartsWith("川裏側胸壁のたて壁厚", errors[0]);
+            Xunit.Assert.Throws<Hikan.Core.HikanValidationException>(() => Hikan.Core.HikanValidator.EnsureInputValid(p));
         }
 
-        // テスト11: 張出し長・天端高は正、根入れ深さは底版厚以上。
-        // 根入れ不足だと底版上面が函体底版下面より上に出る。天端高 0 以下だとたて壁が函体側面に接しない。
-        [Xunit.Theory]
-        [Xunit.InlineData(1.5, 4.0, 1.0, true)]
-        [Xunit.InlineData(1.5, 1.0, 0.5, true)]   // 天端高が函体より低い / 根入れ = 底版厚
-        [Xunit.InlineData(0.0, 4.0, 1.0, false)]  // 張出し長 0
-        [Xunit.InlineData(1.5, 0.0, 1.0, false)]  // 天端高 0
-        [Xunit.InlineData(1.5, 4.0, 0.3, false)]  // 根入れが底版厚未満
-        public void BreastWall_DimensionsMustConnectToBarrel(double length, double crown, double embedment, bool valid)
+        // テスト10b: 既定値では胸壁・翼壁がすべて厚 0.40 m で設置され、新規入力として妥当であること。
+        [Xunit.Fact]
+        public void Defaults_InstallAllWallsAtMinimumThickness()
         {
             Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Xunit.Assert.Equal(0.4m, p.UpstreamBreast.StemThickness);
+            Xunit.Assert.Equal(0.4m, p.DownstreamBreast.StemThickness);
+            Xunit.Assert.Equal(0.4m, p.UpstreamWing.StemThickness);
+            Xunit.Assert.Equal(0.4m, p.DownstreamWing.StemThickness);
+            Xunit.Assert.Empty(Hikan.Core.HikanValidator.ValidateInput(p));
+        }
+
+        // テスト11: 張出し長は正、天端高は底版上面(= 函体の敷高、既定 0.4)より高いこと。
+        [Xunit.Theory]
+        [Xunit.InlineData(1.5, 4.0, true)]
+        [Xunit.InlineData(1.5, 1.0, true)]   // 天端高が函体より低い
+        [Xunit.InlineData(1.5, 0.5, true)]   // 敷高のすぐ上
+        [Xunit.InlineData(0.0, 4.0, false)]  // 張出し長 0
+        [Xunit.InlineData(1.5, 0.4, false)]  // 天端高 = 敷高
+        [Xunit.InlineData(1.5, 0.0, false)]  // 天端高 0
+        public void BreastWall_DimensionsMustConnectToBarrel(double length, double crown, bool valid)
+        {
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.UpstreamBreast = Wall();
             p.UpstreamBreast.Length = (decimal)length;
             p.UpstreamBreast.CrownHeight = (decimal)crown;
-            p.UpstreamBreast.Embedment = (decimal)embedment;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
             else { AssertInvalid(p); }
         }
@@ -157,7 +172,7 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(-0.1, false)]
         public void BreastWall_StemThicknessFollowsStandard(double t, bool valid)
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.DownstreamBreast = Wall();
             p.DownstreamBreast.StemThickness = (decimal)t;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
@@ -168,7 +183,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void BreastWalls_MustNotOverlapEachOther()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.UpstreamBreast = Wall(0.25m);
             p.DownstreamBreast = Wall(19.75m);
             Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
@@ -183,7 +198,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void BreastWalls_MustBeInOrder()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.UpstreamBreast = Wall(15m);
             p.DownstreamBreast = Wall(5m);
             AssertInvalid(p);
@@ -198,7 +213,7 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(10.0, true)]    // 函体中ほど
         public void BreastWall_StemMustLieWithinBarrel(double position, bool valid)
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.UpstreamBreast = Wall((decimal)position);
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
             else { AssertInvalid(p); }
@@ -208,7 +223,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void BreastWall_MustNotOverlapCutoff()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.UpstreamBreast = Wall();
             p.CutoffCount = 2;   // カラーは S = 4.75〜5.25 と 14.75〜15.25
             Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
@@ -218,7 +233,7 @@ namespace Hikan.Core.Tests
             AssertInvalid(p);
 
             // 2 枚のカラーの間(底版 8.95〜11.45)に置くのは可
-            Hikan.Core.HikanParameters q = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters q = HikanTestData.BarrelOnly();
             q.UpstreamBreast = Wall(10m);
             q.CutoffCount = 2;
             Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(q));
@@ -236,7 +251,7 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(50, 0.5, false)]
         public void Cutoff_TotalThicknessMustBeLessThanBarrelLength(int count, double thickness, bool valid)
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.CutoffCount = count;
             p.CutoffThickness = (decimal)thickness;
             if (valid) { Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p)); }
@@ -247,18 +262,18 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void Cutoff_ZeroCount_SkipsDimensionChecks()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.CutoffCount = 0;
             p.CutoffThickness = 0.3m;
             p.CutoffProjection = 0m;
             Xunit.Assert.Empty(Hikan.Core.HikanValidator.Validate(p));
 
-            Hikan.Core.HikanParameters q = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters q = HikanTestData.BarrelOnly();
             q.CutoffCount = 2;
             q.CutoffProjection = 0m;
             AssertInvalid(q);
 
-            Hikan.Core.HikanParameters r = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters r = HikanTestData.BarrelOnly();
             r.CutoffCount = -1;
             AssertInvalid(r);
         }
@@ -267,7 +282,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void MultipleErrors_AreCollected()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.InnerWidth = 0m;
             p.WallThickness = 0.25m;
             p.SoilCover = 12m;

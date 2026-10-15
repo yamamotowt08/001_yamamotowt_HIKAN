@@ -7,7 +7,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void Default_Values()
         {
-            Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(new Hikan.Core.HikanParameters());
+            Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(HikanTestData.BarrelOnly());
 
             Xunit.Assert.Equal(2.800m, e.OuterWidth);
             Xunit.Assert.Equal(2.800m, e.OuterHeight);
@@ -50,7 +50,7 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(0.6, 0.5, 0.9)]
         public void PartVolumes_SumTo_Total(double wall, double top, double bottom)
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.WallThickness = (decimal)wall;
             p.TopSlabThickness = (decimal)top;
             p.BottomSlabThickness = (decimal)bottom;
@@ -64,7 +64,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void Excavation_DegeneratesToBox_WhenSlopeIsZero()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.ExcavationSlope = 0m;
             Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
             Xunit.Assert.Equal(391.020m, e.ExcavationVolume);
@@ -81,9 +81,9 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(1.5)]
         public void Excavation_IncreasesWithSlope(double n)
         {
-            Hikan.Core.HikanParameters zero = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters zero = HikanTestData.BarrelOnly();
             zero.ExcavationSlope = 0m;
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.ExcavationSlope = (decimal)n;
             Xunit.Assert.True(Hikan.Core.HikanEstimator.Calculate(p).ExcavationVolume
                 >= Hikan.Core.HikanEstimator.Calculate(zero).ExcavationVolume);
@@ -93,7 +93,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void Backfill_DeductsOuterPrism_NotConcreteOnly()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
             Xunit.Assert.Equal(156.800m, e.OccupiedVolume);
             Xunit.Assert.True(e.OccupiedVolume > e.ConcreteVolume, "控除は外形体積であること");
@@ -108,7 +108,7 @@ namespace Hikan.Core.Tests
         [Xunit.InlineData(0.05, 19.975, 0.999)]
         public void Slope_AffectsProjectionNotVolume(double i, double projection, double drop)
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.BottomSlope = (decimal)i;
             Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
             Xunit.Assert.Equal((decimal)projection, e.HorizontalProjection);
@@ -120,7 +120,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void Rounding_IsHalfUp()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.BarrelLength = 3.2175m;
             Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
             // 3.840 × 3.2175 = 12.35520 → そのまま 3 位
@@ -133,7 +133,7 @@ namespace Hikan.Core.Tests
         [Xunit.Fact]
         public void BlockDivision_IsPlainDivision()
         {
-            Hikan.Core.HikanParameters p = new Hikan.Core.HikanParameters();
+            Hikan.Core.HikanParameters p = HikanTestData.BarrelOnly();
             p.BlockCount = 5;
             Hikan.Core.HikanEstimate e = Hikan.Core.HikanEstimator.Calculate(p);
             Xunit.Assert.Equal(4.000m, e.BlockLength);
