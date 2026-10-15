@@ -73,7 +73,7 @@ namespace Hikan.Dynamo
             double upstreamBreastToeLength = 0.8,
             double upstreamBreastHeelLength = 1.2,
             double downstreamBreastStemThickness = 0.4,
-            double downstreamBreastPosition = 19.0,
+            double downstreamBreastPosition = 18.0,
             double downstreamBreastLength = 2.0,
             double downstreamBreastCrownHeight = 4.0,
             double downstreamBreastFootingThickness = 0.5,
@@ -104,7 +104,6 @@ namespace Hikan.Dynamo
             double downstreamProtectionToeLength = 0.5,
             double downstreamProtectionHeelLength = 1.0,
             bool gate = true,
-            double gatePosition = 17.0,
             double gateDeckLength = 2.7,
             double gateDeckWidth = 5.8,
             double gateDeckAxialOverhang = 0.7,
@@ -176,7 +175,6 @@ namespace Hikan.Dynamo
             p.DownstreamWing.Protection.ToeLength = (decimal)downstreamProtectionToeLength;
             p.DownstreamWing.Protection.HeelLength = (decimal)downstreamProtectionHeelLength;
             p.Gate.Exists = gate;
-            p.Gate.Position = (decimal)gatePosition;
             p.Gate.DeckLength = (decimal)gateDeckLength;
             p.Gate.DeckWidth = (decimal)gateDeckWidth;
             p.Gate.DeckAxialOverhang = (decimal)gateDeckAxialOverhang;

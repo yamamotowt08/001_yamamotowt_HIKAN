@@ -83,6 +83,7 @@ namespace Hikan.Core
         /// 胸壁(左右それぞれの逆 T 字擁壁)。たて壁厚 0 は旧図面の「設置なし」なので寸法を検査しない
         /// (新規入力では ValidateInput が 0 を弾く)。
         /// 底版上面は函体の敷高にそろえるので、たて壁は敷高から立ち上がる。天端はそれより高いこと。
+        /// 底版は左右つながって函体の下を通る(函体の底版との重なりは体積の解析解で 1 回だけ差し引く)。
         /// </summary>
         private static void CheckBreastWall(
             System.Collections.Generic.List<string> errors,
@@ -323,12 +324,18 @@ namespace Hikan.Core
                 }
             }
 
-            (decimal Min, decimal Max) column = g.ColumnRange;
-            (decimal Min, decimal Max) deck = g.DeckRange;
+            // 門柱の位置は川表側胸壁のたて壁で決まる(門柱の背面 = たて壁の背面)ので、川表側胸壁が要る。
+            if (!p.DownstreamBreast.Exists)
+            {
+                errors.Add(name + "の位置は川表側胸壁のたて壁の背面で決まります。川表側胸壁を設置してください。");
+                return;
+            }
+            (decimal Min, decimal Max) column = HikanGeometry.GateColumnRange(p);
+            (decimal Min, decimal Max) deck = HikanGeometry.GateDeckRange(p);
             if (column.Min < -Tolerance || column.Max > p.BarrelLength + Tolerance)
             {
-                errors.Add(name + "の軸位置 d = " + g.Position + " m では門柱(" + column.Min + "〜" + column.Max
-                    + " m)が函体延長 0〜" + p.BarrelLength + " m からはみ出します。");
+                errors.Add(name + "の門柱(川表側胸壁のたて壁の背面 " + column.Min + " m から X4 + X5 = " + g.ColumnLength
+                    + " m)が函体延長 0〜" + p.BarrelLength + " m からはみ出します。川表側胸壁の軸位置を見直してください。");
             }
             for (int i = 1; i <= p.CutoffCount; i++)
             {
@@ -337,25 +344,27 @@ namespace Hikan.Core
                 decimal cMax = c + p.CutoffThickness / 2m;
                 if (deck.Min < cMax && cMin < deck.Max)
                 {
-                    errors.Add(name + "の軸位置 d = " + g.Position + " m では門柱・操作台(" + deck.Min + "〜" + deck.Max
+                    errors.Add(name + "の門柱・操作台(" + deck.Min + "〜" + deck.Max
                         + " m)が " + i + " 枚目のしゃ水壁(" + cMin + "〜" + cMax + " m)と重なります。");
                 }
             }
-            CheckGateAgainstBreast(errors, g, p.UpstreamBreast, "川裏側胸壁");
-            CheckGateAgainstBreast(errors, g, p.DownstreamBreast, "川表側胸壁");
+            // 川表側胸壁のたて壁とは重なってよい(背面をそろえるので必ず接し、門柱が厚ければ重なる)。重なりは 1 回だけ数える。
+            CheckGateAgainstBreast(errors, p, p.UpstreamBreast, "川裏側胸壁");
             if (deck.Min < 0m) { CheckGateAboveWing(errors, p, p.UpstreamWing, "川裏側"); }
             if (deck.Max > p.BarrelLength) { CheckGateAboveWing(errors, p, p.DownstreamWing, "川表側"); }
         }
 
+        /// <summary>川裏側胸壁の底版・たて壁と門柱・操作台が函体方向に重なると 3 部材の重なりになり得るので弾く。</summary>
         private static void CheckGateAgainstBreast(
-            System.Collections.Generic.List<string> errors, HikanGateTower g, HikanBreastWall w, string name)
+            System.Collections.Generic.List<string> errors, HikanParameters p, HikanBreastWall w, string name)
         {
             if (!w.Exists) { return; }
-            (decimal Min, decimal Max) deck = g.DeckRange;
-            if (deck.Min < w.StemEnd && w.StemStart < deck.Max)
+            (decimal Min, decimal Max) deck = HikanGeometry.GateDeckRange(p);
+            (decimal Min, decimal Max) foot = HikanGeometry.BreastFootingRange(w, true);
+            if (deck.Min < foot.Max && foot.Min < deck.Max)
             {
-                errors.Add("門柱・操作台の軸位置 d = " + g.Position + " m では門柱・操作台(" + deck.Min + "〜" + deck.Max
-                    + " m)が" + name + "のたて壁(" + w.StemStart + "〜" + w.StemEnd + " m)と重なります。");
+                errors.Add("門柱・操作台(" + deck.Min + "〜" + deck.Max + " m)が" + name + "(" + foot.Min + "〜" + foot.Max
+                    + " m)と重なります。");
             }
         }
 

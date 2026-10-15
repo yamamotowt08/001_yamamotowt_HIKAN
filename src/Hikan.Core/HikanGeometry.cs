@@ -17,6 +17,11 @@ namespace Hikan.Core
         public bool IsVoid { get; set; }
         /// <summary>頂版より上の上部工(門柱・操作台)。床掘りの平面範囲には含めない。</summary>
         public bool IsSuperstructure { get; set; }
+        /// <summary>
+        /// 部材の区分(函体 / 川裏側胸壁 / 川表側胸壁 / しゃ水壁 / 川裏側堤防保護部 / 川表側堤防保護部 / 門柱 / 操作台 / 内空)。
+        /// 部材どうしの重なりを、どの部材の数量から差し引くかを決めるのに使う。
+        /// </summary>
+        public string Member { get; set; }
 
         public decimal Volume
         {
@@ -91,7 +96,7 @@ namespace Hikan.Core
             decimal ho = p.OuterHeight;
             decimal l = p.BarrelLength;
 
-            parts.Add(Centred("函体", bo, 0m, ho, 0m, l, false));
+            parts.Add(Tag(Centred("函体", bo, 0m, ho, 0m, l, false), "函体"));
 
             AddBreast(parts, p, p.UpstreamBreast, true);
             AddBreast(parts, p, p.DownstreamBreast, false);
@@ -101,7 +106,7 @@ namespace Hikan.Core
             for (int i = 1; i <= p.CutoffCount; i++)
             {
                 decimal s = CutoffPosition(p, i);
-                parts.Add(Centred("しゃ水壁" + i, bo + 2m * a, -a, ho + a, s - tc / 2m, s + tc / 2m, false));
+                parts.Add(Tag(Centred("しゃ水壁" + i, bo + 2m * a, -a, ho + a, s - tc / 2m, s + tc / 2m, false), "しゃ水壁"));
             }
 
             AddProtection(parts, p, p.UpstreamWing, true);
@@ -109,16 +114,24 @@ namespace Hikan.Core
             AddGate(parts, p);
 
             // 内空は函体のみを貫通する。胸壁は函体側面より外側にあり開口を塞がないため関与しない。
-            parts.Add(Centred("内空", p.InnerWidth, p.BottomSlabThickness, p.BottomSlabThickness + p.InnerHeight,
-                0m, l, true));
+            parts.Add(Tag(Centred("内空", p.InnerWidth, p.BottomSlabThickness, p.BottomSlabThickness + p.InnerHeight,
+                0m, l, true), "内空"));
 
             return parts.ToArray();
         }
 
+        private static HikanPart Tag(HikanPart part, string member)
+        {
+            part.Member = member;
+            return part;
+        }
+
         /// <summary>
-        /// 胸壁 1 基ぶん(左右 2 基 × たて壁 + 底版 = 4 ボックス)を追加する。
+        /// 胸壁 1 基ぶん(左右のたて壁 2 ボックス + 左右つながった底版 1 ボックス)を追加する。
         /// たて壁は函体方向に垂直な板で、軸位置(川裏函体端からの距離)を中心に置き、
-        /// 函体の左右側面に接して外側へ張り出す。函体とは側面で接するだけで重ならない。
+        /// 函体の左右側面に接して外側へ張り出す(函体とは側面で接するだけ)。
+        /// 底版は左右の張出し端から端まで 1 枚で、函体の下を通って左右がつながる(上面 = 敷高)。
+        /// 函体の範囲では函体の底版と重なり、その分は BoxOverlapVolume で 1 回だけ差し引く。
         /// 底版のつま先版は近い方の函体端の側(川裏側胸壁なら川裏、川表側胸壁なら川表)、
         /// かかと版は函体中央の側に伸びる。
         /// </summary>
@@ -134,17 +147,17 @@ namespace Hikan.Core
             decimal top = BreastFootingTop(p);
             (decimal Min, decimal Max) foot = BreastFootingRange(w, upstream);
 
-            string end = upstream ? "川裏側" : "川表側";
+            string member = (upstream ? "川裏側" : "川表側") + "胸壁";
             for (int k = 0; k < 2; k++)
             {
                 bool right = k == 1;
                 decimal uMin = right ? half : -half - w.Length;
                 decimal uMax = right ? half + w.Length : -half;
-                string name = end + "胸壁" + (right ? "右" : "左");
-
-                parts.Add(Box(name + "たて壁", uMin, uMax, top, w.CrownHeight, w.StemStart, w.StemEnd, false));
-                parts.Add(Box(name + "底版", uMin, uMax, top - w.FootingThickness, top, foot.Min, foot.Max, false));
+                parts.Add(Tag(Box(member + (right ? "右" : "左") + "たて壁", uMin, uMax, top, w.CrownHeight,
+                    w.StemStart, w.StemEnd, false), member));
             }
+            parts.Add(Tag(Box(member + "底版", -half - w.Length, half + w.Length, top - w.FootingThickness, top,
+                foot.Min, foot.Max, false), member));
         }
 
         /// <summary>胸壁の底版上面(= たて壁の下端)の高さ。函体の敷高(内空底面 V = 底版厚)にそろえる。</summary>
@@ -286,12 +299,12 @@ namespace Hikan.Core
                 decimal uMin = right ? inner : -outer;
                 decimal uMax = right ? outer : -inner;
                 string side = name + (right ? "右" : "左");
-                parts.Add(Box(side + "たて壁", uMin, uMax, top, top + g.StemHeight, stem.Min, stem.Max, false));
-                parts.Add(Box(side + "底版", uMin, uMax, bottom, top, footing.Min, footing.Max, false));
+                parts.Add(Tag(Box(side + "たて壁", uMin, uMax, top, top + g.StemHeight, stem.Min, stem.Max, false), name));
+                parts.Add(Tag(Box(side + "底版", uMin, uMax, bottom, top, footing.Min, footing.Max, false), name));
             }
             if (g.ToeLength > 0m)
             {
-                parts.Add(Box(name + "つま先版", -outer, outer, bottom, top, toe.Min, toe.Max, false));
+                parts.Add(Tag(Box(name + "つま先版", -outer, outer, bottom, top, toe.Min, toe.Max, false), name));
             }
         }
 
@@ -311,7 +324,7 @@ namespace Hikan.Core
             decimal inner = p.InnerWidth / 2m;
             decimal bottom = p.OuterHeight;
             decimal top = bottom + g.ColumnHeight;
-            (decimal Min, decimal Max) column = g.ColumnRange;
+            (decimal Min, decimal Max) column = GateColumnRange(p);
             decimal split = column.Min + g.TransverseWallThickness;
 
             System.Collections.Generic.List<HikanPart> gate = new System.Collections.Generic.List<HikanPart>();
@@ -325,7 +338,7 @@ namespace Hikan.Core
                     bottom, top, split, column.Max));
             }
 
-            (decimal Min, decimal Max) deck = g.DeckRange;
+            (decimal Min, decimal Max) deck = GateDeckRange(p);
             decimal half = g.DeckWidth / 2m;
             decimal deckTop = top + g.DeckThickness;
             if (!g.Bridge)
@@ -349,8 +362,26 @@ namespace Hikan.Core
                 // 縦方向壁幅 X4 や横方向壁幅 X8 が 0 の場合など、厚さ 0 の直方体は作らない(矩形の柱になる)。
                 if (part.UMax <= part.UMin || part.VMax <= part.VMin || part.SMax <= part.SMin) { continue; }
                 part.IsSuperstructure = true;
+                part.Member = part.Name.StartsWith("門柱", System.StringComparison.Ordinal) ? "門柱" : "操作台";
                 parts.Add(part);
             }
+        }
+
+        /// <summary>
+        /// 門柱の S 範囲。門柱の川裏側の面(横方向壁の面 = 背面)を川表側胸壁のたて壁の川裏側の面(背面)にそろえるので、
+        /// [川表側胸壁のたて壁の川裏側の面, + X4 + X5]。門柱の位置は入力しない。
+        /// </summary>
+        public static (decimal Min, decimal Max) GateColumnRange(HikanParameters p)
+        {
+            decimal start = p.DownstreamBreast.StemStart;
+            return (start, start + p.Gate.ColumnLength);
+        }
+
+        /// <summary>操作台の S 範囲 = 門柱の範囲 ± X3。門柱を含むので、門柱・操作台全体の S 範囲でもある。</summary>
+        public static (decimal Min, decimal Max) GateDeckRange(HikanParameters p)
+        {
+            (decimal Min, decimal Max) c = GateColumnRange(p);
+            return (c.Min - p.Gate.DeckAxialOverhang, c.Max + p.Gate.DeckAxialOverhang);
         }
 
         /// <summary>右側(U ≥ 0)の範囲 [a, b] で直方体を作り、左側なら中心線について鏡映する。</summary>
@@ -393,7 +424,7 @@ namespace Hikan.Core
             decimal inner = p.InnerWidth / 2m;
             decimal top = p.OuterHeight + g.ColumnHeight;
             decimal h = g.HaunchHeight;
-            (decimal Min, decimal Max) column = g.ColumnRange;
+            (decimal Min, decimal Max) column = GateColumnRange(p);
             decimal end = column.Min + g.TransverseWallThickness;
 
             HikanPrismPart right = new HikanPrismPart();
@@ -747,15 +778,60 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 胸壁 1 端ぶん(左右 2 基)の体積 [m3]。たて壁 + 底版。
-        /// 函体とは側面で接するだけで重ならないので控除は不要。たて壁厚 0 のときは 0。
-        /// たて壁は底版上面(敷高)から天端まで。
+        /// 胸壁 1 端ぶんの体積 [m3](正味)。左右のたて壁 + 左右つながった底版 − 函体との重なり。
+        /// たて壁は底版上面(敷高)から天端まで。底版は (外形幅 + 2 × 張出し長) × 底版厚 × (つま先 + 厚 + かかと)。
+        /// 函体の範囲の底版は函体の底版と重なる(外形幅 × min(底版厚, 敷高) × 函体延長内の長さ)ので、
+        /// その分は函体の数量に含め、胸壁からは差し引く。たて壁厚 0 のときは 0。
         /// </summary>
-        public static decimal BreastWallVolume(HikanParameters p, HikanBreastWall w)
+        public static decimal BreastWallVolume(HikanParameters p, HikanBreastWall w, bool upstream)
         {
             if (!w.Exists) { return 0m; }
-            decimal stem = w.Length * (w.CrownHeight - BreastFootingTop(p)) * w.StemThickness;
-            return 2m * (stem + w.FootingVolume);
+            decimal top = BreastFootingTop(p);
+            decimal stems = 2m * w.Length * (w.CrownHeight - top) * w.StemThickness;
+            decimal footing = (p.OuterWidth + 2m * w.Length) * w.FootingThickness * w.FootingLength;
+            (decimal Min, decimal Max) foot = BreastFootingRange(w, upstream);
+            decimal inside = System.Math.Max(0m, System.Math.Min(foot.Max, p.BarrelLength) - System.Math.Max(foot.Min, 0m));
+            decimal overlap = p.OuterWidth * System.Math.Min(w.FootingThickness, top) * inside;
+            return stems + footing - overlap;
+        }
+
+        /// <summary>直方体 2 個の共通部分(体積と 1 次モーメント)。</summary>
+        public static (decimal Volume, decimal MomentU, decimal MomentV, decimal MomentS) BoxOverlap(HikanPart a, HikanPart b)
+        {
+            decimal u0 = System.Math.Max(a.UMin, b.UMin), u1 = System.Math.Min(a.UMax, b.UMax);
+            decimal v0 = System.Math.Max(a.VMin, b.VMin), v1 = System.Math.Min(a.VMax, b.VMax);
+            decimal s0 = System.Math.Max(a.SMin, b.SMin), s1 = System.Math.Min(a.SMax, b.SMax);
+            if (u1 <= u0 || v1 <= v0 || s1 <= s0) { return (0m, 0m, 0m, 0m); }
+            decimal vol = (u1 - u0) * (v1 - v0) * (s1 - s0);
+            return (vol, vol * (u0 + u1) / 2m, vol * (v0 + v1) / 2m, vol * (s0 + s1) / 2m);
+        }
+
+        /// <summary>
+        /// 加算部材(直方体)どうしの重なりの合計体積 [m3]。しゃ水壁 ∩ 函体、胸壁の底版 ∩ 函体、門柱 ∩ 胸壁のたて壁など。
+        /// 3 個以上が重なる点は無い(しゃ水壁と胸壁・門柱が函体方向に重ならないことを HikanValidator が保証し、
+        /// 門柱と函体・操作台、たて壁と底版は面で接するだけ)ので、対ごとの和で厳密。
+        /// </summary>
+        public static decimal BoxOverlapVolume(HikanParameters p)
+        {
+            return OverlapBetween(p, m => true, m => true);
+        }
+
+        /// <summary>区分 a の部材と区分 b の部材の重なりの合計体積 [m3](同じ部材どうし・内空は数えない)。</summary>
+        public static decimal OverlapBetween(HikanParameters p, System.Func<string, bool> a, System.Func<string, bool> b)
+        {
+            HikanPart[] parts = GetParts(p);
+            decimal v = 0m;
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (parts[i].IsVoid) { continue; }
+                for (int j = i + 1; j < parts.Length; j++)
+                {
+                    if (parts[j].IsVoid) { continue; }
+                    bool pair = (a(parts[i].Member) && b(parts[j].Member)) || (a(parts[j].Member) && b(parts[i].Member));
+                    if (pair) { v += BoxOverlap(parts[i], parts[j]).Volume; }
+                }
+            }
+            return v;
         }
 
         /// <summary>しゃ水壁の合計体積 [m3]。函体と重なる部分を控除した正味。</summary>
@@ -769,25 +845,24 @@ namespace Hikan.Core
 
         /// <summary>
         /// モデル全体のコンクリート体積 [m3]。勾配の回転は体積を変えない。
-        /// 部材の重なりは「しゃ水壁 ∩ 函体」のみで、CutoffVolume が控除済み。
-        /// 胸壁は函体と側面で接するだけ、内空は函体のみを貫通する(BarrelVolume が控除済み)。
-        /// 翼壁は函体端より外(川裏 S ≤ 0 / 川表 S ≥ L)にあり、函体とは端面で接するだけだが、
-        /// 函体端近くの胸壁の底版が函体端より外へ出ていると重なる。その重なりは WingOverlapVolume で 1 回差し引く。
-        /// 堤防保護部は翼壁の側壁・底版と重なり、同じく WingOverlapVolume で差し引く(保護部は総量で数え、翼壁を正味にする)。
+        /// 直方体部材の和 − 内空 − 直方体どうしの重なり(BoxOverlapVolume)+ 翼壁 − 翼壁と直方体の重なり + ハンチ。
+        /// 3 個以上が重なる点は無い(HikanValidator が保証)ので、重なりは対ごとに 1 回引けば厳密。
         /// </summary>
         public static decimal ModelVolume(HikanParameters p)
         {
-            return BarrelVolume(p)
-                + BreastWallVolume(p, p.UpstreamBreast)
-                + BreastWallVolume(p, p.DownstreamBreast)
-                + CutoffVolume(p)
-                + WingWallVolume(p, p.UpstreamWing)
-                + WingWallVolume(p, p.DownstreamWing)
-                + ProtectionVolume(p.UpstreamWing)
-                + ProtectionVolume(p.DownstreamWing)
-                + GateColumnVolume(p)
-                + GateDeckVolume(p)
-                - WingOverlapVolume(p, null);
+            decimal v = 0m;
+            foreach (HikanPart part in GetParts(p))
+            {
+                v += part.IsVoid ? -part.Volume : part.Volume;
+            }
+            v -= BoxOverlapVolume(p);
+            v += WingWallVolume(p, p.UpstreamWing) + WingWallVolume(p, p.DownstreamWing);
+            v -= WingOverlapVolume(p, null);
+            foreach (HikanPrismPart part in GetHaunchParts(p))
+            {
+                v += part.Volume;
+            }
+            return v;
         }
 
         /// <summary>内空の全長 [m]。胸壁は開口を塞がないので函体延長に等しい。</summary>
@@ -904,13 +979,20 @@ namespace Hikan.Core
                     (part.UMin + part.UMax) / 2m, (part.VMin + part.VMax) / 2m, (part.SMin + part.SMax) / 2m);
             }
 
-            // 重なり補正: しゃ水壁のボックスは函体と重なるので、その分を 1 回引く。
-            // 胸壁は函体と側面で接するだけで重ならないため補正不要。
-            decimal collarOverlap = p.OuterWidth * p.OuterHeight * p.CutoffThickness;
-            for (int k = 1; k <= p.CutoffCount; k++)
+            // 重なり補正: 直方体どうしの重なり(しゃ水壁 ∩ 函体、胸壁の底版 ∩ 函体、門柱 ∩ 胸壁など)を 1 回引く。
+            HikanPart[] all = GetParts(p);
+            for (int i = 0; i < all.Length; i++)
             {
-                Accumulate(ref mass, ref mu, ref mv, ref ms, -collarOverlap,
-                    0m, p.OuterHeight / 2m, CutoffPosition(p, k));
+                if (all[i].IsVoid) { continue; }
+                for (int j = i + 1; j < all.Length; j++)
+                {
+                    if (all[j].IsVoid) { continue; }
+                    (decimal Volume, decimal MomentU, decimal MomentV, decimal MomentS) o = BoxOverlap(all[i], all[j]);
+                    mass -= o.Volume;
+                    mu -= o.MomentU;
+                    mv -= o.MomentV;
+                    ms -= o.MomentS;
+                }
             }
 
             // 門柱のハンチ(三角柱)。他の部材と重ならない。

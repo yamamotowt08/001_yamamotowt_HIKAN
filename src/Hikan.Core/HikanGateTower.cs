@@ -20,13 +20,13 @@ namespace Hikan.Core
     ///                                       │▓▓│▓▓│ X5  ← 横方向壁(厚 X5、川裏側)
     ///   内面(X8 の内側の端)= 函体の内空側面。切欠き(X8 × X4)はゲートの通る溝。
     ///   ハンチ(H2)は門柱の内面と操作台下面の隅の三角(1:1)で、横方向壁の区間(X5)に付く。
+    ///   門柱の位置は入力しない。門柱の川裏側の面(背面)を川表側胸壁のたて壁の川裏側の面(背面)にそろえる
+    ///   (HikanGeometry.GateColumnRange)。
     /// </summary>
     public sealed class HikanGateTower
     {
         /// <summary>設置するか(既定は設置する)。キーが無い旧 XData は設置しないとして読む。</summary>
         public bool Exists { get; set; } = true;
-        /// <summary>d: 川裏函体端から門柱の中心(縦方向の全長 X4 + X5 の中央)までの距離 [m]</summary>
-        public decimal Position { get; set; } = 17.000m;
 
         /// <summary>X1: 操作台縦方向幅(函体軸方向)[m]。X4 + X5 + 2·X3 と一致すること。</summary>
         public decimal DeckLength { get; set; } = 2.700m;
@@ -76,27 +76,10 @@ namespace Hikan.Core
             get { return LongitudinalWallThickness + TransverseWallWidth; }
         }
 
-        /// <summary>門柱の S 範囲 = 軸位置 ± (X4 + X5)/2</summary>
-        public (decimal Min, decimal Max) ColumnRange
-        {
-            get { return (Position - ColumnLength / 2m, Position + ColumnLength / 2m); }
-        }
-
-        /// <summary>操作台の S 範囲 = 門柱の範囲 ± X3。門柱を含むので、門柱・操作台全体の S 範囲でもある。</summary>
-        public (decimal Min, decimal Max) DeckRange
-        {
-            get
-            {
-                (decimal Min, decimal Max) c = ColumnRange;
-                return (c.Min - DeckAxialOverhang, c.Max + DeckAxialOverhang);
-            }
-        }
-
         public void Write(System.Collections.Generic.Dictionary<string, string> d, string prefix)
         {
             System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
             d[prefix + "exists"] = Exists ? "1" : "0";
-            d[prefix + "position"] = Position.ToString(inv);
             d[prefix + "deck_length"] = DeckLength.ToString(inv);
             d[prefix + "deck_width"] = DeckWidth.ToString(inv);
             d[prefix + "deck_axial_overhang"] = DeckAxialOverhang.ToString(inv);
@@ -116,7 +99,8 @@ namespace Hikan.Core
 
         /// <summary>
         /// キーが無い項目は既定値のまま残す。ただし設置有無のキーが無い旧 XData は門柱を持たないので「設置しない」として読む。
-        /// 第4段階の初版(門柱厚・門柱幅・天端高で入力していた版)のキーは使わない。
+        /// 第4段階の初版(門柱厚・門柱幅・天端高で入力していた版)のキーと、門柱の軸位置(gate_position、
+        /// 今は川表側胸壁のたて壁から決まる)のキーは使わない。
         /// </summary>
         public void Read(
             System.Collections.Generic.IDictionary<string, string> d,
@@ -124,7 +108,6 @@ namespace Hikan.Core
             System.Func<System.Collections.Generic.IDictionary<string, string>, string, decimal, decimal> get)
         {
             Exists = get(d, prefix + "exists", 0m) != 0m;
-            Position = get(d, prefix + "position", Position);
             DeckLength = get(d, prefix + "deck_length", DeckLength);
             DeckWidth = get(d, prefix + "deck_width", DeckWidth);
             DeckAxialOverhang = get(d, prefix + "deck_axial_overhang", DeckAxialOverhang);

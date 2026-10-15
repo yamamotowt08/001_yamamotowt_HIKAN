@@ -277,8 +277,10 @@ namespace Hikan.Core.Tests
             // 斜めの辺をセルで近似するぶんの誤差だけを許す(0.2 %)
             AssertClose(model, c.Union, model * 0.002m, "合併体積");
 
-            // 既知の重なりはしゃ水壁と函体のみ(外形断面 × 厚 × 枚数)。それ以外の重なりは 0。
-            decimal knownOverlap = p.OuterWidth * p.OuterHeight * p.CutoffThickness * p.CutoffCount;
+            // 既知の重なりは直方体どうし(しゃ水壁 ∩ 函体、胸壁の底版 ∩ 函体)のみ。翼壁との重なりは 0。
+            decimal knownOverlap = Hikan.Core.HikanGeometry.BoxOverlapVolume(p);
+            Xunit.Assert.True(knownOverlap > p.OuterWidth * p.OuterHeight * p.CutoffThickness * p.CutoffCount,
+                "胸壁の底版が函体と重なっていること");
             Xunit.Assert.Equal(0m, Hikan.Core.HikanGeometry.WingOverlapVolume(p, null));
             AssertClose(knownOverlap, c.Overlap, 0.000001m, "重なり体積");
         }
@@ -293,22 +295,22 @@ namespace Hikan.Core.Tests
             Hikan.Core.HikanEstimator.Calculate(p);
         }
 
-        // テスト5c: 重なり体積の厳密値。
-        // 川表側(平行・水平)は 胸壁つま先版 S 20〜21 × U 1.4〜1.6(底版の外端)× V 0.0〜0.6 = 0.12 / 片側。
-        // 川裏側(八の字)は 胸壁つま先版 S −0.8〜0 × U 1.4〜UR(S) × V 0.1〜0.6。UR(S) は底版の外端
+        // テスト5c: 重なり体積の厳密値。胸壁の底版は左右つながっているので、翼壁の底版の全幅と重なる。
+        // 川表側(平行・水平)は 胸壁つま先版 S 20〜21 × U −1.6〜1.6(翼壁底版の全幅)× V 0.0〜0.6 = 1.92。
+        // 川裏側(八の字)は 胸壁つま先版 S −0.8〜0 × U −UR(S)〜UR(S) × V 0.1〜0.6。UR(S) は翼壁底版の外端
         // (側壁の外面)で、内面 1.0 − S/6 に 側壁厚 0.5 × √(1 + 1/36) を足したもの。
         [Xunit.Fact]
         public void OverlapVolume_MatchesHandCalculation()
         {
             Hikan.Core.HikanParameters p = WithOverlap();
             // シンプソン則の ÷6 で decimal の最終桁(1e-27 程度)だけずれるので、その幅だけ許す
-            AssertClose(2m * 0.12m, Hikan.Core.HikanGeometry.WingOverlapVolume(p, false), 0.000000001m, "川表側の重なり");
+            AssertClose(1.92m, Hikan.Core.HikanGeometry.WingOverlapVolume(p, false), 0.000000001m, "川表側の重なり");
 
             decimal m = Hikan.Core.HikanGeometry.Sqrt(1m + 1m / 36m);
             decimal urAt0 = 1.0m + 0.5m * m;
             decimal urAtMinus08 = 1.0m + 0.8m / 6m + 0.5m * m;
-            decimal perSide = 0.5m * 0.8m * ((urAt0 + urAtMinus08) / 2m - 1.4m);
-            AssertClose(2m * perSide, Hikan.Core.HikanGeometry.WingOverlapVolume(p, true), 0.000000001m, "川裏側の重なり");
+            decimal full = 0.5m * 0.8m * (urAt0 + urAtMinus08);   // V 0.5 × S 0.8 × 平均の全幅 2 × (UR0 + UR1)/2
+            AssertClose(full, Hikan.Core.HikanGeometry.WingOverlapVolume(p, true), 0.000000001m, "川裏側の重なり");
         }
 
         // テスト5d: 重なりがある配置でも、独立の柱積分で合併体積が ModelVolume と一致し、
@@ -321,7 +323,7 @@ namespace Hikan.Core.Tests
             decimal model = Hikan.Core.HikanGeometry.ModelVolume(p);
             AssertClose(model, c.Union, model * 0.002m, "合併体積");
 
-            decimal collar = p.OuterWidth * p.OuterHeight * p.CutoffThickness * p.CutoffCount;
+            decimal collar = Hikan.Core.HikanGeometry.BoxOverlapVolume(p);   // しゃ水壁 ∩ 函体 + 胸壁の底版 ∩ 函体
             decimal wing = Hikan.Core.HikanGeometry.WingOverlapVolume(p, null);
             Xunit.Assert.True(wing > 0.3m, "重なりが実際に生じている構成であること。実際: " + wing);
             // 川裏側の重なりは斜めの辺をセルで近似するので、その誤差ぶんだけ許す
@@ -340,7 +342,7 @@ namespace Hikan.Core.Tests
 
             // 翼壁の数量は重なりを差し引いた正味
             decimal gross = Hikan.Core.HikanGeometry.WingWallVolume(p, p.DownstreamWing);
-            AssertClose(gross - 0.24m, e.DownstreamWingVolume, 0.0005m, "川表側翼壁の正味");
+            AssertClose(gross - 1.92m, e.DownstreamWingVolume, 0.0005m, "川表側翼壁の正味");
         }
 
         // テスト6: エクステントが翼壁の頂点を含むこと。

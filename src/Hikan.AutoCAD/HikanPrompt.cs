@@ -104,7 +104,10 @@ namespace Hikan.AutoCAD
             return true;
         }
 
-        /// <summary>門柱・操作台(記号は手本の樋門設計ソフトに合わせる)。設置しないなら残りは聞かない。</summary>
+        /// <summary>
+        /// 門柱・操作台(記号は手本の樋門設計ソフトに合わせる)。設置しないなら残りは聞かない。
+        /// 門柱の位置は聞かない(門柱の背面を川表側胸壁のたて壁の背面にそろえる)。
+        /// </summary>
         private static bool PromptGate(Autodesk.AutoCAD.EditorInput.Editor ed, Hikan.Core.HikanGateTower g)
         {
             decimal d;
@@ -112,8 +115,6 @@ namespace Hikan.AutoCAD
             if (!GetInt(ed, "門柱・操作台 (1 = 設置する / 0 = 設置しない)", g.Exists ? 1 : 0, out n)) { return false; }
             g.Exists = n != 0;
             if (!g.Exists) { return true; }
-            if (!GetDecimal(ed, "門柱 d 軸位置 [m] (川裏函体端から門柱の中心まで)", g.Position, out d)) { return false; }
-            g.Position = d;
             if (!GetDecimal(ed, "門柱 X4 縦方向壁幅 [m] (切欠きのある区間、川表側)", g.LongitudinalWallWidth, out d)) { return false; }
             g.LongitudinalWallWidth = d;
             if (!GetDecimal(ed, "門柱 X5 横方向壁厚 [m] (川裏側)", g.TransverseWallThickness, out d)) { return false; }

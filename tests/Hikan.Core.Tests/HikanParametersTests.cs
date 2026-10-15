@@ -122,7 +122,7 @@ namespace Hikan.Core.Tests
                 "downstream_wing_crown_start", "downstream_wing_crown_end", "downstream_wing_floor_thickness",
                 "upstream_wing_protection_exists", "upstream_wing_protection_width", "upstream_wing_protection_stem_thickness", "upstream_wing_protection_stem_height", "upstream_wing_protection_toe_length", "upstream_wing_protection_heel_length",
                 "downstream_wing_protection_exists", "downstream_wing_protection_width", "downstream_wing_protection_stem_thickness", "downstream_wing_protection_stem_height", "downstream_wing_protection_toe_length", "downstream_wing_protection_heel_length",
-                "gate_exists", "gate_position", "gate_deck_length", "gate_deck_width", "gate_deck_axial_overhang", "gate_deck_side_overhang", "gate_deck_thickness", "gate_bridge", "gate_seat_length", "gate_seat_width", "gate_seat_depth", "gate_longitudinal_wall_width", "gate_transverse_wall_thickness", "gate_longitudinal_wall_thickness", "gate_transverse_wall_width", "gate_column_height", "gate_haunch_height"
+                "gate_exists", "gate_deck_length", "gate_deck_width", "gate_deck_axial_overhang", "gate_deck_side_overhang", "gate_deck_thickness", "gate_bridge", "gate_seat_length", "gate_seat_width", "gate_seat_depth", "gate_longitudinal_wall_width", "gate_transverse_wall_thickness", "gate_longitudinal_wall_thickness", "gate_transverse_wall_width", "gate_column_height", "gate_haunch_height"
             };
             foreach (string key in added)
             {

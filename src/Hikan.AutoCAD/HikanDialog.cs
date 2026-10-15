@@ -170,7 +170,7 @@ namespace Hikan.AutoCAD
         {
             Page w = AddPage(title, title, s => s.Breast(upstream),
                 "函体の左右側面に 1 基ずつ取り付く逆T字擁壁(左右同一)。たて壁厚・底版厚は 0.40 m 以上・0.10 m ピッチ。"
-                + "底版上面は函体の敷高にそろえ、たて壁は敷高から立ち上がる。"
+                + "底版上面は函体の敷高にそろえ、たて壁は敷高から立ち上がる。左右の底版は函体の下を通って 1 枚につながる。"
                 + "d は川裏函体端からたて壁の軸(厚さの中心)まで。つま先版は近い方の函体端の側、かかと版は函体中央の側。"
                 + "つま先版長・かかと版長のどちらかを 0 にすると L 字。");
             AddField(w, "t", "たて壁厚", "m", title + "のたて壁厚",
@@ -335,12 +335,10 @@ namespace Hikan.AutoCAD
 
             column.Controls.Add(BuildSheet(s => s.GateColumn(),
                 "門柱は函体の左右の側壁の上に立つ L 字の柱(左右同一)。内側の切欠き(X8 × X4)がゲートの溝で、横方向壁(X5)は川裏側。"
-                + "内面は函体の内空側面にそろえる。d は川裏函体端から門柱の中心(X4 + X5 の中央)まで。"
+                + "内面は函体の内空側面にそろえる。門柱の位置は入力しない: 門柱の背面(川裏側の面)を川表側胸壁のたて壁の背面にそろえる。"
                 + "X5・X7 は 0.40 m 以上・0.10 m ピッチ。ハンチ(H2)は門柱の内面と操作台下面の隅の三角(1:1)で、"
                 + "横方向壁の区間に付く(切欠きは塞がない)。0 でハンチなし。", out g.Grid));
             g.InnerTab = column;
-            AddField(g, "d", "門柱の軸位置(川裏函体端から)", "m", title + "の軸位置",
-                q => q.Gate.Position, (q, v) => q.Gate.Position = v);
             AddField(g, "X4", "縦方向壁幅", "m", title + "の縦方向壁幅",
                 q => q.Gate.LongitudinalWallWidth, (q, v) => q.Gate.LongitudinalWallWidth = v);
             AddField(g, "X5", "横方向壁厚", "m", title + "の横方向壁厚",

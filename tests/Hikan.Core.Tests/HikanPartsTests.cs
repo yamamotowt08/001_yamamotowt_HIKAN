@@ -163,8 +163,8 @@ namespace Hikan.Core.Tests
             {
                 Xunit.Assert.False(parts[i].IsVoid, "内空は 1 個だけで最後にあること: " + parts[i].Name);
             }
-            // 函体 + 胸壁(たて壁 + 底版)× 左右 × 2 端 + しゃ水壁 2 枚 + 内空
-            Xunit.Assert.Equal(12, parts.Length);
+            // 函体 + 胸壁(左右のたて壁 + 左右つながった底版)× 2 端 + しゃ水壁 2 枚 + 内空
+            Xunit.Assert.Equal(10, parts.Length);
 
             // 内空は函体のみを貫通する(胸壁は開口を塞がないので延長しない)
             Hikan.Core.HikanPart hollow = parts[parts.Length - 1];
@@ -189,21 +189,57 @@ namespace Hikan.Core.Tests
                 }
             }
             Xunit.Assert.Equal(0.6m, Hikan.Core.HikanGeometry.BreastFootingTop(p));
-            // 川裏側: たて壁 2 × 1.5 × (4.0 − 0.6) × 0.5 + 底版 2 × 1.5 × 0.5 × (0.8 + 0.5 + 1.2)
-            Xunit.Assert.Equal(5.1m + 3.75m, Hikan.Core.HikanGeometry.BreastWallVolume(p, p.UpstreamBreast));
+            // 川裏側: たて壁 2 × 1.5 × (4.0 − 0.6) × 0.5 = 5.1、底版(左右つながる)(2.8 + 2 × 1.5) × 0.5 × 2.5 = 7.25、
+            // 函体との重なり 2.8 × min(0.5, 0.6) × 函体延長内 1.7(底版 −0.8〜1.7)= 2.38 → 正味 9.97
+            Xunit.Assert.Equal(9.97m, Hikan.Core.HikanGeometry.BreastWallVolume(p, p.UpstreamBreast, true));
         }
 
-        // テスト4a2: 胸壁の型枠。底版の函体側の側面は、函体側面に接する部分(函体延長内 × 高さ min(底版厚, 敷高))を除く。
-        // 川裏側: たて壁 2×1.5×3.4 + 0.5×3.4 + 1.5×0.5 = 12.65、
-        //         底版 2×2.5×0.5 − 1.7×0.5 + 2×1.5×0.5 + 1.5×2.0 = 6.15 → 左右で 37.6
-        // 川表側: たて壁 2×2.0×3.9 + 0.6×3.9 + 2.0×0.6 = 19.14、
-        //         底版 2×3.1×0.6 − 2.1×0.6 + 2×2.0×0.6 + 2.0×2.5 = 9.86 → 左右で 58.0
+        // テスト4a2: 胸壁の型枠。底版は左右つながった 1 枚で、前後の端面のうち函体延長の中にあるものは
+        // 函体の底版の中に入る部分(外形幅 2.8 × min(底版厚, 敷高))を除く。
+        // 川裏側: たて壁 (2×1.5×3.4 + 0.5×3.4 + 1.5×0.5) × 2 = 25.3、
+        //         底版 左右端面 2×2.5×0.5 = 2.5 + 前後端面 2×5.8×0.5 − 2.8×0.5(S 1.7 の面だけ函体内)= 4.4
+        //              + 上面 2×1.5×2.0 = 6.0 → 12.9 → 38.2
+        // 川表側: たて壁 (2×2.0×3.9 + 0.6×3.9 + 2.0×0.6) × 2 = 38.28、
+        //         底版 2×3.1×0.6 = 3.72 + 2×6.8×0.6 − 2.8×0.6(S 17.9 の面)= 6.48 + 2×2.0×2.5 = 10.0 → 20.2 → 58.48
         [Xunit.Fact]
-        public void BreastFormwork_ExcludesFaceTouchingBarrel()
+        public void BreastFormwork_ExcludesFaceInsideBarrel()
         {
             Hikan.Core.HikanParameters p = Full();
             p.CutoffCount = 0;
-            Xunit.Assert.Equal(95.600m, Hikan.Core.HikanEstimator.Calculate(p).FormworkBreast);
+            Xunit.Assert.Equal(96.680m, Hikan.Core.HikanEstimator.Calculate(p).FormworkBreast);
+        }
+
+        // テスト4a3: 左右の底版は函体の下を通って 1 枚につながる(U = ±(外形半幅 + 張出し長))。
+        // 函体との重なりは BoxOverlapVolume で 1 回だけ差し引かれ、独立のスラブ分解とも一致する。
+        [Xunit.Fact]
+        public void BreastFooting_IsContinuousUnderBarrel()
+        {
+            Hikan.Core.HikanParameters p = Full();
+            p.CutoffCount = 0;
+            System.Collections.Generic.Dictionary<string, Hikan.Core.HikanPart> byName =
+                new System.Collections.Generic.Dictionary<string, Hikan.Core.HikanPart>();
+            foreach (Hikan.Core.HikanPart part in Hikan.Core.HikanGeometry.GetParts(p))
+            {
+                byName[part.Name] = part;
+            }
+            Hikan.Core.HikanPart up = byName["川裏側胸壁底版"];
+            Xunit.Assert.Equal(-2.9m, up.UMin);
+            Xunit.Assert.Equal(2.9m, up.UMax);
+            Xunit.Assert.Equal(0.1m, up.VMin);
+            Xunit.Assert.Equal(0.6m, up.VMax);
+            Hikan.Core.HikanPart down = byName["川表側胸壁底版"];
+            Xunit.Assert.Equal(-3.4m, down.UMin);
+            Xunit.Assert.Equal(3.4m, down.UMax);
+            Xunit.Assert.Equal(0.0m, down.VMin);
+
+            // 函体との重なり: 川裏側 2.8 × 0.5 × 1.7 = 2.38、川表側 2.8 × 0.6 × (20 − 17.9) = 3.528
+            Xunit.Assert.Equal(2.38m + 3.528m, Hikan.Core.HikanGeometry.BoxOverlapVolume(p));
+            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p), SlabVolume(p));
+
+            // 底版厚が函体の底版厚より厚ければ函体の下(V < 0)に出る
+            p.UpstreamBreast.FootingThickness = 0.8m;
+            Xunit.Assert.Equal(-0.2m, Hikan.Core.HikanGeometry.ExpectedExtents(p).MinZ);
+            Xunit.Assert.Equal(Hikan.Core.HikanGeometry.ModelVolume(p), SlabVolume(p));
         }
 
         // テスト4b: 胸壁は左右で同一形状(中心線 U = 0 について鏡映)で、函体側面に接し、函体とは重ならないこと。
@@ -220,9 +256,11 @@ namespace Hikan.Core.Tests
             }
 
             string[] bases = new string[] { "川裏側胸壁", "川表側胸壁" };
-            string[] pieces = new string[] { "たて壁", "底版" };
+            string[] pieces = new string[] { "たて壁" };
             foreach (string b in bases)
             {
+                Hikan.Core.HikanPart footing = byName[b + "底版"];
+                Xunit.Assert.Equal(-footing.UMax, footing.UMin);
                 foreach (string piece in pieces)
                 {
                     Hikan.Core.HikanPart left = byName[b + "左" + piece];
@@ -331,14 +369,14 @@ namespace Hikan.Core.Tests
             Hikan.Core.HikanPart upStem = byName["川裏側胸壁右たて壁"];
             Xunit.Assert.Equal(4.75m, upStem.SMin);
             Xunit.Assert.Equal(5.25m, upStem.SMax);
-            Hikan.Core.HikanPart upFoot = byName["川裏側胸壁右底版"];
+            Hikan.Core.HikanPart upFoot = byName["川裏側胸壁底版"];
             Xunit.Assert.Equal(3.95m, upFoot.SMin);   // つま先は川裏側へ 0.8
             Xunit.Assert.Equal(6.45m, upFoot.SMax);   // かかとは函体中央側へ 1.2
 
             Hikan.Core.HikanPart downStem = byName["川表側胸壁左たて壁"];
             Xunit.Assert.Equal(13.7m, downStem.SMin);
             Xunit.Assert.Equal(14.3m, downStem.SMax);
-            Hikan.Core.HikanPart downFoot = byName["川表側胸壁左底版"];
+            Hikan.Core.HikanPart downFoot = byName["川表側胸壁底版"];
             Xunit.Assert.Equal(12.2m, downFoot.SMin); // かかとは函体中央側へ 1.5
             Xunit.Assert.Equal(15.3m, downFoot.SMax); // つま先は川表側へ 1.0
 

@@ -149,7 +149,8 @@ namespace Hikan.Core.Tests
             (decimal Union, decimal Overlap) c = HikanWingTests.ColumnIntegral(p, 0.05m);
             decimal model = Hikan.Core.HikanGeometry.ModelVolume(p);
             AssertClose(model, c.Union, model * 0.002m, "合併体積");
-            AssertClose(Hikan.Core.HikanGeometry.WingOverlapVolume(p, null), c.Overlap, 0.01m, "重なり体積");
+            AssertClose(Hikan.Core.HikanGeometry.WingOverlapVolume(p, null) + Hikan.Core.HikanGeometry.BoxOverlapVolume(p),
+                c.Overlap, 0.01m, "重なり体積");
         }
 
         // テスト5: エクステント・床掘り範囲に保護部が入ること。

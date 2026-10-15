@@ -40,7 +40,7 @@ namespace Hikan.Core
         /// <summary>川裏側胸壁(左右に 1 基ずつ)。つま先版は川裏側に伸びる。</summary>
         public HikanBreastWall UpstreamBreast { get; set; } = new HikanBreastWall { Position = 1.000m };
         /// <summary>川表側胸壁(左右に 1 基ずつ)。つま先版は川表側に伸びる。</summary>
-        public HikanBreastWall DownstreamBreast { get; set; } = new HikanBreastWall { Position = 19.000m };
+        public HikanBreastWall DownstreamBreast { get; set; } = new HikanBreastWall { Position = 18.000m };
 
         // --- 翼壁(U 字の 3 面張り水路)。函体端から外へ。必ず設置する(側壁厚 0 は旧図面の「設置なし」)。 ---
         /// <summary>川裏側翼壁(左右に 1 基ずつ)。川裏函体端(S = 0)から川裏へ伸びる。</summary>

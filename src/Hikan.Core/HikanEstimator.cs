@@ -15,10 +15,11 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 胸壁 1 端ぶん(左右 2 基)の型枠面積 [m2]。
-        /// たて壁は上下流 2 面 + 外側端面 + 天端。函体側面に接する内側端面は計上しない。
-        /// 底版は内外の側面 + 両端面 + つま先版・かかと版の上面。地盤と接する下面は計上しない。
-        /// 底版の上面は敷高なので、函体側の側面は函体側面に接する(函体延長内かつ Z ≥ 0 の部分を除く)。
+        /// 胸壁 1 端ぶんの型枠面積 [m2]。
+        /// たて壁(左右)は上下流 2 面 + 外側端面 + 天端。函体側面に接する内側端面は計上しない。
+        /// 底版は左右つながった 1 枚の版で、左右の端面 + 前後の端面 + 函体の左右のつま先版・かかと版の上面。
+        /// 前後の端面のうち函体延長の中にあるものは、函体の底版の中に入る部分(外形幅 × min(底版厚, 敷高))を除く。
+        /// 地盤と接する下面、函体端より外の函体幅の上面(翼壁の底版などに覆われる)は計上しない。
         /// </summary>
         private static decimal BreastFormwork(HikanParameters p, HikanBreastWall w, bool upstream)
         {
@@ -28,14 +29,16 @@ namespace Hikan.Core
             decimal stem = 2m * w.Length * stemHeight
                 + w.StemThickness * stemHeight
                 + w.Length * w.StemThickness;
+            decimal width = p.OuterWidth + 2m * w.Length;
             (decimal Min, decimal Max) foot = HikanGeometry.BreastFootingRange(w, upstream);
-            decimal contactLength = System.Math.Max(0m,
-                System.Math.Min(foot.Max, p.BarrelLength) - System.Math.Max(foot.Min, 0m));
-            decimal contactHeight = System.Math.Min(w.FootingThickness, top);
-            decimal footing = 2m * w.FootingLength * w.FootingThickness - contactLength * contactHeight
-                + 2m * w.Length * w.FootingThickness
-                + w.Length * (w.ToeLength + w.HeelLength);
-            return 2m * (stem + footing);
+            decimal hidden = p.OuterWidth * System.Math.Min(w.FootingThickness, top);
+            decimal ends = 2m * width * w.FootingThickness;
+            if (foot.Min > 0m && foot.Min < p.BarrelLength) { ends -= hidden; }
+            if (foot.Max > 0m && foot.Max < p.BarrelLength) { ends -= hidden; }
+            decimal footing = 2m * w.FootingLength * w.FootingThickness
+                + ends
+                + 2m * w.Length * (w.ToeLength + w.HeelLength);
+            return 2m * stem + footing;
         }
 
         /// <summary>しゃ水壁の型枠面積 [m2]。外周面 + 前後の環状面。</summary>
@@ -120,8 +123,8 @@ namespace Hikan.Core
             e.ConcreteVolume = RoundHalfUp(HikanGeometry.ModelVolume(p), Digits);
 
             // 胸壁は左右 2 基の合計(函体と重ならない)。しゃ水壁は函体と重なる部分を控除した正味。
-            e.UpstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(p, p.UpstreamBreast), Digits);
-            e.DownstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(p, p.DownstreamBreast), Digits);
+            e.UpstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(p, p.UpstreamBreast, true), Digits);
+            e.DownstreamBreastVolume = RoundHalfUp(HikanGeometry.BreastWallVolume(p, p.DownstreamBreast, false), Digits);
             e.CutoffTotalVolume = RoundHalfUp(HikanGeometry.CutoffVolume(p), Digits);
             e.CutoffSpacing = p.CutoffCount > 0 ? RoundHalfUp(l / p.CutoffCount, Digits) : 0m;
 
@@ -130,8 +133,12 @@ namespace Hikan.Core
             e.UpstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallNetVolume(p, true), Digits);
             e.DownstreamWingVolume = RoundHalfUp(HikanGeometry.WingWallNetVolume(p, false), Digits);
             // 堤防保護部は翼壁と重なる部分も含めた総量で数え、その分は翼壁の正味から差し引かれている。
-            e.GateColumnVolume = RoundHalfUp(HikanGeometry.GateColumnVolume(p), Digits);
-            e.GateDeckVolume = RoundHalfUp(HikanGeometry.GateDeckVolume(p), Digits);
+            // 門柱・操作台は胸壁のたて壁と重なる(背面をそろえるため)。重なりは胸壁に含め、門柱・操作台から差し引く。
+            System.Func<string, bool> breast = m => m == "川裏側胸壁" || m == "川表側胸壁";
+            e.GateColumnVolume = RoundHalfUp(HikanGeometry.GateColumnVolume(p)
+                - HikanGeometry.OverlapBetween(p, m => m == "門柱", breast), Digits);
+            e.GateDeckVolume = RoundHalfUp(HikanGeometry.GateDeckVolume(p)
+                - HikanGeometry.OverlapBetween(p, m => m == "操作台", breast), Digits);
             e.UpstreamProtectionVolume = RoundHalfUp(HikanGeometry.ProtectionVolume(p.UpstreamWing), Digits);
             e.DownstreamProtectionVolume = RoundHalfUp(HikanGeometry.ProtectionVolume(p.DownstreamWing), Digits);
             e.UpstreamWingFlareAngle = RoundHalfUp(HikanGeometry.WingFlareAngle(p, p.UpstreamWing), Digits);

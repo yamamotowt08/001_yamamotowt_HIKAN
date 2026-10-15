@@ -86,21 +86,21 @@ namespace Hikan.AutoCAD
         public void Breast(bool upstream)
         {
             // 断面。Z = 0 は y = 20、函体の敷高(内空底面)は y = 22.5。
-            // 函体の左右に、底版(上面 = 敷高)とその上に立つたて壁が同じ幅で並ぶ。
+            // 底版(上面 = 敷高)は左右の張出し端から端まで 1 枚で函体の下を通る。ここでは底版厚 > 函体の底版厚の例。
+            Solid(7, 18.5f, 43, 18.5f, 43, 22.5f, 7, 22.5f);
             Solid(17, 20, 33, 20, 33, 34, 17, 34);
             Hollow(19.5f, 22.5f, 30.5f, 22.5f, 30.5f, 32, 19.5f, 32);
             foreach (float x0 in new float[] { 7, 33 })
             {
                 Solid(x0, 22.5f, x0 + 10, 22.5f, x0 + 10, 46, x0, 46);
-                Solid(x0, 20, x0 + 10, 20, x0 + 10, 22.5f, x0, 22.5f);
             }
             Dashed(3, 20, 47, 20);
-            Note(25, 17.5f, "Z = 0");
+            Note(25, 16.5f, "Z = 0");
             Note(25, 24.3f, "敷高");
             Dim(33, 46, 43, 46, 3, "Lw");
             Dim(43, 20, 43, 46, -3, "Hc");
-            Dim(7, 22.5f, 7, 20, -3, "tf");
-            Note(25, 50, "底版上面 = 函体の敷高");
+            Dim(7, 22.5f, 7, 18.5f, -3, "tf");
+            Note(25, 12.5f, "底版は函体の下で左右つながる");
             Title(25, 57, "断面(下流を見る)");
 
             // 側面。函体側面 x 54〜96、川裏端 S = 0 は x = 54。
@@ -111,7 +111,7 @@ namespace Hikan.AutoCAD
             float c = upstream ? 64 : 86;
             float toe = upstream ? c - 7 : c + 7;
             float heel = upstream ? c + 13 : c - 13;
-            Solid(System.Math.Min(toe, heel), 20, System.Math.Max(toe, heel), 20,
+            Solid(System.Math.Min(toe, heel), 18.5f, System.Math.Max(toe, heel), 18.5f,
                 System.Math.Max(toe, heel), 22.5f, System.Math.Min(toe, heel), 22.5f);
             Solid(c - 2, 22.5f, c + 2, 22.5f, c + 2, 46, c - 2, 46);
             Dashed(c, 14, c, 51);
@@ -120,15 +120,15 @@ namespace Hikan.AutoCAD
             Dim(c - 2, 40, c + 2, 40, 0, "t");
             if (upstream)
             {
-                Dim(toe, 20, c - 2, 20, -3, "Lt");
-                Dim(c + 2, 20, heel, 20, -3, "Lh");
-                Dim(heel, 20, heel, 22.5f, -3, "tf");
+                Dim(toe, 18.5f, c - 2, 18.5f, -3, "Lt");
+                Dim(c + 2, 18.5f, heel, 18.5f, -3, "Lh");
+                Dim(heel, 18.5f, heel, 22.5f, -3, "tf");
             }
             else
             {
-                Dim(c + 2, 20, toe, 20, -3, "Lt");
-                Dim(heel, 20, c - 2, 20, -3, "Lh");
-                Dim(heel, 20, heel, 22.5f, 3, "tf");
+                Dim(c + 2, 18.5f, toe, 18.5f, -3, "Lt");
+                Dim(heel, 18.5f, c - 2, 18.5f, -3, "Lh");
+                Dim(heel, 18.5f, heel, 22.5f, 3, "tf");
             }
             Title(76, 57, "側面(函体の側面を見る)");
         }
@@ -278,6 +278,7 @@ namespace Hikan.AutoCAD
             Note(56, 30, "← 中心");
             Note(94, 52.5f, "川表 ↑");
             Note(74, 9, "川裏");
+            Note(74, 5, "背面 = 川表側胸壁のたて壁の背面");
             Title(77, 57, "門柱の平面(右の柱)");
         }
 
