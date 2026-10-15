@@ -71,19 +71,19 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 門柱・操作台の型枠面積 [m2]。門柱は 4 側面(左右 2 本)。操作台は 4 側面 + 下面(門柱の天端と接する部分を除く)。
+        /// 門柱・操作台の型枠面積 [m2]。門柱は L 字断面の周囲(= 外接矩形の周長 2·(X4 + X5 + X7 + X8))× 柱高さ × 2 本。
+        /// 操作台は 4 側面 + 下面(門柱の天端と接する部分を除く)。管理橋の受け台(切欠き)は 3 つの立ち上がり面を加える。
         /// 操作台の上面と、門柱が頂版に接する下面は計上しない。
         /// </summary>
         private static decimal GateFormwork(HikanParameters p)
         {
             HikanGateTower g = p.Gate;
             if (!g.Exists) { return 0m; }
-            decimal h = g.CrownHeight - p.OuterHeight;
-            decimal columns = 2m * 2m * (g.ColumnThickness + g.ColumnWidth) * h;
-            decimal width = p.InnerWidth + 2m * g.ColumnThickness + 2m * g.DeckSideOverhang;
-            decimal length = g.ColumnWidth + 2m * g.DeckAxialOverhang;
-            decimal deck = 2m * (width + length) * g.DeckThickness
-                + width * length - 2m * g.ColumnThickness * g.ColumnWidth;
+            decimal columns = 2m * 2m * (g.ColumnLength + g.ColumnBreadth) * g.ColumnHeight;
+            decimal columnTop = g.TransverseWallThickness * g.ColumnBreadth + g.LongitudinalWallWidth * g.LongitudinalWallThickness;
+            decimal deck = 2m * (g.DeckLength + g.DeckWidth) * g.DeckThickness
+                + g.DeckLength * g.DeckWidth - 2m * columnTop;
+            if (g.Bridge) { deck += (2m * g.SeatLength + g.SeatWidth) * g.SeatDepth; }
             return columns + deck;
         }
 

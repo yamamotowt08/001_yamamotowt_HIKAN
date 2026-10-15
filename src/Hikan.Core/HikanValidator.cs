@@ -264,9 +264,10 @@ namespace Hikan.Core
         /// <summary>
         /// 門柱・操作台。設置しない場合は検査しない。他の部材と重ならないことをここで保証する
         /// (体積の解析解は「門柱・操作台は他と重ならない」前提で単純和にしている)。
-        /// - 門柱厚・門柱幅・操作台厚は最小部材厚 0.40 m・0.10 m ピッチ。天端高は頂版上面より高い。張出しは 0 以上。
-        /// - 門柱は函体延長の中に収まる(函体の側壁の上に立つ)。
-        /// - 門柱・操作台の S 範囲は、しゃ水壁・胸壁のたて壁の S 範囲と重ならない(接するのは可)。
+        /// - 横方向壁厚 X5・縦方向壁厚 X7・操作台高さ Y1 は最小部材厚 0.40 m・0.10 m ピッチ。柱高さは正、張出し・壁幅は 0 以上。
+        /// - 整合性: X4 + X5 + 2·X3 = X1、B + 2·(X7 + X8) + 2·X6 = X2(許容 1 mm)。
+        /// - 管理橋の受け台(切欠き)は操作台の中に収まる(W1 &lt; X1、W2 &lt; X2、H1 &lt; Y1)。
+        /// - 門柱は函体延長の中に収まる。門柱・操作台の S 範囲は、しゃ水壁・胸壁のたて壁の S 範囲と重ならない(接するのは可)。
         /// - 操作台が函体端より外へ張り出すなら、その側の翼壁・堤防保護部の天端より高い所にある。
         /// </summary>
         private static void CheckGate(System.Collections.Generic.List<string> errors, HikanParameters p)
@@ -275,15 +276,44 @@ namespace Hikan.Core
             if (!g.Exists) { return; }
             const string name = "門柱・操作台";
 
-            CheckThickness(errors, g.ColumnThickness, name + "の門柱厚");
-            CheckThickness(errors, g.ColumnWidth, name + "の門柱幅");
-            CheckThickness(errors, g.DeckThickness, name + "の操作台厚");
-            if (g.CrownHeight <= p.OuterHeight)
+            CheckThickness(errors, g.TransverseWallThickness, name + "の横方向壁厚 X5");
+            CheckThickness(errors, g.LongitudinalWallThickness, name + "の縦方向壁厚 X7");
+            CheckThickness(errors, g.DeckThickness, name + "の操作台高さ Y1");
+            if (g.LongitudinalWallWidth < 0m) { errors.Add(name + "の縦方向壁幅 X4 は 0 以上にしてください。"); }
+            if (g.TransverseWallWidth < 0m) { errors.Add(name + "の横方向壁幅 X8 は 0 以上にしてください。"); }
+            if (g.ColumnHeight <= 0m) { errors.Add(name + "の柱高さ Y2 は正の値にしてください。"); }
+            if (g.HaunchHeight < 0m) { errors.Add(name + "のハンチ高 H2 は 0 以上にしてください。"); }
+            if (g.DeckAxialOverhang < 0m) { errors.Add(name + "の操作台縦方向張出長 X3 は 0 以上にしてください。"); }
+            if (g.DeckSideOverhang < 0m) { errors.Add(name + "の操作台横方向張出長 X6 は 0 以上にしてください。"); }
+
+            decimal length = g.ColumnLength + 2m * g.DeckAxialOverhang;
+            if (System.Math.Abs(g.DeckLength - length) > Tolerance)
             {
-                errors.Add(name + "の天端高は頂版上面(" + p.OuterHeight + " m)より高くしてください。");
+                errors.Add(name + "の操作台縦方向幅 X1 = " + g.DeckLength + " m が X4 + X5 + 2 × X3 = " + length
+                    + " m と一致しません。");
             }
-            if (g.DeckSideOverhang < 0m) { errors.Add(name + "の左右の張出しは 0 以上にしてください。"); }
-            if (g.DeckAxialOverhang < 0m) { errors.Add(name + "の前後の張出しは 0 以上にしてください。"); }
+            decimal width = p.InnerWidth + 2m * g.ColumnBreadth + 2m * g.DeckSideOverhang;
+            if (System.Math.Abs(g.DeckWidth - width) > Tolerance)
+            {
+                errors.Add(name + "の操作台横方向幅 X2 = " + g.DeckWidth + " m が 内空幅 B + 2 × (X7 + X8) + 2 × X6 = " + width
+                    + " m と一致しません。");
+            }
+
+            if (g.Bridge)
+            {
+                if (g.SeatLength <= 0m || g.SeatLength >= g.DeckLength)
+                {
+                    errors.Add(name + "の操作台受け台縦方向幅 W1 は 0 より大きく操作台縦方向幅 X1 より小さくしてください。");
+                }
+                if (g.SeatWidth <= 0m || g.SeatWidth >= g.DeckWidth)
+                {
+                    errors.Add(name + "の操作台受け台横方向幅 W2 は 0 より大きく操作台横方向幅 X2 より小さくしてください。");
+                }
+                if (g.SeatDepth <= 0m || g.SeatDepth >= g.DeckThickness)
+                {
+                    errors.Add(name + "の操作台受け台高さ H1 は 0 より大きく操作台高さ Y1 より小さくしてください。");
+                }
+            }
 
             (decimal Min, decimal Max) column = g.ColumnRange;
             (decimal Min, decimal Max) deck = g.DeckRange;
@@ -331,10 +361,11 @@ namespace Hikan.Core
             {
                 top = System.Math.Max(top, HikanGeometry.WingFloorTop(p) + w.Protection.StemHeight);
             }
-            if (p.Gate.CrownHeight < top)
+            decimal deckBottom = p.OuterHeight + p.Gate.ColumnHeight;
+            if (deckBottom < top)
             {
-                errors.Add("門柱・操作台の天端高 " + p.Gate.CrownHeight + " m が" + end + "翼壁(堤防保護部を含む)の天端 " + top
-                    + " m より低く、函体端より外へ張り出した操作台が重なります。");
+                errors.Add("門柱・操作台の柱高さ Y2 では操作台の下面(" + deckBottom + " m)が" + end + "翼壁(堤防保護部を含む)の天端 "
+                    + top + " m より低く、函体端より外へ張り出した操作台が重なります。");
             }
         }
 

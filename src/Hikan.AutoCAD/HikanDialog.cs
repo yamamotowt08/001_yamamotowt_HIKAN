@@ -284,47 +284,139 @@ namespace Hikan.AutoCAD
             basic.Controls.Add(column);
         }
 
-        /// <summary>門柱・操作台のタブ。入力表の先頭に設置する/しないを置き、「設置しない」なら欄を無効にして値は保持する。</summary>
+        /// <summary>
+        /// 門柱・操作台のタブ。内側に「基本条件 / 操作台 / 門柱」のタブを持つ(記号は手本の樋門設計ソフトに合わせる)。
+        /// 基本条件は 設置する/しない・門柱形式・操作台形状形式・管理橋の設置。門柱形式は 2 本柱、操作台形状形式は
+        /// 前後・左右に張り出す単純な版だけ実装済みなので、他は表示だけして選べないようにする。
+        /// 「設置しない」なら寸法の欄を、管理橋「しない」なら受け台の欄を無効にする(値は保持)。
+        /// </summary>
         private void AddGatePage()
         {
             const string title = "門柱・操作台";
-            Page g = AddPage(title, title, s => s.Gate(),
-                "函体の左右の側壁の上に門柱を 1 本ずつ立て(左右同一、内面 = 函体の内空側面)、両柱にまたがる操作台の版を載せる。"
-                + "d は川裏函体端から門柱の中心まで。Hc は門柱の天端 = 操作台の下面の高さ(函体底版下面 Z = 0 から)。"
-                + "門柱厚・門柱幅・操作台厚は 0.40 m 以上・0.10 m ピッチ。ゲート溝・頂版の開口は作らない。");
+            Page g = new Page();
+            g.Title = title;
+            g.Prefix = title;
+            g.Tab = new System.Windows.Forms.TabPage(title);
+            pages.Add(g);
+
+            System.Windows.Forms.TabControl inner = new System.Windows.Forms.TabControl();
+            inner.Dock = System.Windows.Forms.DockStyle.Fill;
+            g.Tab.Controls.Add(inner);
+            System.Windows.Forms.TabPage basic = new System.Windows.Forms.TabPage("基本条件");
+            System.Windows.Forms.TabPage deck = new System.Windows.Forms.TabPage("操作台");
+            System.Windows.Forms.TabPage column = new System.Windows.Forms.TabPage("門柱");
+            inner.TabPages.Add(basic);
+            inner.TabPages.Add(deck);
+            inner.TabPages.Add(column);
+
+            deck.Controls.Add(BuildSheet(s => s.Gate(),
+                "操作台は両方の門柱にまたがる版。X1 = X4 + X5 + 2 × X3、X2 = 内空幅 B + 2 × (X7 + X8) + 2 × X6 になるよう入力する"
+                + "(1 mm を超えて食い違うとエラー)。受け台(W1・W2・H1)は管理橋の桁を受ける切欠きで、操作台の川裏側の端の上面を欠く。"
+                + "Y1 は 0.40 m 以上・0.10 m ピッチ。", out g.Grid));
+            g.InnerTab = deck;
+            AddField(g, "X1", "操作台縦方向幅", "m", title + "の操作台縦方向幅",
+                q => q.Gate.DeckLength, (q, v) => q.Gate.DeckLength = v);
+            AddField(g, "X2", "操作台横方向幅", "m", title + "の操作台横方向幅",
+                q => q.Gate.DeckWidth, (q, v) => q.Gate.DeckWidth = v);
+            AddField(g, "X3", "操作台縦方向張出長", "m", title + "の操作台縦方向張出長",
+                q => q.Gate.DeckAxialOverhang, (q, v) => q.Gate.DeckAxialOverhang = v);
+            AddField(g, "X6", "操作台横方向張出長", "m", title + "の操作台横方向張出長",
+                q => q.Gate.DeckSideOverhang, (q, v) => q.Gate.DeckSideOverhang = v);
+            AddField(g, "Y1", "操作台高さ", "m", title + "の操作台高さ",
+                q => q.Gate.DeckThickness, (q, v) => q.Gate.DeckThickness = v);
+            int seatFirst = g.Fields.Count;
+            AddField(g, "W1", "操作台受け台縦方向幅", "m", title + "の操作台受け台縦方向幅",
+                q => q.Gate.SeatLength, (q, v) => q.Gate.SeatLength = v);
+            AddField(g, "W2", "操作台受け台横方向幅", "m", title + "の操作台受け台横方向幅",
+                q => q.Gate.SeatWidth, (q, v) => q.Gate.SeatWidth = v);
+            AddField(g, "H1", "操作台受け台高さ", "m", title + "の操作台受け台高さ",
+                q => q.Gate.SeatDepth, (q, v) => q.Gate.SeatDepth = v);
+            System.Collections.Generic.List<Field> seatFields = g.Fields.GetRange(seatFirst, 3);
+
+            column.Controls.Add(BuildSheet(s => s.GateColumn(),
+                "門柱は函体の左右の側壁の上に立つ L 字の柱(左右同一)。内側の切欠き(X8 × X4)がゲートの溝で、横方向壁(X5)は川裏側。"
+                + "内面は函体の内空側面にそろえる。d は川裏函体端から門柱の中心(X4 + X5 の中央)まで。"
+                + "X5・X7 は 0.40 m 以上・0.10 m ピッチ。ハンチ高 H2 は保存するが、形と位置が未確定のため形状・数量には入れない。", out g.Grid));
+            g.InnerTab = column;
+            AddField(g, "d", "門柱の軸位置(川裏函体端から)", "m", title + "の軸位置",
+                q => q.Gate.Position, (q, v) => q.Gate.Position = v);
+            AddField(g, "X4", "縦方向壁幅", "m", title + "の縦方向壁幅",
+                q => q.Gate.LongitudinalWallWidth, (q, v) => q.Gate.LongitudinalWallWidth = v);
+            AddField(g, "X5", "横方向壁厚", "m", title + "の横方向壁厚",
+                q => q.Gate.TransverseWallThickness, (q, v) => q.Gate.TransverseWallThickness = v);
+            AddField(g, "X7", "縦方向壁厚", "m", title + "の縦方向壁厚",
+                q => q.Gate.LongitudinalWallThickness, (q, v) => q.Gate.LongitudinalWallThickness = v);
+            AddField(g, "X8", "横方向壁幅", "m", title + "の横方向壁幅",
+                q => q.Gate.TransverseWallWidth, (q, v) => q.Gate.TransverseWallWidth = v);
+            AddField(g, "Y2", "柱高さ(頂版上面から)", "m", title + "の柱高さ",
+                q => q.Gate.ColumnHeight, (q, v) => q.Gate.ColumnHeight = v);
+            AddField(g, "H2", "ハンチ高(形状には未反映)", "m", title + "のハンチ高",
+                q => q.Gate.HaunchHeight, (q, v) => q.Gate.HaunchHeight = v);
 
             System.Windows.Forms.RadioButton install = Choice("設置する", true);
             System.Windows.Forms.RadioButton none = Choice("設置しない", true);
             install.Checked = source.Gate.Exists;
             none.Checked = !install.Checked;
-            System.Windows.Forms.GroupBox box = Group(title, install, none);
-            box.MinimumSize = System.Drawing.Size.Empty;
-            g.Grid.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
-            g.Grid.Controls.Add(box, 0, 0);
-            g.Grid.SetColumnSpan(box, 4);
-
-            AddField(g, "d", "門柱の軸位置(川裏函体端から)", "m", title + "の軸位置",
-                q => q.Gate.Position, (q, v) => q.Gate.Position = v);
-            AddField(g, "Tc", "門柱厚(横断方向)", "m", title + "の門柱厚",
-                q => q.Gate.ColumnThickness, (q, v) => q.Gate.ColumnThickness = v);
-            AddField(g, "Wc", "門柱幅(函体軸方向)", "m", title + "の門柱幅",
-                q => q.Gate.ColumnWidth, (q, v) => q.Gate.ColumnWidth = v);
-            AddField(g, "Hc", "門柱天端高(Z = 0 から)", "m", title + "の天端高",
-                q => q.Gate.CrownHeight, (q, v) => q.Gate.CrownHeight = v);
-            AddField(g, "td", "操作台厚", "m", title + "の操作台厚",
-                q => q.Gate.DeckThickness, (q, v) => q.Gate.DeckThickness = v);
-            AddField(g, "ax", "操作台の左右の張出し", "m", title + "の左右の張出し",
-                q => q.Gate.DeckSideOverhang, (q, v) => q.Gate.DeckSideOverhang = v);
-            AddField(g, "as", "操作台の前後の張出し", "m", title + "の前後の張出し",
-                q => q.Gate.DeckAxialOverhang, (q, v) => q.Gate.DeckAxialOverhang = v);
-
+            System.Windows.Forms.RadioButton bridge = Choice("する", true);
+            System.Windows.Forms.RadioButton noBridge = Choice("しない", true);
+            bridge.Checked = source.Gate.Bridge;
+            noBridge.Checked = !bridge.Checked;
             System.Action show = delegate
             {
-                foreach (Field f in g.Fields) { f.Box.Enabled = install.Checked; }
+                foreach (Field f in g.Fields)
+                {
+                    f.Box.Enabled = install.Checked && (bridge.Checked || !seatFields.Contains(f));
+                }
             };
             install.CheckedChanged += delegate { show(); };
+            bridge.CheckedChanged += delegate { show(); };
             show();
-            g.Apply = q => q.Gate.Exists = install.Checked;
+            g.Apply = q =>
+            {
+                q.Gate.Exists = install.Checked;
+                q.Gate.Bridge = bridge.Checked;
+            };
+
+            System.Windows.Forms.RadioButton twoColumns = IconChoice("2 本柱", true, HikanIcons.TwoColumns);
+            twoColumns.Checked = true;
+            System.Windows.Forms.RadioButton standardDeck = IconChoice("形式 4", true, HikanIcons.DeckType4);
+            standardDeck.Checked = true;
+
+            System.Windows.Forms.FlowLayoutPanel list = new System.Windows.Forms.FlowLayoutPanel();
+            list.Dock = System.Windows.Forms.DockStyle.Fill;
+            list.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
+            list.WrapContents = false;
+            list.AutoScroll = true;
+            list.Padding = new System.Windows.Forms.Padding(12);
+            list.Controls.Add(Group("門柱・操作台", install, none));
+            list.Controls.Add(Group("門柱形式", twoColumns, IconChoice("3 本柱", false, HikanIcons.ThreeColumns), Later()));
+            list.Controls.Add(Group("操作台形状形式",
+                IconChoice("形式 1", false, HikanIcons.DeckType1), IconChoice("形式 2", false, HikanIcons.DeckType2),
+                IconChoice("形式 3", false, HikanIcons.DeckType3), standardDeck,
+                IconChoice("形式 5", false, HikanIcons.DeckType5), IconChoice("形式 6", false, HikanIcons.DeckType6), Later()));
+            list.Controls.Add(Group("管理橋の設置", noBridge, bridge));
+            basic.Controls.Add(list);
+        }
+
+        /// <summary>絵付きの選択ボタン(手本の画面のように形を絵で示す)。</summary>
+        private static System.Windows.Forms.RadioButton IconChoice(string text, bool enabled, System.Action<System.Drawing.Graphics> draw)
+        {
+            System.Windows.Forms.RadioButton r = Choice(text, enabled);
+            r.Image = HikanIcons.Render(draw, enabled);
+            r.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
+            r.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
+            r.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
+            return r;
+        }
+
+        private static System.Windows.Forms.Label Later()
+        {
+            System.Windows.Forms.Label later = new System.Windows.Forms.Label();
+            later.Text = "灰色の形式は今後対応予定";
+            later.ForeColor = System.Drawing.Color.DimGray;
+            later.AutoSize = true;
+            later.Margin = new System.Windows.Forms.Padding(12, 9, 3, 3);
+            return later;
         }
 
         private static System.Windows.Forms.RadioButton Choice(string text, bool enabled)

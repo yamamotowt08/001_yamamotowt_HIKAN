@@ -45,12 +45,24 @@ namespace Hikan.Core
             Add(list, "gate_exists", g.Exists ? "設置する" : "設置しない", "", "入力");
             if (!g.Exists) { return; }
             Add(list, "gate_position", F(g.Position), "m", "入力");
-            Add(list, "gate_column_thickness", F(g.ColumnThickness), "m", "入力");
-            Add(list, "gate_column_width", F(g.ColumnWidth), "m", "入力");
-            Add(list, "gate_crown_height", F(g.CrownHeight), "m", "入力");
-            Add(list, "gate_deck_thickness", F(g.DeckThickness), "m", "入力");
-            Add(list, "gate_deck_side_overhang", F(g.DeckSideOverhang), "m", "入力");
+            Add(list, "gate_deck_length", F(g.DeckLength), "m", "入力");
+            Add(list, "gate_deck_width", F(g.DeckWidth), "m", "入力");
             Add(list, "gate_deck_axial_overhang", F(g.DeckAxialOverhang), "m", "入力");
+            Add(list, "gate_deck_side_overhang", F(g.DeckSideOverhang), "m", "入力");
+            Add(list, "gate_deck_thickness", F(g.DeckThickness), "m", "入力");
+            Add(list, "gate_bridge", g.Bridge ? "する" : "しない", "", "入力");
+            if (g.Bridge)
+            {
+                Add(list, "gate_seat_length", F(g.SeatLength), "m", "入力");
+                Add(list, "gate_seat_width", F(g.SeatWidth), "m", "入力");
+                Add(list, "gate_seat_depth", F(g.SeatDepth), "m", "入力");
+            }
+            Add(list, "gate_longitudinal_wall_width", F(g.LongitudinalWallWidth), "m", "入力");
+            Add(list, "gate_transverse_wall_thickness", F(g.TransverseWallThickness), "m", "入力");
+            Add(list, "gate_longitudinal_wall_thickness", F(g.LongitudinalWallThickness), "m", "入力");
+            Add(list, "gate_transverse_wall_width", F(g.TransverseWallWidth), "m", "入力");
+            Add(list, "gate_column_height", F(g.ColumnHeight), "m", "入力");
+            Add(list, "gate_haunch_height", F(g.HaunchHeight), "m", "入力(形状・数量には未反映)");
         }
 
         private static void AddWing(System.Collections.Generic.List<HikanItem> list, HikanWingWall w, string prefix)
@@ -155,7 +167,7 @@ namespace Hikan.Core
             "函体端近くの胸壁の底版が函体端より外へ出て翼壁(厚い底版など)と重なる場合、重なった部分は一体のコンクリートとして 1 回だけ数え、胸壁の数量に含めて翼壁の数量から差し引きます。",
             "胸壁は函体の左右側面にそれぞれ取り付く逆T字擁壁(たて壁 + 底版)としてモデル化しています。左右は同一形状で、入力は片側分です。底版上面は函体の敷高(内空底面)にそろえ、たて壁は敷高から立ち上がります。つま先版長またはかかと版長を 0 にすれば L 字になります。",
             "堤防保護部は翼壁の端部から左右へ張り出す逆T字擁壁(たて壁 + 底版、つま先版は水路床の下で左右つながる)としてモデル化しています。底版は上面 = 敷高、厚さ = 翼壁の底版厚です。翼壁と重なる部分は堤防保護部の数量に含め、翼壁の数量から差し引きます。堤防保護部の型枠は計上していません。",
-            "門柱・ゲート操作台は、函体の左右の側壁の上に立つ矩形の門柱 2 本と、両柱にまたがる操作台の版としてモデル化しています。ゲート溝(戸当り)・頂版の開口・ゲート設備・管理橋は含みません。床掘りの平面範囲には含めず、埋戻しの控除は現地盤(頂版上面 + 土かぶり)より下の部分だけです。",
+            "門柱・ゲート操作台は、函体の左右の側壁の上に立つ L 字断面の門柱 2 本(内側の切欠きがゲートの溝、横方向壁は川裏側)と、両柱にまたがる操作台の版としてモデル化しています。門柱形式は 2 本柱、操作台形状形式は前後・左右に張り出す単純な版のみです。管理橋を設置する場合は操作台の川裏側の端に桁受けの切欠き(受け台)を作り、管理橋そのものは作りません。左柱ハンチ高 H2 は形と位置が未確定のため、形状・数量に入れていません。床掘りの平面範囲には含めず、埋戻しの控除は現地盤(頂版上面 + 土かぶり)より下の部分だけです。",
             "胸壁・翼壁は必ず設置します(たて壁厚・側壁厚 0.40 m 以上)。厚 0 は旧版で作った図面の「設置なし」としてのみ読み込みます。",
             "上流端を川裏とします。胸壁のたて壁は函体方向に垂直で、軸位置(川裏函体端からたて壁厚の中心までの斜距離)を中心に置き、函体延長の内側に収めます。函体の上は跨ぎません。",
             "胸壁のつま先版は近い方の函体端の側(川裏側胸壁は川裏、川表側胸壁は川表)、かかと版は函体中央の側に伸びます。つま先版は函体端より外へ出てもかまいません。",

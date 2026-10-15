@@ -2,47 +2,83 @@ namespace Hikan.Core
 {
     /// <summary>
     /// 門柱・ゲート操作台。函体の左右の側壁の上に門柱を 1 本ずつ立て(左右同一)、両柱にまたがる操作台の版を載せる。
-    /// ゲート溝(戸当り)・頂版の開口は作らない。
+    /// 記号は手本の樋門設計ソフトの「形状寸法」画面(操作台 / 門柱タブ)に合わせる。
+    /// 門柱形式は 2 本柱、操作台形状形式は前後・左右に張り出す単純な版のみ(他の形式は未対応)。
     ///
-    ///   正面(下流を見る)                          側面
-    ///   ┌───────────────────┐ ← 操作台(厚 td)        ├as┤      ├as┤
-    ///   └─┬──┬───────────┬──┬─┘                       ┌──────────────┐ ← 操作台
-    ///     │  │           │  │  ↑                      └──┬────────┬──┘
-    ///     │門│           │門│  Hc(門柱天端高 =          │  門柱  │  Hc
-    ///     │柱│           │柱│     操作台下面、Z=0 から)  │        │
-    ///   ┌─┴──┴───────────┴──┴─┐ ← 頂版上面          ────┴────────┴──── 頂版上面
-    ///   │ ┌───────────────┐ │                            ├── Wc ──┤
-    ///   │ │      内空      │ │                        d = 川裏函体端から門柱の中心まで
-    ///   │ └───────────────┘ │
-    ///   └───────────────────┘
-    ///     ├Tc┤ 門柱厚(内面 = 内空側面)    操作台は門柱の外面から左右に ax 張り出す
+    ///   正面(下流を見る)                              側面
+    ///   ├──────────── X2 ────────────┤                 ├─────── X1 ───────┤
+    ///   ┌────────────┬────┬────────────┐ ↕Y1           ┌────────────┬─W1─┐ ← 受け台(管理橋の桁受け切欠き、
+    ///   └──┬──┬──────┴────┴──────┬──┬──┘               └──┬────┬──┬─┴────┘    深さ H1、正面で幅 W2、川裏側の端)
+    ///   ├X6┤  │                  │  ├X6┤                ├X3┤    │  ├X3┤
+    ///      │  │                  │  │  ↕Y2(柱高さ)        │縦壁│横│
+    ///   ───┴──┴──────────────────┴──┴─── 頂版上面          ├X4──┼X5┤  川表 ←→ 川裏
+    ///      ├X7┼X8┤  内空幅 B   ├X8┼X7┤
+    ///
+    ///   門柱の平面(右の柱、上が川表):         ├X8┼X7┤
+    ///                                       切欠き │▓▓│ X4  ← 縦方向壁(厚 X7)
+    ///                                       ├──┼──┤
+    ///                                       │▓▓│▓▓│ X5  ← 横方向壁(厚 X5、川裏側)
+    ///   内面(X8 の内側の端)= 函体の内空側面。切欠き(X8 × X4)はゲートの通る溝。
     /// </summary>
     public sealed class HikanGateTower
     {
         /// <summary>設置するか(既定は設置する)。キーが無い旧 XData は設置しないとして読む。</summary>
         public bool Exists { get; set; } = true;
-        /// <summary>d: 川裏函体端から門柱の中心までの距離(底版下面に沿う斜距離)[m]</summary>
+        /// <summary>d: 川裏函体端から門柱の中心(縦方向の全長 X4 + X5 の中央)までの距離 [m]</summary>
         public decimal Position { get; set; } = 17.000m;
-        /// <summary>Tc: 門柱厚(横断方向、内面 = 函体の内空側面)[m]</summary>
-        public decimal ColumnThickness { get; set; } = 0.600m;
-        /// <summary>Wc: 門柱幅(函体軸方向)[m]</summary>
-        public decimal ColumnWidth { get; set; } = 1.000m;
-        /// <summary>Hc: 門柱天端高 = 操作台下面の高さ(函体底版下面 Z = 0 から)[m]</summary>
-        public decimal CrownHeight { get; set; } = 7.000m;
-        /// <summary>td: 操作台厚 [m]</summary>
-        public decimal DeckThickness { get; set; } = 0.400m;
-        /// <summary>ax: 操作台の左右の張出し(門柱の外面から)[m]</summary>
-        public decimal DeckSideOverhang { get; set; } = 0.500m;
-        /// <summary>as: 操作台の前後の張出し(門柱の川裏側・川表側の面から)[m]</summary>
-        public decimal DeckAxialOverhang { get; set; } = 0.500m;
 
-        /// <summary>門柱の S 範囲 = 軸位置 ± 門柱幅/2</summary>
-        public (decimal Min, decimal Max) ColumnRange
+        /// <summary>X1: 操作台縦方向幅(函体軸方向)[m]。X4 + X5 + 2·X3 と一致すること。</summary>
+        public decimal DeckLength { get; set; } = 2.700m;
+        /// <summary>X2: 操作台横方向幅 [m]。B + 2·(X7 + X8) + 2·X6 と一致すること。</summary>
+        public decimal DeckWidth { get; set; } = 5.800m;
+        /// <summary>X3: 操作台縦方向張出長(門柱の川表側・川裏側の面から)[m]</summary>
+        public decimal DeckAxialOverhang { get; set; } = 0.700m;
+        /// <summary>X6: 操作台横方向張出長(門柱の外面から)[m]</summary>
+        public decimal DeckSideOverhang { get; set; } = 1.100m;
+        /// <summary>Y1: 操作台高さ(厚さ)[m]</summary>
+        public decimal DeckThickness { get; set; } = 0.600m;
+
+        /// <summary>管理橋を設置するか。設置するなら操作台の川裏側の端に桁受けの切欠き(受け台)を作る。管理橋そのものは作らない。</summary>
+        public bool Bridge { get; set; } = true;
+        /// <summary>W1: 操作台受け台縦方向幅(操作台の川裏側の端から)[m]</summary>
+        public decimal SeatLength { get; set; } = 0.400m;
+        /// <summary>W2: 操作台受け台横方向幅(中央)[m]</summary>
+        public decimal SeatWidth { get; set; } = 1.400m;
+        /// <summary>H1: 操作台受け台高さ(操作台上面からの切欠きの深さ)[m]</summary>
+        public decimal SeatDepth { get; set; } = 0.300m;
+
+        /// <summary>X4: 縦方向壁幅(切欠きのある区間の函体軸方向の長さ)[m]</summary>
+        public decimal LongitudinalWallWidth { get; set; } = 0.900m;
+        /// <summary>X5: 横方向壁厚(函体軸方向、川裏側)[m]</summary>
+        public decimal TransverseWallThickness { get; set; } = 0.400m;
+        /// <summary>X7: 縦方向壁厚(横断方向、外側)[m]</summary>
+        public decimal LongitudinalWallThickness { get; set; } = 0.400m;
+        /// <summary>X8: 横方向壁幅(横断方向、内側 = 切欠きの幅)[m]</summary>
+        public decimal TransverseWallWidth { get; set; } = 0.400m;
+        /// <summary>Y2: 柱高さ(頂版上面から操作台下面まで)[m]</summary>
+        public decimal ColumnHeight { get; set; } = 6.400m;
+        /// <summary>H2: ハンチ高 [m]。値は保存するが、形と位置が未確定のため形状・数量には入れない。</summary>
+        public decimal HaunchHeight { get; set; } = 0.200m;
+
+        /// <summary>門柱の函体軸方向の全長 = X4 + X5</summary>
+        public decimal ColumnLength
         {
-            get { return (Position - ColumnWidth / 2m, Position + ColumnWidth / 2m); }
+            get { return LongitudinalWallWidth + TransverseWallThickness; }
         }
 
-        /// <summary>操作台の S 範囲 = 門柱の範囲 ± 前後の張出し。門柱を含むので、門柱・操作台全体の S 範囲でもある。</summary>
+        /// <summary>門柱の横断方向の全幅 = X7 + X8</summary>
+        public decimal ColumnBreadth
+        {
+            get { return LongitudinalWallThickness + TransverseWallWidth; }
+        }
+
+        /// <summary>門柱の S 範囲 = 軸位置 ± (X4 + X5)/2</summary>
+        public (decimal Min, decimal Max) ColumnRange
+        {
+            get { return (Position - ColumnLength / 2m, Position + ColumnLength / 2m); }
+        }
+
+        /// <summary>操作台の S 範囲 = 門柱の範囲 ± X3。門柱を含むので、門柱・操作台全体の S 範囲でもある。</summary>
         public (decimal Min, decimal Max) DeckRange
         {
             get
@@ -57,15 +93,27 @@ namespace Hikan.Core
             System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
             d[prefix + "exists"] = Exists ? "1" : "0";
             d[prefix + "position"] = Position.ToString(inv);
-            d[prefix + "column_thickness"] = ColumnThickness.ToString(inv);
-            d[prefix + "column_width"] = ColumnWidth.ToString(inv);
-            d[prefix + "crown_height"] = CrownHeight.ToString(inv);
-            d[prefix + "deck_thickness"] = DeckThickness.ToString(inv);
-            d[prefix + "deck_side_overhang"] = DeckSideOverhang.ToString(inv);
+            d[prefix + "deck_length"] = DeckLength.ToString(inv);
+            d[prefix + "deck_width"] = DeckWidth.ToString(inv);
             d[prefix + "deck_axial_overhang"] = DeckAxialOverhang.ToString(inv);
+            d[prefix + "deck_side_overhang"] = DeckSideOverhang.ToString(inv);
+            d[prefix + "deck_thickness"] = DeckThickness.ToString(inv);
+            d[prefix + "bridge"] = Bridge ? "1" : "0";
+            d[prefix + "seat_length"] = SeatLength.ToString(inv);
+            d[prefix + "seat_width"] = SeatWidth.ToString(inv);
+            d[prefix + "seat_depth"] = SeatDepth.ToString(inv);
+            d[prefix + "longitudinal_wall_width"] = LongitudinalWallWidth.ToString(inv);
+            d[prefix + "transverse_wall_thickness"] = TransverseWallThickness.ToString(inv);
+            d[prefix + "longitudinal_wall_thickness"] = LongitudinalWallThickness.ToString(inv);
+            d[prefix + "transverse_wall_width"] = TransverseWallWidth.ToString(inv);
+            d[prefix + "column_height"] = ColumnHeight.ToString(inv);
+            d[prefix + "haunch_height"] = HaunchHeight.ToString(inv);
         }
 
-        /// <summary>キーが無い項目は既定値のまま残す。ただし設置有無のキーが無い旧 XData は門柱を持たないので「設置しない」として読む。</summary>
+        /// <summary>
+        /// キーが無い項目は既定値のまま残す。ただし設置有無のキーが無い旧 XData は門柱を持たないので「設置しない」として読む。
+        /// 第4段階の初版(門柱厚・門柱幅・天端高で入力していた版)のキーは使わない。
+        /// </summary>
         public void Read(
             System.Collections.Generic.IDictionary<string, string> d,
             string prefix,
@@ -73,12 +121,21 @@ namespace Hikan.Core
         {
             Exists = get(d, prefix + "exists", 0m) != 0m;
             Position = get(d, prefix + "position", Position);
-            ColumnThickness = get(d, prefix + "column_thickness", ColumnThickness);
-            ColumnWidth = get(d, prefix + "column_width", ColumnWidth);
-            CrownHeight = get(d, prefix + "crown_height", CrownHeight);
-            DeckThickness = get(d, prefix + "deck_thickness", DeckThickness);
-            DeckSideOverhang = get(d, prefix + "deck_side_overhang", DeckSideOverhang);
+            DeckLength = get(d, prefix + "deck_length", DeckLength);
+            DeckWidth = get(d, prefix + "deck_width", DeckWidth);
             DeckAxialOverhang = get(d, prefix + "deck_axial_overhang", DeckAxialOverhang);
+            DeckSideOverhang = get(d, prefix + "deck_side_overhang", DeckSideOverhang);
+            DeckThickness = get(d, prefix + "deck_thickness", DeckThickness);
+            Bridge = get(d, prefix + "bridge", Bridge ? 1m : 0m) != 0m;
+            SeatLength = get(d, prefix + "seat_length", SeatLength);
+            SeatWidth = get(d, prefix + "seat_width", SeatWidth);
+            SeatDepth = get(d, prefix + "seat_depth", SeatDepth);
+            LongitudinalWallWidth = get(d, prefix + "longitudinal_wall_width", LongitudinalWallWidth);
+            TransverseWallThickness = get(d, prefix + "transverse_wall_thickness", TransverseWallThickness);
+            LongitudinalWallThickness = get(d, prefix + "longitudinal_wall_thickness", LongitudinalWallThickness);
+            TransverseWallWidth = get(d, prefix + "transverse_wall_width", TransverseWallWidth);
+            ColumnHeight = get(d, prefix + "column_height", ColumnHeight);
+            HaunchHeight = get(d, prefix + "haunch_height", HaunchHeight);
         }
     }
 }

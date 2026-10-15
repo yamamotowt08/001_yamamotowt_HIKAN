@@ -282,21 +282,31 @@ namespace Hikan.AutoCAD
         }
 
         /// <summary>
-        /// 門柱・操作台を付ける。門柱は川表側の函体端に寄せ(軸位置 19.5、幅 1.0 → 19.0〜20.0)、
-        /// 操作台は前後に 0.5 張り出して函体端より外(翼壁の上、天端 7.0 > 翼壁 4.0)へ出す。
-        /// 門柱厚 0.6 を函体の側壁厚 0.4 より厚くして、門柱が函体の外面より外へ出る形も確かめる。
+        /// 門柱・操作台を付ける。門柱(L 字、X4 0.9 / X5 0.5 / X7 0.5 / X8 0.4、柱高さ 6.0)は川表側の函体端に寄せ
+        /// (軸位置 19.3 → 18.6〜20.0)、操作台は前後に X3 0.7 張り出して函体端より外(翼壁の上)へ出す。
+        /// X7 ≠ X8・X4 ≠ X5 にして、横方向壁の向き(川裏側)や内外の取り違えを重心で検出できるようにする。
+        /// 管理橋ありで、操作台の川裏側の端に受け台(桁受けの切欠き)を作る。
+        /// 内空幅 2.0 なので X1 = 1.4 + 1.4 = 2.8、X2 = 2.0 + 2 × 0.9 + 2 × 1.1 = 6.0。
         /// </summary>
         private static Hikan.Core.HikanParameters WithGate(Hikan.Core.HikanParameters p)
         {
             Hikan.Core.HikanGateTower g = p.Gate;
             g.Exists = true;
-            g.Position = 19.5m;
-            g.ColumnThickness = 0.6m;
-            g.ColumnWidth = 1.0m;
-            g.CrownHeight = 7.0m;
-            g.DeckThickness = 0.4m;
-            g.DeckSideOverhang = 0.5m;
-            g.DeckAxialOverhang = 0.5m;
+            g.Position = 19.3m;
+            g.LongitudinalWallWidth = 0.9m;
+            g.TransverseWallThickness = 0.5m;
+            g.LongitudinalWallThickness = 0.5m;
+            g.TransverseWallWidth = 0.4m;
+            g.ColumnHeight = 6.0m;
+            g.DeckAxialOverhang = 0.7m;
+            g.DeckSideOverhang = 1.1m;
+            g.DeckLength = 2.8m;
+            g.DeckWidth = 6.0m;
+            g.DeckThickness = 0.6m;
+            g.Bridge = true;
+            g.SeatLength = 0.4m;
+            g.SeatWidth = 1.4m;
+            g.SeatDepth = 0.3m;
             return p;
         }
 

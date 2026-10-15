@@ -104,7 +104,7 @@ namespace Hikan.AutoCAD
             return true;
         }
 
-        /// <summary>門柱・操作台。設置しないなら残りは聞かない。</summary>
+        /// <summary>門柱・操作台(記号は手本の樋門設計ソフトに合わせる)。設置しないなら残りは聞かない。</summary>
         private static bool PromptGate(Autodesk.AutoCAD.EditorInput.Editor ed, Hikan.Core.HikanGateTower g)
         {
             decimal d;
@@ -114,18 +114,37 @@ namespace Hikan.AutoCAD
             if (!g.Exists) { return true; }
             if (!GetDecimal(ed, "門柱 d 軸位置 [m] (川裏函体端から門柱の中心まで)", g.Position, out d)) { return false; }
             g.Position = d;
-            if (!GetDecimal(ed, "門柱 Tc 厚 [m] (横断方向、内面 = 内空側面)", g.ColumnThickness, out d)) { return false; }
-            g.ColumnThickness = d;
-            if (!GetDecimal(ed, "門柱 Wc 幅 [m] (函体軸方向)", g.ColumnWidth, out d)) { return false; }
-            g.ColumnWidth = d;
-            if (!GetDecimal(ed, "門柱 Hc 天端高 [m] (= 操作台下面、函体底版下面から)", g.CrownHeight, out d)) { return false; }
-            g.CrownHeight = d;
-            if (!GetDecimal(ed, "操作台 td 厚 [m]", g.DeckThickness, out d)) { return false; }
-            g.DeckThickness = d;
-            if (!GetDecimal(ed, "操作台 ax 左右の張出し [m] (門柱の外面から)", g.DeckSideOverhang, out d)) { return false; }
-            g.DeckSideOverhang = d;
-            if (!GetDecimal(ed, "操作台 as 前後の張出し [m] (門柱の面から)", g.DeckAxialOverhang, out d)) { return false; }
+            if (!GetDecimal(ed, "門柱 X4 縦方向壁幅 [m] (切欠きのある区間、川表側)", g.LongitudinalWallWidth, out d)) { return false; }
+            g.LongitudinalWallWidth = d;
+            if (!GetDecimal(ed, "門柱 X5 横方向壁厚 [m] (川裏側)", g.TransverseWallThickness, out d)) { return false; }
+            g.TransverseWallThickness = d;
+            if (!GetDecimal(ed, "門柱 X7 縦方向壁厚 [m] (外側)", g.LongitudinalWallThickness, out d)) { return false; }
+            g.LongitudinalWallThickness = d;
+            if (!GetDecimal(ed, "門柱 X8 横方向壁幅 [m] (内側、切欠きの幅)", g.TransverseWallWidth, out d)) { return false; }
+            g.TransverseWallWidth = d;
+            if (!GetDecimal(ed, "門柱 Y2 柱高さ [m] (頂版上面から操作台下面まで)", g.ColumnHeight, out d)) { return false; }
+            g.ColumnHeight = d;
+            if (!GetDecimal(ed, "門柱 H2 ハンチ高 [m] (保存のみ、形状には未反映)", g.HaunchHeight, out d)) { return false; }
+            g.HaunchHeight = d;
+            if (!GetDecimal(ed, "操作台 X1 縦方向幅 [m] (= X4 + X5 + 2 × X3)", g.DeckLength, out d)) { return false; }
+            g.DeckLength = d;
+            if (!GetDecimal(ed, "操作台 X2 横方向幅 [m] (= 内空幅 + 2 × (X7 + X8) + 2 × X6)", g.DeckWidth, out d)) { return false; }
+            g.DeckWidth = d;
+            if (!GetDecimal(ed, "操作台 X3 縦方向張出長 [m]", g.DeckAxialOverhang, out d)) { return false; }
             g.DeckAxialOverhang = d;
+            if (!GetDecimal(ed, "操作台 X6 横方向張出長 [m]", g.DeckSideOverhang, out d)) { return false; }
+            g.DeckSideOverhang = d;
+            if (!GetDecimal(ed, "操作台 Y1 高さ [m]", g.DeckThickness, out d)) { return false; }
+            g.DeckThickness = d;
+            if (!GetInt(ed, "管理橋の設置 (1 = する / 0 = しない)", g.Bridge ? 1 : 0, out n)) { return false; }
+            g.Bridge = n != 0;
+            if (!g.Bridge) { return true; }
+            if (!GetDecimal(ed, "操作台 W1 受け台縦方向幅 [m] (川裏側の端の桁受け切欠き)", g.SeatLength, out d)) { return false; }
+            g.SeatLength = d;
+            if (!GetDecimal(ed, "操作台 W2 受け台横方向幅 [m] (中央)", g.SeatWidth, out d)) { return false; }
+            g.SeatWidth = d;
+            if (!GetDecimal(ed, "操作台 H1 受け台高さ [m] (切欠きの深さ)", g.SeatDepth, out d)) { return false; }
+            g.SeatDepth = d;
             return true;
         }
 

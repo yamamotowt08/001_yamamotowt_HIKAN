@@ -251,8 +251,12 @@ namespace Hikan.Core
         }
 
         /// <summary>
-        /// 門柱・操作台。門柱は函体の左右の側壁の上(頂版上面 V = 外形高)から天端 Hc まで立ち、内面を内空側面(±B/2)にそろえる。
-        /// 操作台は V = Hc から厚 td、U は門柱の外面から左右に ax、S は門柱の範囲から前後に as 張り出す。
+        /// 門柱・操作台。門柱は函体の左右の側壁の上(頂版上面 V = 外形高)から柱高さ Y2 まで立つ L 字の柱で、
+        /// 内面(横方向壁の内側の端)を内空側面(±B/2)にそろえる。重ならない直方体に分けて作る:
+        ///   横方向壁 … U [B/2, B/2 + X8 + X7] × S [柱の川裏側の面, + X5]
+        ///   縦方向壁 … U [B/2 + X8, B/2 + X8 + X7] × S [横方向壁の川表側の面, + X4](内側の X8 × X4 は切欠き)
+        /// 操作台は V = 外形高 + Y2 から厚 Y1、U は ±X2/2、S は門柱の範囲 ± X3。管理橋を設置するなら、
+        /// 川裏側の端の上面を W1 × W2(中央)× 深さ H1 で欠く(切欠きを避けて直方体に分ける)。
         /// 門柱と頂版、門柱と操作台は面で接するだけで重ならない。他の部材と重ならないことは HikanValidator が保証する。
         /// </summary>
         private static void AddGate(System.Collections.Generic.List<HikanPart> parts, HikanParameters p)
@@ -260,37 +264,76 @@ namespace Hikan.Core
             HikanGateTower g = p.Gate;
             if (!g.Exists) { return; }
             decimal inner = p.InnerWidth / 2m;
-            decimal outer = inner + g.ColumnThickness;
+            decimal bottom = p.OuterHeight;
+            decimal top = bottom + g.ColumnHeight;
             (decimal Min, decimal Max) column = g.ColumnRange;
-            (decimal Min, decimal Max) deck = g.DeckRange;
+            decimal split = column.Min + g.TransverseWallThickness;
 
-            HikanPart right = Box("門柱右", inner, outer, p.OuterHeight, g.CrownHeight, column.Min, column.Max, false);
-            HikanPart left = Box("門柱左", -outer, -inner, p.OuterHeight, g.CrownHeight, column.Min, column.Max, false);
-            decimal half = outer + g.DeckSideOverhang;
-            HikanPart top = Box("操作台", -half, half, g.CrownHeight, g.CrownHeight + g.DeckThickness, deck.Min, deck.Max, false);
-            foreach (HikanPart part in new HikanPart[] { right, left, top })
+            System.Collections.Generic.List<HikanPart> gate = new System.Collections.Generic.List<HikanPart>();
+            for (int k = 0; k < 2; k++)
             {
+                bool right = k == 1;
+                string side = "門柱" + (right ? "右" : "左");
+                gate.Add(Mirrored(side + "横方向壁", right, inner, inner + g.ColumnBreadth,
+                    bottom, top, column.Min, split));
+                gate.Add(Mirrored(side + "縦方向壁", right, inner + g.TransverseWallWidth, inner + g.ColumnBreadth,
+                    bottom, top, split, column.Max));
+            }
+
+            (decimal Min, decimal Max) deck = g.DeckRange;
+            decimal half = g.DeckWidth / 2m;
+            decimal deckTop = top + g.DeckThickness;
+            if (!g.Bridge)
+            {
+                gate.Add(Box("操作台", -half, half, top, deckTop, deck.Min, deck.Max, false));
+            }
+            else
+            {
+                // 受け台(桁受けの切欠き)は川裏側(S の小さい側)の端。切欠きの周りを 4 つの直方体に分ける。
+                decimal seatEnd = deck.Min + g.SeatLength;
+                decimal seatBottom = deckTop - g.SeatDepth;
+                decimal seatHalf = g.SeatWidth / 2m;
+                gate.Add(Box("操作台", -half, half, top, deckTop, seatEnd, deck.Max, false));
+                gate.Add(Box("操作台受け台下", -half, half, top, seatBottom, deck.Min, seatEnd, false));
+                gate.Add(Box("操作台受け台左", -half, -seatHalf, seatBottom, deckTop, deck.Min, seatEnd, false));
+                gate.Add(Box("操作台受け台右", seatHalf, half, seatBottom, deckTop, deck.Min, seatEnd, false));
+            }
+
+            foreach (HikanPart part in gate)
+            {
+                // 縦方向壁幅 X4 や横方向壁幅 X8 が 0 の場合など、厚さ 0 の直方体は作らない(矩形の柱になる)。
+                if (part.UMax <= part.UMin || part.VMax <= part.VMin || part.SMax <= part.SMin) { continue; }
                 part.IsSuperstructure = true;
                 parts.Add(part);
             }
         }
 
-        /// <summary>門柱 2 本の体積 [m3] = 2 × Tc × Wc × (Hc − 外形高)。</summary>
+        /// <summary>右側(U ≥ 0)の範囲 [a, b] で直方体を作り、左側なら中心線について鏡映する。</summary>
+        private static HikanPart Mirrored(string name, bool right, decimal a, decimal b,
+            decimal vMin, decimal vMax, decimal sMin, decimal sMax)
+        {
+            return right
+                ? Box(name, a, b, vMin, vMax, sMin, sMax, false)
+                : Box(name, -b, -a, vMin, vMax, sMin, sMax, false);
+        }
+
+        /// <summary>門柱 2 本の体積 [m3] = 2 × Y2 × (X5 × (X7 + X8) + X4 × X7)(L 字の断面積 × 高さ)。</summary>
         public static decimal GateColumnVolume(HikanParameters p)
         {
             HikanGateTower g = p.Gate;
             if (!g.Exists) { return 0m; }
-            return 2m * g.ColumnThickness * g.ColumnWidth * (g.CrownHeight - p.OuterHeight);
+            decimal area = g.TransverseWallThickness * g.ColumnBreadth + g.LongitudinalWallWidth * g.LongitudinalWallThickness;
+            return 2m * g.ColumnHeight * area;
         }
 
-        /// <summary>操作台の体積 [m3] = td × (B + 2·Tc + 2·ax) × (Wc + 2·as)。</summary>
+        /// <summary>操作台の体積 [m3] = Y1 × X1 × X2 − (管理橋ありなら)W1 × W2 × H1。</summary>
         public static decimal GateDeckVolume(HikanParameters p)
         {
             HikanGateTower g = p.Gate;
             if (!g.Exists) { return 0m; }
-            return g.DeckThickness
-                * (p.InnerWidth + 2m * g.ColumnThickness + 2m * g.DeckSideOverhang)
-                * (g.ColumnWidth + 2m * g.DeckAxialOverhang);
+            decimal v = g.DeckThickness * g.DeckLength * g.DeckWidth;
+            if (g.Bridge) { v -= g.SeatLength * g.SeatWidth * g.SeatDepth; }
+            return v;
         }
 
         /// <summary>
